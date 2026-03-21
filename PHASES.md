@@ -11,6 +11,7 @@ Backlog is a personal web application designed to streamline the software engine
 Backlog fixes this by aggregating job postings in real time from community-maintained GitHub repositories like [SimplifyJobs/New-Grad-Positions](https://github.com/SimplifyJobs/New-Grad-Positions) and normalizing everything into a single, clean feed. It also tracks every job you've applied to, where you are in the interview process, helps you prepare for interviews, and generates tailored application materials — all in one place.
 
 **The core loop:**
+
 1. New jobs are discovered and normalized automatically from GitHub sources
 2. You see a clean, filtered feed of relevant roles ranked by recency and match score
 3. You get alerted (email, browser push, or SMS) when a high-match job drops
@@ -27,19 +28,30 @@ Backlog is primarily a personal tool, but it's architected for multiple users. A
 
 ### Tech Stack
 
-| Layer | Choice | Why |
-|---|---|---|
-| Frontend | **Next.js (App Router)** | SSR, API routes, Vercel-native, excellent DX |
-| Styling | **Tailwind CSS** | Fast, consistent, utility-first |
-| Animations | **Framer Motion** | Spring physics, staggered entrances, gesture support |
-| Backend | **Next.js API Routes + Render (worker)** | API routes for app logic; Render runs background aggregation workers on a cron schedule |
-| Database | **Supabase (PostgreSQL)** | Free tier, built-in auth, real-time subscriptions, great JS SDK |
-| LLM — High Frequency | **GPT-4o-mini (OpenAI)** | Cheap, fast, used for job normalization (runs on every new posting) |
-| LLM — Quality Tasks | **Claude Sonnet 4.6 (Anthropic)** | Used for cover letters, resume tailoring, STAR responses — fewer calls, higher stakes |
-| Notifications | **Resend (email) + Web Push API + Twilio (SMS)** | Multi-channel alerts for new high-match jobs |
-| PDF Parsing | **pdf-parse or pdfjs-dist** | Extract raw text from uploaded resume PDFs |
-| Charts | **Recharts** | Composable, React-native chart library |
-| Hosting | **Vercel (frontend) + Render (workers)** | Both have generous free tiers |
+| Layer                  | Choice                                           | Why                                                                                      |
+| ---------------------- | ------------------------------------------------ | ---------------------------------------------------------------------------------------- |
+| Frontend               | **Next.js (App Router)**                         | SSR, API routes, Vercel-native, file-based routing maps cleanly to app pages             |
+| Styling                | **Tailwind CSS**                                 | Utility-first, fast to iterate, consistent without a component library                   |
+| Animations             | **Framer Motion**                                | Spring physics, staggered entrances, gesture support — page transitions, card entrances   |
+| Drag & Drop            | **@dnd-kit/core**                                | Modern accessible DnD primitive; Framer Motion handles animation on top                  |
+| Rich Text              | **Tiptap**                                       | Headless rich text editor for application notes — stores as ProseMirror JSON             |
+| Command Palette        | **cmdk**                                         | Headless command menu primitive powering Cmd+K fuzzy search                               |
+| Backend                | **Next.js API Routes + Render (worker)**         | API routes for app logic; Render runs background aggregation workers on cron              |
+| Database               | **Supabase (PostgreSQL)**                        | Managed Postgres with built-in auth, RLS, and real-time subscriptions                   |
+| LLM — High Frequency   | **GPT-4o-mini (OpenAI)**                         | $0.15/1M tokens, fast — job normalization, match scoring, URL job extraction             |
+| LLM — Quality Tasks    | **Claude Sonnet 4.6 (Anthropic)**                | Cover letters, resume tailoring, STAR responses, extension open-ended field answers       |
+| Email Notifications    | **Resend**                                       | Simple REST API for transactional email, generous free tier                               |
+| Push Notifications     | **Web Push API**                                 | Native browser push — no third-party service, works across Chrome and Firefox             |
+| SMS Notifications      | **Twilio**                                       | SMS as high-urgency channel — can be deferred if overkill for personal use               |
+| File Storage           | **Supabase Storage**                             | Stores resume uploads and generated PDFs; `resume_url` and `pdf_url` fields point here   |
+| PDF Parsing            | **pdf-parse**                                    | Lightweight server-side text extraction from uploaded resume PDFs                         |
+| PDF Generation         | **@react-pdf/renderer**                          | Generates tailored resume PDFs server-side — lighter than Puppeteer, no headless browser  |
+| Charts                 | **Recharts**                                     | Composable, React-native chart library                                                    |
+| Unit/Integration Tests | **Vitest**                                       | Better ESM support than Jest for Next.js 14+, fast, same assertion API                   |
+| API Mocking (tests)    | **MSW (Mock Service Worker)**                    | Intercepts fetch in tests — no real API calls to OpenAI/Anthropic/GitHub in CI           |
+| E2E Tests              | **Playwright**                                   | Real browser E2E runner — tests full user flows; unrelated to extension DOM manipulation  |
+| Hosting                | **Vercel (frontend) + Render (workers)**         | Both have generous free tiers; Render handles long-running cron jobs Vercel can't         |
+| Browser Extension      | **Chrome MV3 + Firefox MV2 compat**              | MV3 required for Chrome Web Store; thin MV2 shim for Firefox                             |
 
 ### Architecture Overview
 
@@ -57,13 +69,20 @@ Backlog is primarily a personal tool, but it's architected for multiple users. A
                         │ API Routes + Supabase SDK
 ┌───────────────────────▼──────────────────────────────────┐
 │                  Supabase (PostgreSQL)                    │
-│  - jobs              (normalized job postings)            │
-│  - applications      (user pipeline + notes)             │
-│  - users             (profile, resume text, preferences) │
-│  - cover_letters     (generated letters per application) │
-│  - company_profiles  (description, Q&A bank, metadata)   │
-│  - sources           (GitHub repos + fetch schedule)     │
-│  - notifications     (alert preferences per user)        │
+│  - jobs                  (normalized postings)           │
+│  - applications          (user pipeline + notes)         │
+│  - application_timeline  (full status change history)    │
+│  - users                 (full structured profile)       │
+│  - work_history          (structured work entries)       │
+│  - education             (structured education entries)  │
+│  - saved_answers         (pre-written common answers)    │
+│  - resume_versions       (tailored resume PDFs per job)  │
+│  - match_scores          (lazy-cached per user per job)  │
+│  - cover_letters         (per application, not per job)  │
+│  - company_profiles      (description, Q&A bank)         │
+│  - sources               (GitHub repos + fetch schedule) │
+│  - notification_log      (alert log per user/channel)    │
+│  - api_keys              (user-scoped extension tokens)  │
 │  - Real-time subscriptions → live feed updates           │
 └───────────────────────▲──────────────────────────────────┘
                         │ writes normalized jobs
@@ -73,6 +92,7 @@ Backlog is primarily a personal tool, but it's architected for multiple users. A
 │  - GitHub API fetches latest commits / markdown diffs    │
 │  - GPT-4o-mini normalizes raw entries into DB schema     │
 │  - Deduplication before writing                          │
+│  - Upserts minimal company_profiles stub per new company │
 │  - Triggers notification pipeline for matching users     │
 └──────────────────────────────────────────────────────────┘
                         │ alerts
@@ -80,26 +100,64 @@ Backlog is primarily a personal tool, but it's architected for multiple users. A
 │              Notification Service                         │
 │  - Resend → email alerts                                 │
 │  - Web Push API → browser push notifications             │
-│  - Twilio → SMS to registered phone number              │
+│  - Twilio → SMS to registered phone number               │
+│  - Deduplication: checks notification_log before sending │
 └──────────────────────────────────────────────────────────┘
 ```
 
-### Database Schema (High-Level)
+### Database Schema (Full)
 
 **`jobs`**
-- `id`, `title`, `company`, `location`, `salary_min`, `salary_max`, `url`, `source`, `posted_at`, `fetched_at`, `description`, `tags[]`, `is_remote`, `experience_level`, `company_id`
+- `id`, `title`, `company`, `company_id`, `location`, `salary_min`, `salary_max`, `url`, `source` (github | manual), `posted_at`, `fetched_at`, `description`, `tags[]`, `is_remote`, `experience_level`
+- `source` distinguishes automated aggregation (`github`) from user-pasted manual entries (`manual`)
 
 **`applications`**
-- `id`, `user_id`, `job_id`, `status` (saved | applied | phone_screen | technical | final | offer | rejected), `applied_at`, `notes`, `recruiter_name`, `recruiter_email`, `last_updated`
+- `id`, `user_id`, `job_id`, `status` (saved | applied | phone_screen | technical | final | offer | rejected), `applied_at`, `notes` (`jsonb` — Tiptap ProseMirror format), `recruiter_name`, `recruiter_email`, `last_updated`
 
-**`users`**
-- `id`, `email`, `phone`, `resume_text`, `resume_url`, `preferred_locations[]`, `preferred_salary_min`, `skills[]`, `experience_level`, `notification_email`, `notification_push`, `notification_sms`, `alert_match_threshold`
+**`application_timeline`** ← full status history; enables timeline UI in detail panel
+- `id`, `application_id`, `from_status`, `to_status`, `changed_at`, `note`
 
-**`cover_letters`**
-- `id`, `user_id`, `job_id`, `template_type` (formal | casual | startup), `content`, `created_at`
+**`users`** ← full structured profile; source of truth for extension auto-fill
+- `id`, `email`, `full_name`, `phone`, `address`
+- `linkedin_url`, `github_url`, `portfolio_url`
+- `citizenship_status`, `visa_sponsorship_required` (bool), `willing_to_relocate` (bool)
+- `resume_text`, `resume_url`
+- `preferred_locations[]`, `preferred_salary_min`, `preferred_role_types[]`, `remote_preference` (remote | hybrid | onsite | any)
+- `skills[]`, `experience_level`, `years_of_experience`
+- `notification_email` (bool), `notification_push` (bool), `notification_sms` (bool)
+- `notification_quiet_hours_start` (time), `notification_quiet_hours_end` (time)
+- `alert_match_threshold`
+
+**`work_history`** ← structured work entries; used by extension to fill work experience sections
+- `id`, `user_id`, `company`, `title`, `start_date`, `end_date`, `is_current` (bool), `description`
+
+**`education`** ← structured education entries; used by extension to fill education sections
+- `id`, `user_id`, `school`, `degree`, `field_of_study`, `gpa`, `graduation_year`
+
+**`saved_answers`** ← pre-written answers to common application questions
+- `id`, `user_id`, `question`, `answer`
+- Extension checks these before falling back to LLM generation for open-ended fields
+
+**`star_responses`** ← STAR method prep responses per company, reusable across applications
+- `id`, `user_id`, `company_id` (nullable — some responses are general-purpose), `question`, `situation`, `task`, `action`, `result`, `full_response`, `created_at`, `updated_at`
+- Surfaced in per-application Prep tab; used as few-shot context when extension calls LLM for open-ended answers
+
+**`push_subscriptions`** ← browser push subscription objects, one per device/browser
+- `id`, `user_id`, `endpoint`, `p256dh`, `auth`, `created_at`
+- Required by Web Push API to push to a specific browser; stored when user enables push notifications
+
+**`resume_versions`** ← tailored resumes per job, never overwrites base resume
+- `id`, `user_id`, `job_id`, `content_text`, `pdf_url`, `created_at`
+
+**`match_scores`** ← lazy-computed and cached; invalidated when resume changes
+- `id`, `user_id`, `job_id`, `score`, `rationale`, `computed_at`, `is_stale` (bool)
+- UNIQUE constraint on `(user_id, job_id)` — upsert on conflict, never accumulate duplicates
+
+**`cover_letters`** ← linked to application_id; handles reapplication edge case
+- `id`, `user_id`, `application_id`, `template_type` (formal | casual | startup), `content`, `pdf_url` (nullable — generated on finalize, used by extension for file attachment), `created_at`
 
 **`company_profiles`**
-- `id`, `name`, `description`, `glassdoor_rating`, `headcount_range`, `funding_stage`, `behavioral_questions[]`, `technical_questions[]`, `last_updated`
+- `id`, `name`, `description`, `glassdoor_rating` (nullable — populated via third-party API, not LLM), `headcount_range`, `funding_stage`, `behavioral_questions[]`, `technical_questions[]`, `last_updated`
 
 **`sources`**
 - `id`, `name`, `type` (github), `url`, `last_fetched_at`, `fetch_interval_minutes`
@@ -107,99 +165,174 @@ Backlog is primarily a personal tool, but it's architected for multiple users. A
 **`notification_log`**
 - `id`, `user_id`, `job_id`, `channel` (email | push | sms), `sent_at`
 
+**`api_keys`** ← user-scoped tokens for browser extension authentication
+- `id`, `user_id`, `key_hash`, `label`, `last_used_at`, `created_at`, `revoked_at`
+
+### RLS Policy Summary
+
+| Table | Authenticated Read | Write |
+|---|---|---|
+| `jobs` | All users | Service role only (aggregation worker + URL extractor API) |
+| `company_profiles` | All users | Service role only |
+| `match_scores` | Own rows | Own rows (server-side on demand) |
+| `applications` | Own rows (`user_id = auth.uid()`) | Own rows |
+| `application_timeline` | Via application ownership | Via application ownership |
+| `users` | Own row | Own row |
+| `work_history` | Own rows | Own rows |
+| `education` | Own rows | Own rows |
+| `saved_answers` | Own rows | Own rows |
+| `resume_versions` | Own rows | Own rows |
+| `cover_letters` | Own rows | Own rows |
+| `notification_log` | Own rows | Service role (dispatcher writes) |
+| `push_subscriptions` | Own rows | Own rows |
+| `star_responses` | Own rows | Own rows |
+| `api_keys` | Own rows | Own rows |
+| `sources` | All users | Service role only |
+
+### Auto-Fill Flow (End-to-End)
+
+```
+1. User sees a job in Backlog feed → clicks "Auto-Apply"
+2. ATS page opens in a new tab (Greenhouse, Lever, Workday, etc.)
+3. Extension content script activates, traverses DOM, detects all form fields
+4. Extension loads user's structured profile from local cache (fetched on init, one API call)
+5. Standard fields filled via DOM manipulation — no LLM:
+     Name, email, phone, address
+     LinkedIn, GitHub, portfolio URLs
+     Work authorization / citizenship / visa sponsorship
+     Work history entries (company, title, dates, description)
+     Education (school, degree, GPA, graduation year)
+     Skills, years of experience
+6. Open-ended text fields:
+     a. Check saved_answers for a matching pre-written response → use it
+     b. Fall back to Claude Sonnet: profile + STAR responses as context → generate answer
+7. Resume and cover letter attached to file upload fields
+8. Extension popup shows a review panel — all filled values visible and editable
+9. User reviews, adjusts if needed, clicks the site's native Submit button
+10. Extension detects submission (navigation event or XHR success response)
+    → Calls Backlog API → status set to "Applied", applied_at stamped
+    → application_timeline row written
+    → Toast in Backlog: "Marked as Applied"
+```
+
+**Workday note:** Workday uses Angular-rendered inputs that ignore direct `value` assignment. The extension must dispatch synthetic `InputEvent` and `change` events after setting values. Supported on a best-effort basis — some Workday forms may require manual correction in the review step.
+
+### "Add Job from URL" Flow
+
+```
+User pastes URL into "Add Job from URL" input in Backlog feed
+→ Backend detects URL pattern:
+    boards.greenhouse.io/*  → Greenhouse Jobs API → clean structured JSON
+    jobs.lever.co/*         → Lever Postings API  → clean structured JSON
+    Other static pages      → server-side HTML fetch + GPT-4o-mini extraction
+    JS-rendered / fails     → prompt user: "Open this page in Chrome and click
+                               'Add to Backlog' in the extension"
+→ Job normalized and written to jobs table with source = 'manual'
+→ Job appears in feed; can be auto-applied like any aggregated job
+
+Alternative: on any job posting page, click "Add to Backlog" in the extension popup.
+Content script extracts JD from the already-rendered page (no server-side fetch needed)
+and sends it to the Backlog API. Works on all sites including Workday.
+```
+
 ### Job Sources (Phase 1 Scope)
 
-| Source | Method | Update Frequency |
-|---|---|---|
-| SimplifyJobs/New-Grad-Positions | GitHub API — poll for new commits, parse markdown diff | Every 15 min |
-| SimplifyJobs/Summer2025-Internships | GitHub API | Every 15 min |
-| Other community GitHub job repos | GitHub API | Every 30 min |
+| Source                              | Method                                                 | Update Frequency |
+| ----------------------------------- | ------------------------------------------------------ | ---------------- |
+| SimplifyJobs/New-Grad-Positions     | GitHub API — poll for new commits, parse markdown diff | Every 15 min     |
+| SimplifyJobs/Summer2025-Internships | GitHub API                                             | Every 15 min     |
+| Other community GitHub job repos    | GitHub API                                             | Every 30 min     |
+| User-pasted URLs                    | Greenhouse/Lever public API or HTML fetch + LLM parse  | On demand        |
 
 Additional sources (LinkedIn, Indeed, Glassdoor) are deferred to a future phase due to scraping complexity and ToS considerations.
 
 ### LLM Strategy
 
-| Task | Model | Rationale |
-|---|---|---|
-| Job normalization (title, salary, location, skills extraction) | GPT-4o-mini | High frequency, low cost ($0.15/1M tokens), fast |
-| Resume match scoring | GPT-4o-mini | Runs per job per user, needs to be cheap |
-| Resume tailoring for a specific job | Claude Sonnet 4.6 | Quality matters, fewer calls |
-| Cover letter generation | Claude Sonnet 4.6 | Nuanced writing, template adherence |
-| STAR method response drafting | Claude Sonnet 4.6 | Structured, thoughtful output |
-| Cover letter template selection | Claude Sonnet 4.6 | Reads job/company tone, picks formal/casual/startup |
+| Task                                                           | Model             | Rationale                                                                      |
+| -------------------------------------------------------------- | ----------------- | ------------------------------------------------------------------------------ |
+| Job normalization (title, salary, location, skills extraction) | GPT-4o-mini       | High frequency, low cost, fast                                                 |
+| URL-pasted job extraction (non-Greenhouse/Lever)               | GPT-4o-mini       | Same normalization pipeline, on demand                                         |
+| Resume match scoring                                           | GPT-4o-mini       | Lazy + cached in `match_scores`; invalidated on resume change                  |
+| Resume tailoring for a specific job                            | Claude Sonnet 4.6 | Quality matters, fewer calls                                                   |
+| Cover letter generation                                        | Claude Sonnet 4.6 | Nuanced writing, template adherence                                             |
+| STAR method response drafting                                  | Claude Sonnet 4.6 | Structured, thoughtful output                                                  |
+| Cover letter template selection                                | Claude Sonnet 4.6 | Reads job/company tone, picks formal/casual/startup                            |
+| Extension: open-ended question answers                         | Claude Sonnet 4.6 | Only invoked after checking saved_answers; standard fields use local profile   |
 
 ### Key Features
 
 **Real-Time Job Feed**
+
 - Supabase real-time subscriptions push new jobs to the UI without a page refresh
 - Jobs sorted by `posted_at` — newest first, always
 - "Just posted" badge on jobs under 3 hours old
-- Resume match score (0–100%) on every card with a short LLM rationale
+- Cursor-based infinite scroll — 25 jobs per page, fetches next batch on scroll
+- "Add Job from URL" — paste any job link; Backlog normalizes and adds it to your feed
+
+**Match Scores**
+
+- Shown as "Upload your resume to see match scores" until Phase 5 resume upload is done — Phase 3 is never blocked on this
+- After Phase 5: computed lazily on first view per user, stored in `match_scores`, invalidated when resume changes
+- Rationale shown alongside score so you understand why it matched
 
 **Filters & Search**
-- Location (city, state, remote, hybrid, on-site)
-- Salary range (min/max slider)
-- Experience level (new grad, mid-level, senior, staff)
-- Role type (frontend, backend, full-stack, ML/AI, infra, mobile, etc.)
-- Saved filter presets — save your default view
+
+- Location (city, state, remote, hybrid, on-site), salary range, experience level, role type
+- Saved filter presets
+
+**Profile & Settings**
+
+- Full structured profile covering everything a job application asks for
+- This profile is the sole data source for the extension's standard field filling — no LLM needed for name/email/address/work history/education
+- Pre-written answers to common questions act as the first lookup before LLM generation
+- Profile completeness indicator shows what's missing and what it affects
 
 **Resume Management**
+
 - Upload a PDF resume — text is extracted and stored in your profile
-- "Tailor for this job" button on any job detail page — Claude rewrites your resume bullets to better align with the JD, without fabricating experience
-- Original resume always preserved; tailored versions are separate
+- "Tailor for this job" — Claude rewrites your resume bullets aligned to JD, without fabricating experience
+- Tailored versions stored in `resume_versions`; base resume is never overwritten
+- PDFs generated via `@react-pdf/renderer`
 
 **Cover Letter Generator**
-- Optional — triggered by a "Generate Cover Letter" button per job
-- Three templates: `formal`, `casual`, `startup-focused`
-- LLM reads the job description and company profile to pick the best-fit template automatically
-- User can override template choice, regenerate, and edit inline before saving
-- Saved per application
+
+- Optional; triggered per job
+- Claude reads JD + company profile + resume → selects template → generates letter
+- Inline editor; saved to `cover_letters` by `application_id`
 
 **Application Pipeline / Kanban**
+
+- Drag-and-drop via `@dnd-kit/core`; Framer Motion handles animation
 - Stages: `Saved → Applied → Phone Screen → Technical → Final Round → Offer / Rejected`
-- Drag-and-drop cards between stages with smooth animation
-- Each card: company logo, role title, date applied, days since last update
-- Per-application detail panel: notes (rich text), recruiter name + email, application URL, timeline of status changes
+- Every status transition writes a row to `application_timeline`
+- Detail panel: Tiptap rich-text notes, recruiter info, full timeline
 
 **Company Intelligence Panel**
-- Every job detail page has a collapsible company panel
-- Contains: company description, industry, headcount range, funding stage, Glassdoor rating (where available)
-- Behavioral questions this company is known to ask (community-sourced + LLM-enriched)
-- Technical questions / topics (e.g. "often asks system design for distributed caches")
-- Helps you walk into an interview having done your homework
+
+- Minimal company stub upserted during aggregation — panel is never empty
+- Phase 7 enriches stubs with full description, headcount, funding stage
+- Glassdoor ratings: populated via third-party data API, not LLM (LLM cannot look up live ratings)
+- Behavioral and technical question bank per company
 
 **Interview Prep**
-- Per-application "Prep" tab with company-specific behavioral and technical questions
-- STAR method response builder: paste a question → Claude drafts a structured response using your profile/resume as context → you edit and save it
-- Saved responses are reusable across applications to the same company or similar roles
+
+- Per-application "Prep" tab with company-specific questions
+- STAR response builder: Claude drafts using your profile → you edit and save
+- Saved responses reusable across similar applications
 
 **Alert System**
-- User configures: match score threshold, preferred role types, locations, salary floor
-- When a new job clears all thresholds, alerts fire across configured channels
-- Channels: email (Resend), browser push (Web Push API), SMS (Twilio)
-- Notification log in settings so you can see what was sent and when
 
-**Analytics Page (`/analytics`)**
+- Threshold-based alerts across email, push, SMS
+- Dispatcher checks `notification_log` before sending — no duplicate alerts
+- Quiet hours respected via `users.notification_quiet_hours_start/end`
+
+**Analytics**
+
 - Jobs posted today vs. 7-day rolling average
-- Application activity chart — toggle between weekly / monthly / yearly views
-- Application funnel: how many at each stage (applied → phone screen → technical → offer)
-- Response rate (applications that moved past "applied" / total applied)
-- Most active companies hiring right now
-- Time-to-first-response distribution (how long before you heard back)
-
-**Dashboard Mini-Stats**
-- Compact stat strip on the main dashboard: jobs posted today, your open applications, interviews this week, match score of the top new job
-- Small sparkline of your application activity over the last 30 days
-
-**Export**
-- CSV export of all application data
-- Google Sheets integration — OAuth connect once, push or sync application tracker to a sheet on demand
-
-**Auth & Access Control**
-- Supabase Auth handles login/session
-- Registration page exists but shows "Account creation is temporarily closed" on submit — no actual signup flow
-- Accounts are created manually by the admin directly in Supabase dashboard
-- Row-level security (RLS) on all tables ensures users only see their own data
+- Application activity chart — weekly / monthly / yearly
+- Application funnel from `application_timeline`
+- Response rate, time-to-first-response distribution
+- Manually-added jobs vs aggregated jobs breakdown
 
 ---
 
@@ -210,15 +343,14 @@ Additional sources (LinkedIn, Indeed, Glassdoor) are deferred to a future phase 
 - **Loading skeletons** — every async surface has a skeleton state, no blank screens
 - **Keyboard shortcuts** — `F` to focus filters, `K`/`J` to navigate job cards, `A` to mark as applied, `?` to show shortcut cheatsheet
 - **Onboarding flow** — first login prompts resume upload + notification preferences + alert configuration before showing the feed
-- **Profile completeness indicator** — subtle progress bar encouraging users to fill in skills, salary expectations, locations
-- **"Quick apply" action** — one-click to mark a job as applied directly from the feed card without opening the detail page
-- **Recruiter contact auto-detection** — when pasting a job URL into the notes, LLM attempts to extract recruiter name and email if present in the page
-- **Notification preferences page** — granular control over which events trigger which channels
+- **Profile completeness indicator** — shows what's missing and what features it unlocks (e.g. "Add work history to improve auto-fill accuracy")
+- **"Quick apply" action** — one-click to mark a job as applied directly from the feed card
+- **Recruiter contact auto-detection** — when pasting a job URL into notes, LLM attempts to extract recruiter name and email
 - **Application age indicator** — visual cue when a saved job is getting old ("applied 12 days ago — follow up?")
-- **Responsive layout** — fully usable on mobile for quick triage on the go
-- **Toast notifications** — non-blocking feedback for actions (job saved, cover letter generated, export complete)
-- **Command palette** (`Cmd+K`) — fuzzy search across jobs, applications, companies
-- **Empty state illustrations** — friendly, on-brand empty states instead of blank white boxes
+- **Responsive layout** — fully usable on mobile
+- **Toast notifications** — non-blocking feedback for all actions
+- **Command palette** (`Cmd+K`) — fuzzy search via `cmdk`
+- **Empty state illustrations** — friendly empty states instead of blank boxes
 - **Optimistic UI updates** — kanban card moves feel instant; rollback on failure
 
 ---
@@ -226,128 +358,196 @@ Additional sources (LinkedIn, Indeed, Glassdoor) are deferred to a future phase 
 ## Phases
 
 ### Phase 1 — Foundation & Auth
-- [ ] Initialize Next.js project with App Router, Tailwind CSS, Framer Motion
-- [ ] Configure Supabase project — create all tables, enable RLS, set up auth
-- [ ] Build auth pages: login, "registration closed" message on signup
+
+- [x] Initialize Next.js project with App Router, Tailwind CSS, Framer Motion, @dnd-kit/core, Tiptap, cmdk
+- [x] Configure Supabase — create all tables per schema above, enable RLS with all policies, set up auth (migration at `supabase/migrations/001_initial_schema.sql`)
+- [ ] Create Supabase Storage buckets: `resumes` (private, user-scoped) and `generated-pdfs` (private, user-scoped)
+- [x] Create Postgres trigger on `auth.users` insert → auto-creates corresponding row in `public.users` with `id = auth.uid()` — without this, the profile page has nothing to read/write
+- [x] Build auth pages: login, "registration closed" message on signup
 - [ ] Provision admin account directly in Supabase
-- [ ] Build base layout: sidebar nav, header, route structure (`/feed`, `/tracker`, `/analytics`, `/prep`, `/profile`, `/settings`)
-- [ ] Implement protected routes — redirect unauthenticated users to login
+- [x] Build base layout: sidebar nav, header, route structure (`/feed`, `/tracker`, `/analytics`, `/prep`, `/profile`, `/settings`)
+- [x] Implement protected routes — redirect unauthenticated users to login
 - [ ] Deploy skeleton app to Vercel; confirm environment variables and Supabase connection
+- [x] Set up Vitest + MSW for unit/integration tests; set up Playwright for E2E tests
+- [x] Write E2E test: unauthenticated user is redirected to login
 
 ### Phase 2 — Job Aggregation Engine
+
 - [ ] Set up Render worker service (Node.js)
 - [ ] Integrate GitHub API to poll SimplifyJobs repos for new commits
-- [ ] Parse markdown diffs to extract new job entries
-- [ ] Integrate GPT-4o-mini to normalize raw entries into `jobs` schema
-- [ ] Implement deduplication logic before DB writes
-- [ ] Schedule cron jobs (every 15 min for primary sources)
-- [ ] Write aggregated jobs to Supabase in real time
+- [ ] Parse markdown diffs to extract new job entries (`lib/github/parser.ts`)
+- [ ] Integrate GPT-4o-mini to normalize raw entries into `jobs` schema (`lib/llm/normalizer.ts`)
+- [ ] Implement deduplication logic before DB writes (deduplicate by URL; fall back to title+company hash)
+- [ ] Upsert minimal `company_profiles` stub (name + id) for each new company during aggregation — ensures company panel is never empty in Phase 3
+- [ ] Schedule cron jobs (every 15 min for primary sources, 30 min for secondary)
+- [ ] Write aggregated jobs to Supabase using service role key (never anon key)
 - [ ] Add `sources` table management and last-fetched tracking
+- [ ] Unit tests: markdown parser, normalization prompt builder, deduplication logic
+- [ ] Integration test: mock GitHub API response → worker writes correct rows to test DB
 
 ### Phase 3 — Job Feed & Discovery
+
 - [ ] Build real-time job feed UI with Supabase subscriptions
-- [ ] Job card component: title, company, location, salary, posted time, match score placeholder, "Just posted" badge
-- [ ] Job detail page/drawer: full description, company panel, apply button, save button
+- [ ] Cursor-based infinite scroll — 25 jobs per fetch, load more on scroll
+- [ ] Job card component: title, company, location, salary, posted time, "Just posted" badge
+- [ ] Match score placeholder — show "Upload your resume to see your match score" until Phase 5. Do not block Phase 3 on scoring.
+- [ ] Job detail page/drawer: full description, company panel (stub data from Phase 2 for now), apply button, save button
 - [ ] Filter sidebar: location, salary range, experience level, role type, remote toggle
 - [ ] Saved filter presets
 - [ ] Sort controls (newest, highest match, salary)
+- [ ] **"Add Job from URL"** feature:
+  - Input in feed header (or modal) for pasting a job URL
+  - Backend: detect Greenhouse/Lever URL → use their public API; other URLs → HTML fetch + GPT-4o-mini
+  - On failure (JS-rendered) → show prompt: "Open this page in Chrome and use the extension"
+  - Job written to `jobs` with `source = 'manual'`; appears in feed immediately
+  - `lib/jobs/url-extractor.ts` handles all URL → normalized job logic
 - [ ] Skeleton loading states for feed and detail
+- [ ] Integration tests: feed API route returns paginated filtered results; URL extractor identifies Greenhouse/Lever URLs correctly
+- [ ] E2E test: login → feed loads → filter by remote → jobs update; paste Greenhouse URL → job appears in feed
 
 ### Phase 4 — Application Tracker
-- [ ] Kanban board with drag-and-drop (Framer Motion)
+
+- [ ] Kanban board with drag-and-drop (`@dnd-kit/core` for DnD logic, Framer Motion for animation)
 - [ ] Application stages: Saved → Applied → Phone Screen → Technical → Final → Offer / Rejected
-- [ ] Application detail panel: notes (rich text), recruiter info, timeline, linked job
+- [ ] Every status transition writes a row to `application_timeline` — never update status without logging the change
+- [ ] Application detail panel: Tiptap rich-text notes (stored as `jsonb`), recruiter info, application URL, timeline rendered from `application_timeline`
 - [ ] "Quick apply" action from feed card
 - [ ] Application age and follow-up nudges
 - [ ] Animations: card entrance, drag physics, stage transition
+- [ ] Unit tests: status transition logic, timeline write, optimistic update rollback
+- [ ] Integration tests: PATCH /applications/:id updates status + writes timeline row
+- [ ] E2E test: drag card from Applied → Phone Screen → verify timeline shows the change
 
 ### Phase 5 — Resume & Profile
-> Profile data here powers the browser extension in Phase 10 — the richer this is, the better auto-fill works.
 
-- [ ] Profile page with structured fields:
-  - Personal: full name, email, phone, address, LinkedIn URL, GitHub URL, portfolio URL
-  - Work authorization: citizenship status, visa sponsorship required, willing to relocate
-  - Preferences: salary expectations, preferred locations, preferred role types, remote preference
-  - Experience level, years of experience
-- [ ] Work history section: structured entries (company, title, start/end dates, description) — not just resume text
-- [ ] Education section: school, degree, field of study, GPA, graduation year
-- [ ] Skills list (user-managed, also auto-extracted from resume)
-- [ ] Pre-written answers to common application questions ("Tell us about yourself", "Why are you interested in this role?")
-- [ ] PDF resume upload → text extraction via `pdf-parse`
-- [ ] Store resume text + structured profile in `users` table; display parsed preview
-- [ ] Resume match scoring: GPT-4o-mini compares resume to each job's JD, returns 0–100 score + rationale
-- [ ] Display match score + rationale on job cards and detail page
-- [ ] "Tailor resume for this job" — Claude Sonnet rewrites resume bullets aligned to JD, saved separately as a versioned PDF
-- [ ] Profile completeness indicator with per-section breakdown
+- [ ] Profile page with all structured fields from `users` schema: personal info, contact, work authorization, preferences, experience level, years of experience
+- [ ] Work history section (`work_history` table): add/edit/delete structured entries (company, title, dates, description, is_current)
+- [ ] Education section (`education` table): add/edit/delete structured entries (school, degree, field, GPA, graduation year)
+- [ ] Skills list (user-managed tags)
+- [ ] Pre-written answers (`saved_answers` table): user can add question/answer pairs for common prompts — these will be used by the extension before falling back to LLM
+- [ ] PDF resume upload → text extraction via `pdf-parse` (`lib/pdf/parser.ts`) → store in `users.resume_text`; auto-extract skills and populate suggestions
+- [ ] **Resume match scoring** (`lib/llm/matcher.ts`):
+  - Lazy: compute on first time a user views a job, not at ingest time
+  - Cache: store in `match_scores (user_id, job_id, score, rationale, computed_at, is_stale)`
+  - Invalidate: when `users.resume_text` changes, set all user's `match_scores.is_stale = true`
+  - Recompute stale scores on next view
+- [ ] Replace Phase 3 match score placeholder with real scores on job cards
+- [ ] **"Tailor resume for this job"** — Claude Sonnet rewrites resume bullets aligned to JD:
+  - Save tailored version to `resume_versions` table with `job_id` reference
+  - Generate PDF via `@react-pdf/renderer` (`lib/pdf/generator.ts`)
+  - Base `users.resume_url` is never overwritten
+- [ ] Profile completeness indicator with per-section breakdown and callouts ("Add work history to improve auto-fill accuracy")
+- [ ] Unit tests: PDF text extraction, resume version creation, score cache invalidation logic
+- [ ] Integration tests: match score API returns cached score on second call; upload new resume → existing scores marked stale
+
+> Note: The richer this profile is, the better the extension's auto-fill accuracy. Work history and education entries directly map to the most-asked sections on ATS forms.
 
 ### Phase 6 — Cover Letters
+
 - [ ] Cover letter template definitions: `formal`, `casual`, `startup-focused`
 - [ ] "Generate Cover Letter" button on job detail page
 - [ ] Claude Sonnet reads JD + company profile + user resume → selects template → generates letter
 - [ ] Inline editor for reviewing and editing generated letter
-- [ ] Save finalized letter to `cover_letters` table linked to application
+- [ ] Save finalized letter to `cover_letters` table with `application_id`
 - [ ] Template override option (user can force a specific template)
+- [ ] Unit tests: template selection logic, cover letter prompt builder
+- [ ] Integration test: generate → save → retrieve by application_id
 
 ### Phase 7 — Company Intelligence & Interview Prep
-- [ ] `company_profiles` table population: LLM-enriched descriptions from job postings
-- [ ] Company panel on job detail: description, headcount, funding, Glassdoor rating
-- [ ] Behavioral and technical question bank per company
+
+- [ ] **Enrich `company_profiles` stubs** from Phase 2 — LLM reads accumulated job postings for a company and fills in description, headcount estimate, funding stage, inferred tech stack
+- [ ] Glassdoor rating: integrate a third-party data source (Clearbit, RapidAPI wrapper, or similar) — do not use LLM for this, it cannot look up live ratings
+- [ ] Company panel on job detail now renders full enriched data
+- [ ] Behavioral and technical question bank per company (LLM-generated from job descriptions, community-sourced)
 - [ ] Per-application "Prep" tab surfacing company-specific questions
-- [ ] STAR response builder: input question → Claude drafts structured response using user profile → user edits and saves
-- [ ] Saved responses reusable across similar applications
+- [ ] STAR response builder: input question → Claude drafts structured response (S/T/A/R sections) using user profile + resume → user edits and saves to `star_responses` table
+- [ ] Saved responses linked to `company_id` (nullable for general-purpose responses); surfaced on any application to that company; used as few-shot context by extension LLM calls
+- [ ] Unit tests: STAR prompt builder, response storage/retrieval
+- [ ] E2E test: open prep tab → generate STAR response → save → verify persisted
 
 ### Phase 8 — Notifications & Alerts
-- [ ] Notification preferences UI (match threshold, role types, channels)
-- [ ] Email alerts via Resend — triggered when new job clears user thresholds
-- [ ] Browser push notifications via Web Push API
-- [ ] SMS alerts via Twilio to user's registered phone
+
+- [ ] Notification preferences UI: match threshold, role types, channels, quiet hours (maps to `users.notification_quiet_hours_start/end`)
+- [ ] Push subscription UI: "Enable browser notifications" button → calls `Notification.requestPermission()` → subscribes with VAPID public key → saves subscription to `push_subscriptions` table
+- [ ] Dispatcher (`lib/notifications/dispatcher.ts`):
+  - Before sending any alert, check `notification_log` for (user_id, job_id, channel) — skip if already sent
+  - Respect quiet hours before sending
+  - Send across all configured channels for a matching job
+- [ ] Email alerts via Resend (`lib/notifications/email.ts`)
+- [ ] Browser push notifications via Web Push API (`lib/notifications/push.ts`) — reads `push_subscriptions` table to find user's registered browser endpoints; requires VAPID keys in env
+- [ ] SMS alerts via Twilio (`lib/notifications/sms.ts`)
 - [ ] Notification log page in settings
-- [ ] Respect quiet hours preference
+- [ ] Unit tests: threshold matching logic, quiet hours check, deduplication
+- [ ] Integration test: new job inserted → dispatcher fires for matching user → notification_log row created → second run for same job does not resend
 
 ### Phase 9 — Analytics
+
 - [ ] `/analytics` page
 - [ ] Jobs posted today + 7-day rolling average chart
 - [ ] Application activity chart with weekly / monthly / yearly toggle (Recharts)
-- [ ] Application funnel visualization (Sankey or stacked bar)
+- [ ] Application funnel visualization (stacked bar)
 - [ ] Response rate metric
 - [ ] Most active companies hiring right now
-- [ ] Time-to-first-response distribution
+- [ ] Time-to-first-response distribution (derived from `application_timeline`)
 - [ ] Dashboard mini-stats strip + 30-day sparkline
+- [ ] Breakdown of manually-added jobs (`source = 'manual'`) vs aggregated feed jobs
+- [ ] Integration tests: analytics API routes return correct aggregations
 
 ### Phase 10 — Browser Extension (Auto-Fill)
-> A Chrome extension that connects to Backlog's backend and automatically fills out job applications on external sites using the user's structured profile, tailored resume, and generated cover letter.
 
-**How it works:** The extension runs a content script inside whatever job application page the user is on (Greenhouse, Lever, Workday, iCIMS, custom portals). It reads all form field labels and input types, sends them to the Backlog API, the LLM maps each field to the user's profile data and generates answers for open-ended questions, then fills the form programmatically. The user reviews the filled form before submitting. On submit, the extension notifies Backlog and auto-moves the job to "Applied" in the kanban.
+> The extension fills job application forms on external ATS sites using your Backlog profile. You always review before submitting — the extension never submits for you.
+
+**Standard field auto-fill (no LLM):**
+The extension loads your full structured profile on init (one API call, cached for the session). For standard form fields — name, email, phone, address, LinkedIn, GitHub, work history entries, education, work authorization, citizenship, visa sponsorship — it fills directly using DOM manipulation and synthetic input events. No LLM call.
+
+**Open-ended questions (LLM):**
+For free-text prompts ("Why do you want to work here?"), the extension first checks your `saved_answers` for a match. If found, it uses that. If not, it calls Claude Sonnet with your profile + STAR responses as context to generate an answer.
+
+**Workday note:** Workday uses Angular-rendered inputs that require synthetic `InputEvent` + `change` event dispatch rather than direct `value` assignment. Supported best-effort — some forms may require manual correction in the review step.
 
 - [ ] Chrome extension scaffold (Manifest V3, content script, background service worker, popup)
-- [ ] Secure API key linking — extension authenticates against Backlog backend with a user-scoped key generated in Settings
-- [ ] Content script: DOM traversal to detect and extract all form fields (label text, input type, name attributes, dropdowns, textareas, file inputs)
-- [ ] Targeted parsers for major ATS platforms: Greenhouse, Lever, Workday, iCIMS, BambooHR — these have consistent HTML structures that improve fill accuracy
-- [ ] LLM field mapper (Claude Sonnet): receives field list + job context → returns a `{ fieldId: value }` mapping using user's structured profile
-- [ ] LLM answer generation for open-ended questions ("Why do you want to work here?", "Tell us about a challenge you overcame") using resume + company profile + STAR responses from prep
-- [ ] Cover letter attachment: if a cover letter was generated for this job in Backlog, extension attaches it to file upload fields
-- [ ] Tailored resume attachment: attaches the job-specific tailored resume PDF if one exists, otherwise falls back to base resume
-- [ ] Review UI: extension popup shows a diff-style preview of what will be filled before committing — user can edit individual fields
-- [ ] One-click fill + manual submit: extension fills all fields, user reviews, user clicks the site's native Submit button
-- [ ] Post-submit callback: extension detects successful submission and notifies Backlog API → job auto-moves to "Applied", applied_at timestamp set
-- [ ] Settings page in extension: view linked account, API key, toggle auto-detect on/off per site
-- [ ] "Initiate from Backlog" flow: clicking "Auto-Apply" on a Backlog job card opens the application URL in a new tab with the extension pre-loaded and ready
+- [ ] API key system: generate user-scoped key in Backlog Settings → stored as hash in `api_keys` table → extension authenticates with raw key, server verifies against hash
+- [ ] Extension loads full structured profile on init (one API call) and caches locally for the session
+- [ ] Content script: DOM traversal to detect all form fields (label text, input type, name/id attributes, dropdowns, textareas, file inputs)
+- [ ] Targeted parsers for major ATS platforms: Greenhouse, Lever, Workday (best-effort), iCIMS, BambooHR
+- [ ] Standard field filling from cached profile — no LLM
+- [ ] Open-ended field handling: check `saved_answers` first → fall back to Claude Sonnet
+- [ ] LLM answer generation uses STAR responses from Phase 7 as examples where relevant
+- [ ] Cover letter attachment: attaches generated cover letter for this job if one exists
+- [ ] Resume attachment: attaches `resume_versions` PDF for this job if exists, else base resume
+- [ ] Review UI: extension popup shows all filled fields with values, editable inline before confirming
+- [ ] User clicks site's native Submit button — extension never submits automatically
+- [ ] Post-submit: extension detects navigation/XHR success → calls Backlog API → job set to "Applied", `applied_at` stamped, `application_timeline` row written
+- [ ] **"Add to Backlog" button** in extension popup on any job posting page:
+  - Content script extracts page title, company, description from already-rendered DOM
+  - Sends to Backlog API → normalized via GPT-4o-mini → added as `source = 'manual'`
+  - Solves the JS-rendered page problem (browser already rendered it; no server-side fetch needed)
+  - Covers any site including Workday where URL-paste fallback fails
+- [ ] "Initiate from Backlog" flow: clicking "Auto-Apply" on a job card opens ATS URL in new tab with extension pre-loaded
+- [ ] Settings page in extension: view linked account, API key, toggle auto-detect per site
 - [ ] Firefox support (Manifest V2 compatibility layer)
+- [ ] Unit tests: standard field detection and mapping, ATS-specific DOM parsers, saved_answers lookup
+- [ ] Integration test: mock ATS form → standard fields filled without LLM call → open-ended field triggers Claude → review panel renders
 
 ### Phase 11 — Export & Integrations
+
 - [ ] CSV export of full application history
 - [ ] Google Sheets OAuth integration — push / sync tracker data on demand
 
+> Note: Google Sheets OAuth requires setting up a Google Cloud project, OAuth credentials, and a redirect URI. More infrastructure than it looks — scope this carefully.
+
 ### Phase 12 — Polish, Performance & QoL
+
 - [ ] Keyboard shortcuts (`F`, `K`/`J`, `A`, `?`, `Cmd+K`)
-- [ ] Command palette with fuzzy search (jobs, applications, companies)
-- [ ] Onboarding flow for first login
+- [ ] Command palette with fuzzy search via `cmdk` (jobs, applications, companies)
+- [ ] Onboarding flow for first login (resume upload + profile completion + notification prefs + alert config)
 - [ ] Full mobile-responsive layout audit
 - [ ] Empty state illustrations
-- [ ] Optimistic UI updates across all mutations
+- [ ] Optimistic UI updates across all mutations with rollback on failure
 - [ ] Toast notification system
 - [ ] Performance audit: lazy loading, image optimization, query caching
 - [ ] PWA manifest + service worker for offline basic functionality
+- [ ] Full E2E test suite review — cover all critical paths across phases
 
 ---
 
