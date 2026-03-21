@@ -28,30 +28,30 @@ Backlog is primarily a personal tool, but it's architected for multiple users. A
 
 ### Tech Stack
 
-| Layer                  | Choice                                           | Why                                                                                      |
-| ---------------------- | ------------------------------------------------ | ---------------------------------------------------------------------------------------- |
-| Frontend               | **Next.js (App Router)**                         | SSR, API routes, Vercel-native, file-based routing maps cleanly to app pages             |
-| Styling                | **Tailwind CSS**                                 | Utility-first, fast to iterate, consistent without a component library                   |
-| Animations             | **Framer Motion**                                | Spring physics, staggered entrances, gesture support — page transitions, card entrances   |
-| Drag & Drop            | **@dnd-kit/core**                                | Modern accessible DnD primitive; Framer Motion handles animation on top                  |
-| Rich Text              | **Tiptap**                                       | Headless rich text editor for application notes — stores as ProseMirror JSON             |
-| Command Palette        | **cmdk**                                         | Headless command menu primitive powering Cmd+K fuzzy search                               |
-| Backend                | **Next.js API Routes + Render (worker)**         | API routes for app logic; Render runs background aggregation workers on cron              |
-| Database               | **Supabase (PostgreSQL)**                        | Managed Postgres with built-in auth, RLS, and real-time subscriptions                   |
-| LLM — High Frequency   | **GPT-4o-mini (OpenAI)**                         | $0.15/1M tokens, fast — job normalization, match scoring, URL job extraction             |
-| LLM — Quality Tasks    | **Claude Sonnet 4.6 (Anthropic)**                | Cover letters, resume tailoring, STAR responses, extension open-ended field answers       |
-| Email Notifications    | **Resend**                                       | Simple REST API for transactional email, generous free tier                               |
-| Push Notifications     | **Web Push API**                                 | Native browser push — no third-party service, works across Chrome and Firefox             |
-| SMS Notifications      | **Twilio**                                       | SMS as high-urgency channel — can be deferred if overkill for personal use               |
-| File Storage           | **Supabase Storage**                             | Stores resume uploads and generated PDFs; `resume_url` and `pdf_url` fields point here   |
-| PDF Parsing            | **pdf-parse**                                    | Lightweight server-side text extraction from uploaded resume PDFs                         |
-| PDF Generation         | **@react-pdf/renderer**                          | Generates tailored resume PDFs server-side — lighter than Puppeteer, no headless browser  |
-| Charts                 | **Recharts**                                     | Composable, React-native chart library                                                    |
-| Unit/Integration Tests | **Vitest**                                       | Better ESM support than Jest for Next.js 14+, fast, same assertion API                   |
-| API Mocking (tests)    | **MSW (Mock Service Worker)**                    | Intercepts fetch in tests — no real API calls to OpenAI/Anthropic/GitHub in CI           |
-| E2E Tests              | **Playwright**                                   | Real browser E2E runner — tests full user flows; unrelated to extension DOM manipulation  |
-| Hosting                | **Vercel (frontend) + Render (workers)**         | Both have generous free tiers; Render handles long-running cron jobs Vercel can't         |
-| Browser Extension      | **Chrome MV3 + Firefox MV2 compat**              | MV3 required for Chrome Web Store; thin MV2 shim for Firefox                             |
+| Layer                  | Choice                                   | Why                                                                                      |
+| ---------------------- | ---------------------------------------- | ---------------------------------------------------------------------------------------- |
+| Frontend               | **Next.js (App Router)**                 | SSR, API routes, Vercel-native, file-based routing maps cleanly to app pages             |
+| Styling                | **Tailwind CSS**                         | Utility-first, fast to iterate, consistent without a component library                   |
+| Animations             | **Framer Motion**                        | Spring physics, staggered entrances, gesture support — page transitions, card entrances  |
+| Drag & Drop            | **@dnd-kit/core**                        | Modern accessible DnD primitive; Framer Motion handles animation on top                  |
+| Rich Text              | **Tiptap**                               | Headless rich text editor for application notes — stores as ProseMirror JSON             |
+| Command Palette        | **cmdk**                                 | Headless command menu primitive powering Cmd+K fuzzy search                              |
+| Backend                | **Next.js API Routes + Render (worker)** | API routes for app logic; Render Web Service runs aggregation on 8h cron + `/run` endpoint for manual triggers |
+| Database               | **Supabase (PostgreSQL)**                | Managed Postgres with built-in auth, RLS, and real-time subscriptions                    |
+| LLM — High Frequency   | **GPT-4o-mini (OpenAI)**                 | $0.15/1M tokens, fast — job normalization, match scoring, URL job extraction             |
+| LLM — Quality Tasks    | **Claude Sonnet 4.6 (Anthropic)**        | Cover letters, resume tailoring, STAR responses, extension open-ended field answers      |
+| Email Notifications    | **Resend**                               | Simple REST API for transactional email, generous free tier                              |
+| Push Notifications     | **Web Push API**                         | Native browser push — no third-party service, works across Chrome and Firefox            |
+| SMS Notifications      | **Twilio**                               | SMS as high-urgency channel — can be deferred if overkill for personal use               |
+| File Storage           | **Supabase Storage**                     | Stores resume uploads and generated PDFs; `resume_url` and `pdf_url` fields point here   |
+| PDF Parsing            | **pdf-parse**                            | Lightweight server-side text extraction from uploaded resume PDFs                        |
+| PDF Generation         | **@react-pdf/renderer**                  | Generates tailored resume PDFs server-side — lighter than Puppeteer, no headless browser |
+| Charts                 | **Recharts**                             | Composable, React-native chart library                                                   |
+| Unit/Integration Tests | **Vitest**                               | Better ESM support than Jest for Next.js 14+, fast, same assertion API                   |
+| API Mocking (tests)    | **MSW (Mock Service Worker)**            | Intercepts fetch in tests — no real API calls to OpenAI/Anthropic/GitHub in CI           |
+| E2E Tests              | **Playwright**                           | Real browser E2E runner — tests full user flows; unrelated to extension DOM manipulation |
+| Hosting                | **Vercel (frontend) + Render (workers)** | Both have generous free tiers; Render Web Service handles long-running jobs + manual trigger endpoint |
+| Browser Extension      | **Chrome MV3 + Firefox MV2 compat**      | MV3 required for Chrome Web Store; thin MV2 shim for Firefox                             |
 
 ### Architecture Overview
 
@@ -108,16 +108,20 @@ Backlog is primarily a personal tool, but it's architected for multiple users. A
 ### Database Schema (Full)
 
 **`jobs`**
+
 - `id`, `title`, `company`, `company_id`, `location`, `salary_min`, `salary_max`, `url`, `source` (github | manual), `posted_at`, `fetched_at`, `description`, `tags[]`, `is_remote`, `experience_level`
 - `source` distinguishes automated aggregation (`github`) from user-pasted manual entries (`manual`)
 
 **`applications`**
+
 - `id`, `user_id`, `job_id`, `status` (saved | applied | phone_screen | technical | final | offer | rejected), `applied_at`, `notes` (`jsonb` — Tiptap ProseMirror format), `recruiter_name`, `recruiter_email`, `last_updated`
 
 **`application_timeline`** ← full status history; enables timeline UI in detail panel
+
 - `id`, `application_id`, `from_status`, `to_status`, `changed_at`, `note`
 
 **`users`** ← full structured profile; source of truth for extension auto-fill
+
 - `id`, `email`, `full_name`, `phone`, `address`
 - `linkedin_url`, `github_url`, `portfolio_url`
 - `citizenship_status`, `visa_sponsorship_required` (bool), `willing_to_relocate` (bool)
@@ -129,65 +133,77 @@ Backlog is primarily a personal tool, but it's architected for multiple users. A
 - `alert_match_threshold`
 
 **`work_history`** ← structured work entries; used by extension to fill work experience sections
+
 - `id`, `user_id`, `company`, `title`, `start_date`, `end_date`, `is_current` (bool), `description`
 
 **`education`** ← structured education entries; used by extension to fill education sections
+
 - `id`, `user_id`, `school`, `degree`, `field_of_study`, `gpa`, `graduation_year`
 
 **`saved_answers`** ← pre-written answers to common application questions
+
 - `id`, `user_id`, `question`, `answer`
 - Extension checks these before falling back to LLM generation for open-ended fields
 
 **`star_responses`** ← STAR method prep responses per company, reusable across applications
+
 - `id`, `user_id`, `company_id` (nullable — some responses are general-purpose), `question`, `situation`, `task`, `action`, `result`, `full_response`, `created_at`, `updated_at`
 - Surfaced in per-application Prep tab; used as few-shot context when extension calls LLM for open-ended answers
 
 **`push_subscriptions`** ← browser push subscription objects, one per device/browser
+
 - `id`, `user_id`, `endpoint`, `p256dh`, `auth`, `created_at`
 - Required by Web Push API to push to a specific browser; stored when user enables push notifications
 
 **`resume_versions`** ← tailored resumes per job, never overwrites base resume
+
 - `id`, `user_id`, `job_id`, `content_text`, `pdf_url`, `created_at`
 
 **`match_scores`** ← lazy-computed and cached; invalidated when resume changes
+
 - `id`, `user_id`, `job_id`, `score`, `rationale`, `computed_at`, `is_stale` (bool)
 - UNIQUE constraint on `(user_id, job_id)` — upsert on conflict, never accumulate duplicates
 
 **`cover_letters`** ← linked to application_id; handles reapplication edge case
+
 - `id`, `user_id`, `application_id`, `template_type` (formal | casual | startup), `content`, `pdf_url` (nullable — generated on finalize, used by extension for file attachment), `created_at`
 
 **`company_profiles`**
+
 - `id`, `name`, `description`, `glassdoor_rating` (nullable — populated via third-party API, not LLM), `headcount_range`, `funding_stage`, `behavioral_questions[]`, `technical_questions[]`, `last_updated`
 
 **`sources`**
+
 - `id`, `name`, `type` (github), `url`, `last_fetched_at`, `fetch_interval_minutes`
 
 **`notification_log`**
+
 - `id`, `user_id`, `job_id`, `channel` (email | push | sms), `sent_at`
 
 **`api_keys`** ← user-scoped tokens for browser extension authentication
+
 - `id`, `user_id`, `key_hash`, `label`, `last_used_at`, `created_at`, `revoked_at`
 
 ### RLS Policy Summary
 
-| Table | Authenticated Read | Write |
-|---|---|---|
-| `jobs` | All users | Service role only (aggregation worker + URL extractor API) |
-| `company_profiles` | All users | Service role only |
-| `match_scores` | Own rows | Own rows (server-side on demand) |
-| `applications` | Own rows (`user_id = auth.uid()`) | Own rows |
-| `application_timeline` | Via application ownership | Via application ownership |
-| `users` | Own row | Own row |
-| `work_history` | Own rows | Own rows |
-| `education` | Own rows | Own rows |
-| `saved_answers` | Own rows | Own rows |
-| `resume_versions` | Own rows | Own rows |
-| `cover_letters` | Own rows | Own rows |
-| `notification_log` | Own rows | Service role (dispatcher writes) |
-| `push_subscriptions` | Own rows | Own rows |
-| `star_responses` | Own rows | Own rows |
-| `api_keys` | Own rows | Own rows |
-| `sources` | All users | Service role only |
+| Table                  | Authenticated Read                | Write                                                      |
+| ---------------------- | --------------------------------- | ---------------------------------------------------------- |
+| `jobs`                 | All users                         | Service role only (aggregation worker + URL extractor API) |
+| `company_profiles`     | All users                         | Service role only                                          |
+| `match_scores`         | Own rows                          | Own rows (server-side on demand)                           |
+| `applications`         | Own rows (`user_id = auth.uid()`) | Own rows                                                   |
+| `application_timeline` | Via application ownership         | Via application ownership                                  |
+| `users`                | Own row                           | Own row                                                    |
+| `work_history`         | Own rows                          | Own rows                                                   |
+| `education`            | Own rows                          | Own rows                                                   |
+| `saved_answers`        | Own rows                          | Own rows                                                   |
+| `resume_versions`      | Own rows                          | Own rows                                                   |
+| `cover_letters`        | Own rows                          | Own rows                                                   |
+| `notification_log`     | Own rows                          | Service role (dispatcher writes)                           |
+| `push_subscriptions`   | Own rows                          | Own rows                                                   |
+| `star_responses`       | Own rows                          | Own rows                                                   |
+| `api_keys`             | Own rows                          | Own rows                                                   |
+| `sources`              | All users                         | Service role only                                          |
 
 ### Auto-Fill Flow (End-to-End)
 
@@ -239,25 +255,25 @@ and sends it to the Backlog API. Works on all sites including Workday.
 
 | Source                              | Method                                                 | Update Frequency |
 | ----------------------------------- | ------------------------------------------------------ | ---------------- |
-| SimplifyJobs/New-Grad-Positions     | GitHub API — poll for new commits, parse markdown diff | Every 15 min     |
-| SimplifyJobs/Summer2025-Internships | GitHub API                                             | Every 15 min     |
-| Other community GitHub job repos    | GitHub API                                             | Every 30 min     |
+| SimplifyJobs/New-Grad-Positions     | GitHub API — poll for new commits, parse markdown diff | Every 8 hours    |
+| SimplifyJobs/Summer2025-Internships | GitHub API                                             | Every 8 hours    |
+| Other community GitHub job repos    | GitHub API                                             | Every 8 hours    |
 | User-pasted URLs                    | Greenhouse/Lever public API or HTML fetch + LLM parse  | On demand        |
 
 Additional sources (LinkedIn, Indeed, Glassdoor) are deferred to a future phase due to scraping complexity and ToS considerations.
 
 ### LLM Strategy
 
-| Task                                                           | Model             | Rationale                                                                      |
-| -------------------------------------------------------------- | ----------------- | ------------------------------------------------------------------------------ |
-| Job normalization (title, salary, location, skills extraction) | GPT-4o-mini       | High frequency, low cost, fast                                                 |
-| URL-pasted job extraction (non-Greenhouse/Lever)               | GPT-4o-mini       | Same normalization pipeline, on demand                                         |
-| Resume match scoring                                           | GPT-4o-mini       | Lazy + cached in `match_scores`; invalidated on resume change                  |
-| Resume tailoring for a specific job                            | Claude Sonnet 4.6 | Quality matters, fewer calls                                                   |
-| Cover letter generation                                        | Claude Sonnet 4.6 | Nuanced writing, template adherence                                             |
-| STAR method response drafting                                  | Claude Sonnet 4.6 | Structured, thoughtful output                                                  |
-| Cover letter template selection                                | Claude Sonnet 4.6 | Reads job/company tone, picks formal/casual/startup                            |
-| Extension: open-ended question answers                         | Claude Sonnet 4.6 | Only invoked after checking saved_answers; standard fields use local profile   |
+| Task                                                           | Model             | Rationale                                                                    |
+| -------------------------------------------------------------- | ----------------- | ---------------------------------------------------------------------------- |
+| Job normalization (title, salary, location, skills extraction) | GPT-4o-mini       | High frequency, low cost, fast                                               |
+| URL-pasted job extraction (non-Greenhouse/Lever)               | GPT-4o-mini       | Same normalization pipeline, on demand                                       |
+| Resume match scoring                                           | GPT-4o-mini       | Lazy + cached in `match_scores`; invalidated on resume change                |
+| Resume tailoring for a specific job                            | Claude Sonnet 4.6 | Quality matters, fewer calls                                                 |
+| Cover letter generation                                        | Claude Sonnet 4.6 | Nuanced writing, template adherence                                          |
+| STAR method response drafting                                  | Claude Sonnet 4.6 | Structured, thoughtful output                                                |
+| Cover letter template selection                                | Claude Sonnet 4.6 | Reads job/company tone, picks formal/casual/startup                          |
+| Extension: open-ended question answers                         | Claude Sonnet 4.6 | Only invoked after checking saved_answers; standard fields use local profile |
 
 ### Key Features
 
@@ -361,48 +377,48 @@ Additional sources (LinkedIn, Indeed, Glassdoor) are deferred to a future phase 
 
 - [x] Initialize Next.js project with App Router, Tailwind CSS, Framer Motion, @dnd-kit/core, Tiptap, cmdk
 - [x] Configure Supabase — create all tables per schema above, enable RLS with all policies, set up auth (migration at `supabase/migrations/001_initial_schema.sql`)
-- [ ] Create Supabase Storage buckets: `resumes` (private, user-scoped) and `generated-pdfs` (private, user-scoped)
+- [x] Create Supabase Storage buckets: `resumes` (private, user-scoped) and `generated-pdfs` (private, user-scoped)
 - [x] Create Postgres trigger on `auth.users` insert → auto-creates corresponding row in `public.users` with `id = auth.uid()` — without this, the profile page has nothing to read/write
 - [x] Build auth pages: login, "registration closed" message on signup
-- [ ] Provision admin account directly in Supabase
+- [x] Provision admin account directly in Supabase
 - [x] Build base layout: sidebar nav, header, route structure (`/feed`, `/tracker`, `/analytics`, `/prep`, `/profile`, `/settings`)
 - [x] Implement protected routes — redirect unauthenticated users to login
-- [ ] Deploy skeleton app to Vercel; confirm environment variables and Supabase connection
+- [x] Deploy skeleton app to Vercel; confirm environment variables and Supabase connection
 - [x] Set up Vitest + MSW for unit/integration tests; set up Playwright for E2E tests
 - [x] Write E2E test: unauthenticated user is redirected to login
 
 ### Phase 2 — Job Aggregation Engine
 
-- [ ] Set up Render worker service (Node.js)
-- [ ] Integrate GitHub API to poll SimplifyJobs repos for new commits
-- [ ] Parse markdown diffs to extract new job entries (`lib/github/parser.ts`)
-- [ ] Integrate GPT-4o-mini to normalize raw entries into `jobs` schema (`lib/llm/normalizer.ts`)
-- [ ] Implement deduplication logic before DB writes (deduplicate by URL; fall back to title+company hash)
-- [ ] Upsert minimal `company_profiles` stub (name + id) for each new company during aggregation — ensures company panel is never empty in Phase 3
-- [ ] Schedule cron jobs (every 15 min for primary sources, 30 min for secondary)
-- [ ] Write aggregated jobs to Supabase using service role key (never anon key)
-- [ ] Add `sources` table management and last-fetched tracking
-- [ ] Unit tests: markdown parser, normalization prompt builder, deduplication logic
+- [x] Set up Render worker service (Node.js) — scaffolded at `worker/` with its own package.json; deploy to Render as a Background Worker pointed at `worker/`
+- [x] Integrate GitHub API to poll SimplifyJobs/New-Grad-Positions for new commits (`worker/src/github/fetcher.ts`)
+- [x] Parse README markdown table to extract new job entries (`worker/src/github/parser.ts`) — handles ↳ sub-rows, 🔒 locked rows, markdown + HTML links, multi-location `<br>` cells
+- [x] Integrate GPT-4o-mini to normalize raw entries into `jobs` schema (`worker/src/llm/normalizer.ts`) — batched 20 at a time, falls back gracefully on API failure
+- [x] Implement deduplication logic before DB writes — URL-first (UNIQUE constraint); runs before normalization to avoid burning OpenAI tokens on already-stored jobs (`worker/src/jobs/deduplicator.ts`)
+- [x] Upsert minimal `company_profiles` stub (name + id) for each new company during aggregation (`worker/src/db/writer.ts`)
+- [x] Schedule cron jobs — every 15 min via `node-cron` (`worker/src/index.ts`); immediate run on startup
+- [x] Write aggregated jobs to Supabase using service role key — never anon key (`worker/src/db/client.ts`)
+- [x] Add `sources` table management and last-fetched + last-sha tracking (`worker/src/db/sources.ts`); migration 002 adds `last_sha` column
+- [x] Unit tests: markdown parser (including edge cases), date parsing, deduplication logic (`worker/tests/`)
 - [ ] Integration test: mock GitHub API response → worker writes correct rows to test DB
 
 ### Phase 3 — Job Feed & Discovery
 
-- [ ] Build real-time job feed UI with Supabase subscriptions
-- [ ] Cursor-based infinite scroll — 25 jobs per fetch, load more on scroll
-- [ ] Job card component: title, company, location, salary, posted time, "Just posted" badge
-- [ ] Match score placeholder — show "Upload your resume to see your match score" until Phase 5. Do not block Phase 3 on scoring.
-- [ ] Job detail page/drawer: full description, company panel (stub data from Phase 2 for now), apply button, save button
-- [ ] Filter sidebar: location, salary range, experience level, role type, remote toggle
+- [x] Build real-time job feed UI with Supabase subscriptions
+- [x] Cursor-based infinite scroll — 25 jobs per fetch, load more on scroll
+- [x] Job card component: title, company, location, salary, posted time, "Just posted" badge
+- [x] Match score placeholder — show "Upload your resume to see your match score" until Phase 5. Do not block Phase 3 on scoring.
+- [x] Job detail page/drawer: full description, company panel (stub data from Phase 2 for now), apply button, save button
+- [x] Filter sidebar: location, salary range, experience level, role type, remote toggle
 - [ ] Saved filter presets
-- [ ] Sort controls (newest, highest match, salary)
-- [ ] **"Add Job from URL"** feature:
+- [x] Sort controls (newest, salary)
+- [x] **"Add Job from URL"** feature:
   - Input in feed header (or modal) for pasting a job URL
   - Backend: detect Greenhouse/Lever URL → use their public API; other URLs → HTML fetch + GPT-4o-mini
   - On failure (JS-rendered) → show prompt: "Open this page in Chrome and use the extension"
   - Job written to `jobs` with `source = 'manual'`; appears in feed immediately
   - `lib/jobs/url-extractor.ts` handles all URL → normalized job logic
-- [ ] Skeleton loading states for feed and detail
-- [ ] Integration tests: feed API route returns paginated filtered results; URL extractor identifies Greenhouse/Lever URLs correctly
+- [x] Skeleton loading states for feed and detail
+- [x] Integration tests: URL extractor identifies Greenhouse/Lever URLs correctly; feed query param builder verified
 - [ ] E2E test: login → feed loads → filter by remote → jobs update; paste Greenhouse URL → job appears in feed
 
 ### Phase 4 — Application Tracker

@@ -122,21 +122,18 @@ export default function Sidebar({ userEmail }: SidebarProps) {
       </nav>
 
       {/* User + logout */}
-      <div className="border-t border-zinc-800 px-3 py-3">
-        <div className="flex items-center gap-2.5 rounded-md px-2 py-2">
-          {/* Avatar */}
-          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-zinc-700 text-xs font-medium text-zinc-200">
+      <div className="border-t border-zinc-800 px-3 py-3 space-y-1">
+        <div className="flex items-center gap-2.5 px-2 py-1.5">
+          <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-zinc-700 text-[10px] font-semibold text-zinc-200">
             {userEmail ? userEmail[0].toUpperCase() : '?'}
           </div>
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-xs text-zinc-300">{userEmail ?? 'Unknown'}</p>
-          </div>
+          <p className="min-w-0 flex-1 truncate text-xs text-zinc-400">{userEmail ?? 'Unknown'}</p>
         </div>
         <button
           onClick={handleLogout}
-          className="mt-1 flex w-full items-center gap-2 rounded-md px-3 py-1.5 text-xs text-zinc-500 transition-colors hover:bg-zinc-800/60 hover:text-zinc-300"
+          className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-xs text-zinc-500 transition-colors hover:bg-zinc-800/60 hover:text-zinc-300"
         >
-          <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
+          <svg className="h-3.5 w-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M12 9l-3 3m0 0l3 3m-3-3h12.75" />
           </svg>
           Sign out
