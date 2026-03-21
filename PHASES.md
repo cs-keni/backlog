@@ -411,6 +411,8 @@ Additional sources (LinkedIn, Indeed, Glassdoor) are deferred to a future phase 
 - [x] Filter sidebar: location, salary range, experience level, role type, remote toggle
 - [ ] Saved filter presets
 - [x] Sort controls (newest, salary)
+- [x] Date range filter (All time / 24h / 7 days / 30 days / 1 year) — sidebar preset buttons + API `posted_at` filter
+- [x] Fix aggregation parser — README switched from markdown pipe tables to HTML `<table>` format; parser rewritten to handle `<tr>`/`<td>` rows and new `Xd` age format
 - [x] **"Add Job from URL"** feature:
   - Input in feed header (or modal) for pasting a job URL
   - Backend: detect Greenhouse/Lever URL → use their public API; other URLs → HTML fetch + GPT-4o-mini

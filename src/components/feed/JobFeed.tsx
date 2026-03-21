@@ -21,6 +21,7 @@ const DEFAULT_FILTERS: FeedFilters = {
   salaryMin: '',
   experienceLevel: '',
   roleType: '',
+  dateRange: '',
 }
 
 function buildParams(
@@ -36,6 +37,7 @@ function buildParams(
   if (filters.salaryMin) params.set('salary_min', filters.salaryMin)
   if (filters.experienceLevel) params.set('experience_level', filters.experienceLevel)
   if (filters.roleType) params.set('role_type', filters.roleType)
+  if (filters.dateRange) params.set('date_range', filters.dateRange)
   if (cursor) {
     params.set('cursor', cursor.cursor)
     params.set('cursorId', cursor.cursorId)

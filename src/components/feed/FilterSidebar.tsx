@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { FeedFilters } from '@/lib/jobs/types'
+import { DateRange, FeedFilters } from '@/lib/jobs/types'
 
 interface FilterSidebarProps {
   filters: FeedFilters
@@ -23,6 +23,14 @@ const ROLE_TYPES = [
   { value: 'contract', label: 'Contract' },
 ]
 
+const DATE_RANGES: { value: DateRange; label: string }[] = [
+  { value: '', label: 'All time' },
+  { value: '24h', label: '24h' },
+  { value: '7d', label: '7 days' },
+  { value: '30d', label: '30 days' },
+  { value: '1y', label: '1 year' },
+]
+
 export function FilterSidebar({ filters, onChange }: FilterSidebarProps) {
   const [isOpen, setIsOpen] = useState(true)
 
@@ -31,7 +39,7 @@ export function FilterSidebar({ filters, onChange }: FilterSidebarProps) {
   }
 
   function reset() {
-    onChange({ location: '', isRemote: 'all', salaryMin: '', experienceLevel: '', roleType: '' })
+    onChange({ location: '', isRemote: 'all', salaryMin: '', experienceLevel: '', roleType: '', dateRange: '' })
   }
 
   const hasActiveFilters =
@@ -39,7 +47,8 @@ export function FilterSidebar({ filters, onChange }: FilterSidebarProps) {
     filters.isRemote !== 'all' ||
     filters.salaryMin ||
     filters.experienceLevel ||
-    filters.roleType
+    filters.roleType ||
+    filters.dateRange
 
   return (
     <div className="space-y-1">
@@ -164,6 +173,26 @@ export function FilterSidebar({ filters, onChange }: FilterSidebarProps) {
                       }`}
                     >
                       {rt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Date range */}
+              <div className="space-y-1.5">
+                <label className="text-[11px] text-zinc-500 font-medium">Posted</label>
+                <div className="grid grid-cols-2 gap-1">
+                  {DATE_RANGES.map((dr) => (
+                    <button
+                      key={dr.value}
+                      onClick={() => update({ dateRange: dr.value })}
+                      className={`py-1.5 rounded-md text-xs font-medium transition-colors ${
+                        filters.dateRange === dr.value
+                          ? 'bg-zinc-700 text-zinc-100'
+                          : 'bg-zinc-800/50 text-zinc-500 hover:text-zinc-300'
+                      }`}
+                    >
+                      {dr.label}
                     </button>
                   ))}
                 </div>

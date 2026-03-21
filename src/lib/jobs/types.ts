@@ -31,12 +31,15 @@ export interface Job {
   applications: Application[] | null
 }
 
+export type DateRange = '' | '24h' | '7d' | '30d' | '1y'
+
 export interface FeedFilters {
   location: string
   isRemote: 'all' | 'remote' | 'onsite'
   salaryMin: string
   experienceLevel: string
   roleType: string
+  dateRange: DateRange
 }
 
 export type SortOption = 'newest' | 'salary'

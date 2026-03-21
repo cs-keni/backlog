@@ -128,11 +128,27 @@ function inferExperienceLevel(title: string): string | null {
   return null
 }
 
-// Parses "Sep 5", "Aug 12" etc. into an ISO 8601 string.
-// Year inference: if the month is strictly after the current month, assume last year.
+// Parses the job posting date from two possible formats:
+//
+//   New format: "0d", "1d", "7d", "30d" — days ago (current README format)
+//   Legacy format: "Sep 5", "Aug 12" — month + day (older README format)
+//
+// Returns an ISO 8601 string, or null if unparseable.
 export function parsePostedDate(rawDate: string): string | null {
   if (!rawDate) return null
 
+  // New format: Xd (days ago)
+  const daysMatch = rawDate.match(/^(\d+)d$/i)
+  if (daysMatch) {
+    const daysAgo = parseInt(daysMatch[1], 10)
+    const date = new Date()
+    date.setDate(date.getDate() - daysAgo)
+    date.setHours(0, 0, 0, 0)
+    return date.toISOString()
+  }
+
+  // Legacy format: "Sep 5", "Aug 12"
+  // Year inference: if the month is strictly after the current month, assume last year.
   const MONTHS: Record<string, number> = {
     jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5,
     jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11,

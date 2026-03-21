@@ -25,6 +25,7 @@ export async function GET(request: NextRequest) {
   const salaryMin = searchParams.get('salary_min')
   const experienceLevel = searchParams.get('experience_level') // entry | mid | senior
   const roleType = searchParams.get('role_type') // full_time | internship | contract
+  const dateRange = searchParams.get('date_range') // '24h' | '7d' | '30d' | '1y' | null
   const sort = searchParams.get('sort') ?? 'newest' // newest | salary
 
   let query = supabase
@@ -77,6 +78,14 @@ export async function GET(request: NextRequest) {
   if (salaryMin) query = query.gte('salary_min', parseInt(salaryMin, 10))
   if (experienceLevel) query = query.eq('experience_level', experienceLevel)
   if (roleType) query = query.eq('role_type', roleType)
+  if (dateRange) {
+    const cutoff = new Date()
+    if (dateRange === '24h') cutoff.setDate(cutoff.getDate() - 1)
+    else if (dateRange === '7d') cutoff.setDate(cutoff.getDate() - 7)
+    else if (dateRange === '30d') cutoff.setDate(cutoff.getDate() - 30)
+    else if (dateRange === '1y') cutoff.setFullYear(cutoff.getFullYear() - 1)
+    query = query.gte('posted_at', cutoff.toISOString())
+  }
 
   // Sort
   if (sort === 'salary') {
