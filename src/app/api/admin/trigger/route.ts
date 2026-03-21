@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server'
 
-// Allow up to 60s — aggregation can take a while when normalizing many jobs
-export const maxDuration = 60
+// Worker responds immediately (fire-and-forget), so this doesn't need a long timeout
+export const maxDuration = 10
 
-export async function POST() {
+export async function POST(request: Request) {
   const workerUrl = process.env.WORKER_URL
   const workerSecret = process.env.WORKER_SECRET
 
@@ -14,8 +14,11 @@ export async function POST() {
     )
   }
 
+  const { searchParams } = new URL(request.url)
+  const force = searchParams.get('force') === '1' || searchParams.get('force') === 'true'
+
   try {
-    const res = await fetch(`${workerUrl}/run`, {
+    const res = await fetch(`${workerUrl}/run${force ? '?force=1' : ''}`, {
       method: 'POST',
       headers: { 'x-worker-secret': workerSecret },
     })
@@ -26,7 +29,8 @@ export async function POST() {
       return NextResponse.json({ error: 'Worker returned an error' }, { status: 502 })
     }
 
-    const data = (await res.json()) as { written: number; skipped: boolean }
+    // Worker now returns immediately: { started: true } or { skipped: true, running: true }
+    const data = (await res.json()) as { started?: boolean; written?: number; skipped?: boolean; running?: boolean }
     return NextResponse.json(data)
   } catch (err) {
     console.error('[trigger] Failed to reach worker:', err)

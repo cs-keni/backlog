@@ -19,15 +19,19 @@ function formatSalary(min: number | null, max: number | null): string | null {
   return `Up to ${fmt(max!)}`
 }
 
-function timeAgo(iso: string): { label: string; isNew: boolean } {
-  const diff = Date.now() - new Date(iso).getTime()
+function timeAgo(iso: string | null): { label: string; isNew: boolean } {
+  if (!iso) return { label: 'Unknown', isNew: false }
+  const date = new Date(iso)
+  if (isNaN(date.getTime())) return { label: 'Unknown', isNew: false }
+  const diff = Date.now() - date.getTime()
   const hours = diff / 1000 / 60 / 60
   if (hours < 3) return { label: `${Math.ceil(hours)}h ago`, isNew: true }
   if (hours < 24) return { label: `${Math.floor(hours)}h ago`, isNew: false }
   const days = Math.floor(hours / 24)
   if (days === 1) return { label: '1d ago', isNew: false }
-  if (days < 7) return { label: `${days}d ago`, isNew: false }
-  return { label: `${Math.floor(days / 7)}w ago`, isNew: false }
+  if (days < 14) return { label: `${days}d ago`, isNew: false }
+  if (days < 60) return { label: `${Math.floor(days / 7)}w ago`, isNew: false }
+  return { label: `${Math.floor(days / 30)}mo ago`, isNew: false }
 }
 
 const statusColors: Record<string, string> = {
@@ -50,10 +54,33 @@ const statusLabels: Record<string, string> = {
   rejected: 'Rejected',
 }
 
+// Deterministic color from company name — picks from a fixed palette
+const AVATAR_COLORS = [
+  'bg-blue-500/20 text-blue-300',
+  'bg-violet-500/20 text-violet-300',
+  'bg-emerald-500/20 text-emerald-300',
+  'bg-orange-500/20 text-orange-300',
+  'bg-pink-500/20 text-pink-300',
+  'bg-cyan-500/20 text-cyan-300',
+  'bg-yellow-500/20 text-yellow-300',
+  'bg-rose-500/20 text-rose-300',
+]
+
+function companyAvatar(name: string): { initials: string; color: string } {
+  const words = name.trim().split(/\s+/)
+  const initials = words.length >= 2
+    ? (words[0][0] + words[1][0]).toUpperCase()
+    : name.slice(0, 2).toUpperCase()
+  let hash = 0
+  for (let i = 0; i < name.length; i++) hash = (hash * 31 + name.charCodeAt(i)) >>> 0
+  return { initials, color: AVATAR_COLORS[hash % AVATAR_COLORS.length] }
+}
+
 export function JobCard({ job, isSelected, onClick, index }: JobCardProps) {
   const salary = formatSalary(job.salary_min, job.salary_max)
   const { label: timeLabel, isNew } = timeAgo(job.posted_at)
   const application = job.applications?.[0]
+  const avatar = companyAvatar(job.company)
 
   return (
     <motion.button
@@ -68,8 +95,12 @@ export function JobCard({ job, isSelected, onClick, index }: JobCardProps) {
       }`}
     >
       {/* Top row */}
-      <div className="flex items-start justify-between gap-3 mb-1.5">
-        <div className="min-w-0">
+      <div className="flex items-start gap-3 mb-1.5">
+        {/* Company avatar */}
+        <div className={`shrink-0 w-8 h-8 rounded-lg flex items-center justify-center text-[11px] font-semibold ${avatar.color}`}>
+          {avatar.initials}
+        </div>
+        <div className="min-w-0 flex-1">
           <p className="text-sm font-medium text-zinc-100 truncate">{job.title}</p>
           <p className="text-xs text-zinc-400 truncate mt-0.5">{job.company}</p>
         </div>

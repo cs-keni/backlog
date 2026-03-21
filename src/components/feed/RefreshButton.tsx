@@ -3,24 +3,31 @@
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 
-type State = 'idle' | 'loading' | 'success' | 'error'
+type State = 'idle' | 'loading' | 'checking' | 'error'
 
 export default function RefreshButton() {
   const [state, setState] = useState<State>('idle')
-  const [count, setCount] = useState<number | null>(null)
 
-  const handleRefresh = async () => {
-    if (state === 'loading') return
+  const handleRefresh = async (force = false) => {
+    if (state === 'loading' || state === 'checking') return
     setState('loading')
-    setCount(null)
 
     try {
-      const res = await fetch('/api/admin/trigger', { method: 'POST' })
+      const url = force ? '/api/admin/trigger?force=1' : '/api/admin/trigger'
+      const res = await fetch(url, { method: 'POST' })
       if (!res.ok) throw new Error(`${res.status}`)
-      const data = (await res.json()) as { written: number; skipped: boolean }
-      setCount(data.written)
-      setState('success')
-      setTimeout(() => setState('idle'), 3000)
+      const data = (await res.json()) as { started?: boolean; skipped?: boolean; running?: boolean }
+
+      if (data.running) {
+        // Already in progress — just show "checking" briefly
+        setState('checking')
+      } else if (data.started) {
+        // Fired off — new jobs will appear via realtime subscription
+        setState('checking')
+      } else {
+        setState('checking')
+      }
+      setTimeout(() => setState('idle'), 4000)
     } catch {
       setState('error')
       setTimeout(() => setState('idle'), 3000)
@@ -28,26 +35,27 @@ export default function RefreshButton() {
   }
 
   const bgClass =
-    state === 'success'
-      ? 'bg-emerald-500 border-emerald-500 text-white'
+    state === 'checking'
+      ? 'bg-zinc-800 border-zinc-600 text-zinc-200'
       : state === 'error'
         ? 'bg-red-500 border-red-500 text-white'
         : 'bg-zinc-900 border-zinc-700 text-zinc-200 hover:bg-zinc-800 hover:border-zinc-600'
 
   return (
-    <div className="fixed bottom-6 right-6 z-50">
+    <div className="fixed bottom-6 left-6 z-40">
       <motion.button
-        onClick={handleRefresh}
-        disabled={state === 'loading'}
-        whileHover={state !== 'loading' ? { scale: 1.04 } : {}}
-        whileTap={state !== 'loading' ? { scale: 0.96 } : {}}
+        onClick={() => handleRefresh(false)}
+        onContextMenu={(e) => { e.preventDefault(); void handleRefresh(true) }}
+        disabled={state === 'loading' || state === 'checking'}
+        whileHover={state === 'idle' || state === 'error' ? { scale: 1.04 } : {}}
+        whileTap={state === 'idle' || state === 'error' ? { scale: 0.96 } : {}}
         className={`flex items-center gap-2 rounded-full border px-4 py-2.5 text-sm font-medium shadow-lg shadow-black/30 transition-colors ${bgClass}`}
-        title="Check for new jobs"
+        title="Check for new jobs (right-click to force re-fetch)"
       >
         <motion.svg
-          animate={state === 'loading' ? { rotate: 360 } : { rotate: 0 }}
+          animate={state === 'loading' || state === 'checking' ? { rotate: 360 } : { rotate: 0 }}
           transition={
-            state === 'loading'
+            state === 'loading' || state === 'checking'
               ? { repeat: Infinity, duration: 0.9, ease: 'linear' }
               : { duration: 0 }
           }
@@ -84,18 +92,18 @@ export default function RefreshButton() {
               exit={{ opacity: 0, y: -4 }}
               transition={{ duration: 0.15 }}
             >
-              Checking...
+              Pinging...
             </motion.span>
           )}
-          {state === 'success' && (
+          {state === 'checking' && (
             <motion.span
-              key="success"
+              key="checking"
               initial={{ opacity: 0, y: 4 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -4 }}
               transition={{ duration: 0.15 }}
             >
-              {count === 0 ? 'Up to date' : `${count} new job${count === 1 ? '' : 's'}`}
+              Fetching jobs...
             </motion.span>
           )}
           {state === 'error' && (

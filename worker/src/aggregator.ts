@@ -14,7 +14,7 @@ export interface AggregationResult {
   skipped: boolean // true when no new commits were detected
 }
 
-export async function runAggregation(): Promise<AggregationResult> {
+export async function runAggregation(force = false): Promise<AggregationResult> {
   const startedAt = Date.now()
   console.log(`\n[aggregator] ─── Run started at ${new Date().toISOString()} ───`)
 
@@ -24,9 +24,12 @@ export async function runAggregation(): Promise<AggregationResult> {
 
     // 2. Check for new commits — skip early if nothing changed
     const latestSha = await fetchLatestCommitSha()
-    if (source.last_sha === latestSha) {
+    if (!force && source.last_sha === latestSha) {
       console.log(`[aggregator] No new commits (SHA: ${latestSha.slice(0, 7)}). Skipping.`)
       return { written: 0, newJobs: [], skipped: true }
+    }
+    if (force) {
+      console.log(`[aggregator] Force mode — bypassing SHA check (SHA: ${latestSha.slice(0, 7)})`)
     }
     console.log(
       `[aggregator] New commit detected: ${latestSha.slice(0, 7)} (was: ${source.last_sha?.slice(0, 7) ?? 'none'})`
@@ -38,8 +41,7 @@ export async function runAggregation(): Promise<AggregationResult> {
     console.log(`[aggregator] Parsed ${rawEntries.length} entries from README`)
 
     if (rawEntries.length === 0) {
-      console.warn('[aggregator] No entries parsed — README format may have changed')
-      await updateSourceSha(source.id, latestSha)
+      console.warn('[aggregator] No entries parsed — README format may have changed. SHA not saved; will retry next run.')
       return { written: 0, newJobs: [], skipped: false }
     }
 

@@ -28,20 +28,34 @@ if (!process.env.DISCORD_WEBHOOK_URL) {
 const WORKER_SECRET = process.env.WORKER_SECRET!
 const PORT = parseInt(process.env.PORT ?? '3001', 10)
 
-async function runAndNotify(): Promise<{ written: number; skipped: boolean }> {
-  const result = await runAggregation()
-  if (result.written > 0) {
-    await sendJobsNotification(result.newJobs, result.written)
+// ── Run lock ─────────────────────────────────────────────────────────────────
+// Prevents concurrent aggregation runs (e.g. startup + manual trigger overlap).
+let isRunning = false
+
+async function runAndNotify(force = false): Promise<{ written: number; skipped: boolean }> {
+  if (isRunning) {
+    console.log('[worker] Aggregation already in progress — skipping duplicate run')
+    return { written: 0, skipped: true }
   }
-  return { written: result.written, skipped: result.skipped }
+  isRunning = true
+  try {
+    const result = await runAggregation(force)
+    if (result.written > 0) {
+      await sendJobsNotification(result.newJobs, result.written)
+    }
+    return { written: result.written, skipped: result.skipped }
+  } finally {
+    isRunning = false
+  }
 }
 
 // ── HTTP server ──────────────────────────────────────────────────────────────
-// POST /run  — manual trigger from the Next.js app (protected by WORKER_SECRET)
-// GET  /health — Render health check
+// POST /run        — manual trigger (protected by WORKER_SECRET)
+// POST /run?force=1 — bypass SHA check, re-process even if README unchanged
+// GET  /health     — Render health check
 
 const server = http.createServer(async (req, res) => {
-  if (req.method === 'POST' && req.url === '/run') {
+  if (req.method === 'POST' && req.url?.startsWith('/run')) {
     const secret = req.headers['x-worker-secret']
     if (secret !== WORKER_SECRET) {
       res.writeHead(401, { 'Content-Type': 'application/json' })
@@ -49,15 +63,20 @@ const server = http.createServer(async (req, res) => {
       return
     }
 
-    try {
-      const result = await runAndNotify()
+    const force = req.url.includes('force=1') || req.url.includes('force=true')
+
+    // Fire-and-forget: respond immediately, aggregation runs in background.
+    // The frontend gets notified of new jobs via Supabase realtime inserts.
+    if (isRunning) {
       res.writeHead(200, { 'Content-Type': 'application/json' })
-      res.end(JSON.stringify(result))
-    } catch (err) {
-      console.error('[server] /run threw:', err)
-      res.writeHead(500, { 'Content-Type': 'application/json' })
-      res.end(JSON.stringify({ error: 'Aggregation failed' }))
+      res.end(JSON.stringify({ written: 0, skipped: true, running: true }))
+      return
     }
+
+    res.writeHead(202, { 'Content-Type': 'application/json' })
+    res.end(JSON.stringify({ started: true }))
+
+    runAndNotify(force).catch(console.error)
     return
   }
 
