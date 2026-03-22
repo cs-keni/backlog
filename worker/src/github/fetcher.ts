@@ -1,6 +1,4 @@
 const GITHUB_API = 'https://api.github.com'
-const OWNER = 'SimplifyJobs'
-const REPO = 'New-Grad-Positions'
 const FILE_PATH = 'README.md'
 
 function buildHeaders(): Record<string, string> {
@@ -17,9 +15,9 @@ function buildHeaders(): Record<string, string> {
 
 // Returns the latest commit SHA that touched README.md.
 // Storing and comparing this SHA lets us skip runs where nothing changed.
-export async function fetchLatestCommitSha(): Promise<string> {
+export async function fetchLatestCommitSha(owner: string, repo: string): Promise<string> {
   const res = await fetch(
-    `${GITHUB_API}/repos/${OWNER}/${REPO}/commits?path=${FILE_PATH}&per_page=1`,
+    `${GITHUB_API}/repos/${owner}/${repo}/commits?path=${FILE_PATH}&per_page=1`,
     { headers: buildHeaders() }
   )
   if (!res.ok) {
@@ -31,9 +29,9 @@ export async function fetchLatestCommitSha(): Promise<string> {
 }
 
 // Returns the full decoded content of README.md.
-export async function fetchReadmeContent(): Promise<string> {
+export async function fetchReadmeContent(owner: string, repo: string): Promise<string> {
   const res = await fetch(
-    `${GITHUB_API}/repos/${OWNER}/${REPO}/contents/${FILE_PATH}`,
+    `${GITHUB_API}/repos/${owner}/${repo}/contents/${FILE_PATH}`,
     { headers: buildHeaders() }
   )
   if (!res.ok) {

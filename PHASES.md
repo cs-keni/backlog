@@ -391,6 +391,7 @@ Additional sources (LinkedIn, Indeed, Glassdoor) are deferred to a future phase 
 
 - [x] Set up Render worker service (Node.js) — scaffolded at `worker/` with its own package.json; deploy to Render as a Background Worker pointed at `worker/`
 - [x] Integrate GitHub API to poll SimplifyJobs/New-Grad-Positions for new commits (`worker/src/github/fetcher.ts`)
+- [x] Add SimplifyJobs/Summer2026-Internships as a second aggregation source — aggregator refactored to support multiple sources, each with its own `role_type` tag
 - [x] Parse README markdown table to extract new job entries (`worker/src/github/parser.ts`) — handles ↳ sub-rows, 🔒 locked rows, markdown + HTML links, multi-location `<br>` cells
 - [x] Integrate GPT-4o-mini to normalize raw entries into `jobs` schema (`worker/src/llm/normalizer.ts`) — batched 20 at a time, falls back gracefully on API failure
 - [x] Implement deduplication logic before DB writes — URL-first (UNIQUE constraint); runs before normalization to avoid burning OpenAI tokens on already-stored jobs (`worker/src/jobs/deduplicator.ts`)
@@ -409,9 +410,14 @@ Additional sources (LinkedIn, Indeed, Glassdoor) are deferred to a future phase 
 - [x] Match score placeholder — show "Upload your resume to see your match score" until Phase 5. Do not block Phase 3 on scoring.
 - [x] Job detail page/drawer: full description, company panel (stub data from Phase 2 for now), apply button, save button
 - [x] Filter sidebar: location, salary range, experience level, role type, remote toggle
+- [x] `role_type` column added to `jobs` table (migration 003); worker writes `full_time` vs `internship` based on source; role type filter now functional
 - [ ] Saved filter presets
 - [x] Sort controls (newest, salary)
 - [x] Date range filter (All time / 24h / 7 days / 30 days / 1 year) — sidebar preset buttons + API `posted_at` filter
+- [x] Fix infinite scroll — cursor switched from `posted_at` (nullable) to `fetched_at` (always non-null); eliminates duplicate page loads
+- [x] Company logos via Clearbit API — ATS-aware domain extraction (Greenhouse/Lever slug → domain); falls back to letter avatar
+- [x] Idle auto-logout — 8h of inactivity triggers sign-out; `IdleLogout` client component in app layout
+- [x] Refresh button moved from fixed bottom-left overlay into FeedHeader inline (next to sort tabs)
 - [x] Fix aggregation parser — README switched from markdown pipe tables to HTML `<table>` format; parser rewritten to handle `<tr>`/`<td>` rows and new `Xd` age format
 - [x] **"Add Job from URL"** feature:
   - Input in feed header (or modal) for pasting a job URL
@@ -546,6 +552,19 @@ For free-text prompts ("Why do you want to work here?"), the extension first che
 - [ ] Firefox support (Manifest V2 compatibility layer)
 - [ ] Unit tests: standard field detection and mapping, ATS-specific DOM parsers, saved_answers lookup
 - [ ] Integration test: mock ATS form → standard fields filled without LLM call → open-ended field triggers Claude → review panel renders
+
+### Phase 10.5 — Dashboard Home Page
+
+> Insert a `/` dashboard as the default landing page. The current nav goes straight to `/feed`, but the app would benefit from a home screen that gives you a quick read on everything at once.
+
+- [ ] Add `/` route and redirect sidebar default to `/` instead of `/feed`
+- [ ] Dashboard layout: 2-column grid on desktop, stacked on mobile
+- [ ] **Top stats strip**: open applications count, interviews in progress, offers pending, total jobs in feed today
+- [ ] **Newest jobs mini-feed**: top 5 most recently fetched jobs with "View all" link to `/feed`
+- [ ] **Application pipeline summary**: small kanban-style count per stage (Saved / Applied / Phone / Technical / Final / Offer / Rejected) — no drag/drop, just counts + "Open tracker" link
+- [ ] **Analytics sparkline**: 30-day application activity bar chart (Recharts, compact)
+- [ ] **Upcoming prep nudges**: applications with interviews soon (by `updated_at`) — links to `/prep`
+- [ ] Animate widgets in on load (staggered Framer Motion entrance)
 
 ### Phase 11 — Export & Integrations
 

@@ -27,6 +27,7 @@ export interface Job {
   tags: string[] | null
   is_remote: boolean
   experience_level: string | null
+  role_type: string | null
   company_profiles: CompanyProfile | null
   applications: Application[] | null
 }

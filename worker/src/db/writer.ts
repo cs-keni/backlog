@@ -1,7 +1,7 @@
 import { supabase } from './client'
 import type { NormalizedJob } from '../llm/normalizer'
 
-export async function writeJobs(jobs: NormalizedJob[]): Promise<number> {
+export async function writeJobs(jobs: NormalizedJob[], roleType: 'full_time' | 'internship'): Promise<number> {
   if (jobs.length === 0) return 0
 
   let written = 0
@@ -23,6 +23,7 @@ export async function writeJobs(jobs: NormalizedJob[]): Promise<number> {
         is_remote: job.is_remote,
         experience_level: job.experience_level,
         tags: job.tags,
+        role_type: roleType,
       },
       { onConflict: 'url', ignoreDuplicates: true }
     )

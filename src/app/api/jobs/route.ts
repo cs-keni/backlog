@@ -15,18 +15,19 @@ export async function GET(request: NextRequest) {
   }
 
   const { searchParams } = request.nextUrl
-  const cursor = searchParams.get('cursor') // ISO timestamp — posted_at of last item
-  const cursorId = searchParams.get('cursorId') // id of last item (tiebreak)
+  // Cursor is fetched_at (ISO timestamp) + id — fetched_at is always non-null, safe for pagination
+  const cursor = searchParams.get('cursor')
+  const cursorId = searchParams.get('cursorId')
   const limit = 25
 
   // Filters
-  const location = searchParams.get('location') // text search
+  const location = searchParams.get('location')
   const isRemote = searchParams.get('is_remote') // 'true' | 'false' | null
   const salaryMin = searchParams.get('salary_min')
-  const experienceLevel = searchParams.get('experience_level') // entry | mid | senior
-  const roleType = searchParams.get('role_type') // full_time | internship | contract
+  const experienceLevel = searchParams.get('experience_level')
+  const roleType = searchParams.get('role_type') // 'full_time' | 'internship' | 'contract'
   const dateRange = searchParams.get('date_range') // '24h' | '7d' | '30d' | '1y' | null
-  const sort = searchParams.get('sort') ?? 'newest' // newest | salary
+  const sort = searchParams.get('sort') ?? 'newest'
 
   let query = supabase
     .from('jobs')
@@ -47,6 +48,7 @@ export async function GET(request: NextRequest) {
       tags,
       is_remote,
       experience_level,
+      role_type,
       company_profiles (
         id,
         name,
@@ -64,10 +66,11 @@ export async function GET(request: NextRequest) {
     // RLS scopes applications to the current user automatically
     .eq('applications.user_id', user.id)
 
-  // Cursor-based pagination (posted_at DESC, id DESC)
+  // Cursor-based pagination using fetched_at + id.
+  // fetched_at is always non-null so it's safe to paginate on.
   if (cursor && cursorId) {
     query = query.or(
-      `posted_at.lt.${cursor},and(posted_at.eq.${cursor},id.lt.${cursorId})`
+      `fetched_at.lt.${cursor},and(fetched_at.eq.${cursor},id.lt.${cursorId})`
     )
   }
 
@@ -87,13 +90,12 @@ export async function GET(request: NextRequest) {
     query = query.gte('posted_at', cutoff.toISOString())
   }
 
-  // Sort
+  // Sort — always use fetched_at + id as the stable pagination key
   if (sort === 'salary') {
     query = query.order('salary_min', { ascending: false, nullsFirst: false })
   }
-  // Always secondary sort by posted_at + id for stable cursor pagination
   query = query
-    .order('posted_at', { ascending: false })
+    .order('fetched_at', { ascending: false })
     .order('id', { ascending: false })
     .limit(limit)
 
@@ -106,9 +108,10 @@ export async function GET(request: NextRequest) {
 
   const jobs = data ?? []
   const last = jobs[jobs.length - 1]
-  const nextCursor = jobs.length === limit && last
-    ? { cursor: last.posted_at, cursorId: last.id }
-    : null
+  const nextCursor =
+    jobs.length === limit && last
+      ? { cursor: last.fetched_at, cursorId: last.id }
+      : null
 
   return Response.json({ jobs, nextCursor })
 }

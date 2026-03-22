@@ -5,73 +5,110 @@ import { filterNewEntries } from './jobs/deduplicator'
 import { writeJobs } from './db/writer'
 import { getOrCreateSource, updateSourceSha } from './db/sources'
 
-const SOURCE_NAME = 'SimplifyJobs/New-Grad-Positions'
-const SOURCE_URL = 'https://github.com/SimplifyJobs/New-Grad-Positions'
+interface SourceConfig {
+  name: string
+  url: string
+  owner: string
+  repo: string
+  roleType: 'full_time' | 'internship'
+}
+
+const SOURCES: SourceConfig[] = [
+  {
+    name: 'SimplifyJobs/New-Grad-Positions',
+    url: 'https://github.com/SimplifyJobs/New-Grad-Positions',
+    owner: 'SimplifyJobs',
+    repo: 'New-Grad-Positions',
+    roleType: 'full_time',
+  },
+  {
+    name: 'SimplifyJobs/Summer2026-Internships',
+    url: 'https://github.com/SimplifyJobs/Summer2026-Internships',
+    owner: 'SimplifyJobs',
+    repo: 'Summer2026-Internships',
+    roleType: 'internship',
+  },
+]
 
 export interface AggregationResult {
   written: number
   newJobs: NormalizedJob[]
-  skipped: boolean // true when no new commits were detected
+  skipped: boolean
 }
 
 export async function runAggregation(force = false): Promise<AggregationResult> {
   const startedAt = Date.now()
   console.log(`\n[aggregator] ─── Run started at ${new Date().toISOString()} ───`)
 
-  try {
-    // 1. Ensure the source row exists in the DB
-    const source = await getOrCreateSource(SOURCE_NAME, SOURCE_URL)
+  let totalWritten = 0
+  const allNewJobs: NormalizedJob[] = []
 
-    // 2. Check for new commits — skip early if nothing changed
-    const latestSha = await fetchLatestCommitSha()
-    if (!force && source.last_sha === latestSha) {
-      console.log(`[aggregator] No new commits (SHA: ${latestSha.slice(0, 7)}). Skipping.`)
-      return { written: 0, newJobs: [], skipped: true }
+  for (const sourceConfig of SOURCES) {
+    try {
+      const result = await runSourceAggregation(sourceConfig, force)
+      totalWritten += result.written
+      allNewJobs.push(...result.newJobs)
+    } catch (err) {
+      console.error(`[aggregator] Failed for source "${sourceConfig.name}":`, err)
+      // Continue with next source — one failure shouldn't block the rest
     }
-    if (force) {
-      console.log(`[aggregator] Force mode — bypassing SHA check (SHA: ${latestSha.slice(0, 7)})`)
-    }
-    console.log(
-      `[aggregator] New commit detected: ${latestSha.slice(0, 7)} (was: ${source.last_sha?.slice(0, 7) ?? 'none'})`
-    )
-
-    // 3. Fetch and parse the full README
-    const markdown = await fetchReadmeContent()
-    const rawEntries = parseJobsTable(markdown)
-    console.log(`[aggregator] Parsed ${rawEntries.length} entries from README`)
-
-    if (rawEntries.length === 0) {
-      console.warn('[aggregator] No entries parsed — README format may have changed. SHA not saved; will retry next run.')
-      return { written: 0, newJobs: [], skipped: false }
-    }
-
-    // 4. Filter out jobs already in the DB (by URL)
-    const newEntries = await filterNewEntries(rawEntries)
-
-    if (newEntries.length === 0) {
-      console.log('[aggregator] All entries already stored. Updating SHA and exiting.')
-      await updateSourceSha(source.id, latestSha)
-      return { written: 0, newJobs: [], skipped: false }
-    }
-
-    // 5. Normalize via GPT-4o-mini
-    console.log(`[aggregator] Normalizing ${newEntries.length} new entries...`)
-    const normalizedJobs = await normalizeEntries(newEntries)
-
-    // 6. Write to Supabase
-    const written = await writeJobs(normalizedJobs)
-    console.log(`[aggregator] Wrote ${written}/${normalizedJobs.length} jobs to DB`)
-
-    // 7. Update source SHA so the next run can skip if unchanged
-    await updateSourceSha(source.id, latestSha)
-
-    const elapsed = ((Date.now() - startedAt) / 1000).toFixed(1)
-    console.log(`[aggregator] ─── Run complete in ${elapsed}s ───\n`)
-
-    return { written, newJobs: normalizedJobs, skipped: false }
-  } catch (err) {
-    console.error('[aggregator] Run failed:', err)
-    // Do NOT update the SHA on failure — we want to retry on the next run
-    throw err
   }
+
+  const elapsed = ((Date.now() - startedAt) / 1000).toFixed(1)
+  console.log(`[aggregator] ─── All sources complete in ${elapsed}s (${totalWritten} total written) ───\n`)
+
+  return { written: totalWritten, newJobs: allNewJobs, skipped: false }
+}
+
+async function runSourceAggregation(
+  config: SourceConfig,
+  force: boolean
+): Promise<AggregationResult> {
+  console.log(`\n[aggregator] Processing source: ${config.name}`)
+
+  // 1. Ensure source row exists
+  const source = await getOrCreateSource(config.name, config.url)
+
+  // 2. Check for new commits
+  const latestSha = await fetchLatestCommitSha(config.owner, config.repo)
+  if (!force && source.last_sha === latestSha) {
+    console.log(`[aggregator] ${config.name}: No new commits (${latestSha.slice(0, 7)}). Skipping.`)
+    return { written: 0, newJobs: [], skipped: true }
+  }
+  if (force) {
+    console.log(`[aggregator] ${config.name}: Force mode — bypassing SHA check (${latestSha.slice(0, 7)})`)
+  } else {
+    console.log(`[aggregator] ${config.name}: New commit detected: ${latestSha.slice(0, 7)} (was: ${source.last_sha?.slice(0, 7) ?? 'none'})`)
+  }
+
+  // 3. Fetch and parse README
+  const markdown = await fetchReadmeContent(config.owner, config.repo)
+  const rawEntries = parseJobsTable(markdown)
+  console.log(`[aggregator] ${config.name}: Parsed ${rawEntries.length} entries`)
+
+  if (rawEntries.length === 0) {
+    console.warn(`[aggregator] ${config.name}: No entries parsed — README format may have changed. SHA not saved; will retry.`)
+    return { written: 0, newJobs: [], skipped: false }
+  }
+
+  // 4. Filter already-stored jobs
+  const newEntries = await filterNewEntries(rawEntries)
+  if (newEntries.length === 0) {
+    console.log(`[aggregator] ${config.name}: All entries already stored. Updating SHA.`)
+    await updateSourceSha(source.id, latestSha)
+    return { written: 0, newJobs: [], skipped: false }
+  }
+
+  // 5. Normalize via GPT-4o-mini
+  console.log(`[aggregator] ${config.name}: Normalizing ${newEntries.length} new entries...`)
+  const normalizedJobs = await normalizeEntries(newEntries)
+
+  // 6. Write to Supabase (role_type comes from source config, not LLM)
+  const written = await writeJobs(normalizedJobs, config.roleType)
+  console.log(`[aggregator] ${config.name}: Wrote ${written}/${normalizedJobs.length} jobs`)
+
+  // 7. Update SHA
+  await updateSourceSha(source.id, latestSha)
+
+  return { written, newJobs: normalizedJobs, skipped: false }
 }

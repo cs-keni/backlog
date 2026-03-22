@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { Job } from '@/lib/jobs/types'
 
@@ -32,6 +33,55 @@ function timeAgo(iso: string | null): { label: string; isNew: boolean } {
   if (days < 14) return { label: `${days}d ago`, isNew: false }
   if (days < 60) return { label: `${Math.floor(days / 7)}w ago`, isNew: false }
   return { label: `${Math.floor(days / 30)}mo ago`, isNew: false }
+}
+
+// ATS portals that host jobs for many different companies.
+// When a job URL points to one of these, we extract the company slug
+// from the path instead of using the portal's domain for the logo.
+const ATS_PATTERNS: Array<{ domain: string; slugIndex: number }> = [
+  { domain: 'greenhouse.io', slugIndex: 1 },
+  { domain: 'lever.co', slugIndex: 1 },
+  { domain: 'ashbyhq.com', slugIndex: 1 },
+  { domain: 'workable.com', slugIndex: 1 },
+]
+
+const BLOCKED_DOMAINS = [
+  'workday.com',
+  'myworkdayjobs.com',
+  'taleo.net',
+  'icims.com',
+  'jobvite.com',
+  'smartrecruiters.com',
+  'successfactors.com',
+  'bamboohr.com',
+]
+
+function getLogoUrl(company: string, jobUrl: string): string {
+  try {
+    const u = new URL(jobUrl)
+    const hostname = u.hostname
+
+    // Try to extract company slug from known ATS URL patterns
+    for (const ats of ATS_PATTERNS) {
+      if (hostname.includes(ats.domain)) {
+        const parts = u.pathname.split('/').filter(Boolean)
+        const slug = parts[ats.slugIndex - 1]
+        if (slug) return `https://logo.clearbit.com/${slug}.com`
+      }
+    }
+
+    // Generic ATS portals where the domain tells us nothing useful
+    if (BLOCKED_DOMAINS.some((d) => hostname.includes(d))) {
+      const slug = company.toLowerCase().replace(/[^a-z0-9]/g, '')
+      return `https://logo.clearbit.com/${slug}.com`
+    }
+
+    // Real company domain — use it directly
+    return `https://logo.clearbit.com/${hostname.replace(/^www\./, '')}`
+  } catch {
+    const slug = company.toLowerCase().replace(/[^a-z0-9]/g, '')
+    return `https://logo.clearbit.com/${slug}.com`
+  }
 }
 
 const statusColors: Record<string, string> = {
@@ -77,10 +127,14 @@ function companyAvatar(name: string): { initials: string; color: string } {
 }
 
 export function JobCard({ job, isSelected, onClick, index }: JobCardProps) {
+  const [logoError, setLogoError] = useState(false)
+
   const salary = formatSalary(job.salary_min, job.salary_max)
-  const { label: timeLabel, isNew } = timeAgo(job.posted_at)
+  // Fall back to fetched_at when posted_at is null (common for jobs ingested before date parsing was reliable)
+  const { label: timeLabel, isNew } = timeAgo(job.posted_at ?? job.fetched_at)
   const application = job.applications?.[0]
   const avatar = companyAvatar(job.company)
+  const logoUrl = getLogoUrl(job.company, job.url)
 
   return (
     <motion.button
@@ -96,10 +150,19 @@ export function JobCard({ job, isSelected, onClick, index }: JobCardProps) {
     >
       {/* Top row */}
       <div className="flex items-start gap-3 mb-1.5">
-        {/* Company avatar */}
-        <div className={`shrink-0 w-8 h-8 rounded-lg flex items-center justify-center text-[11px] font-semibold ${avatar.color}`}>
-          {avatar.initials}
-        </div>
+        {/* Company logo / avatar */}
+        {!logoError ? (
+          <img
+            src={logoUrl}
+            alt={job.company}
+            onError={() => setLogoError(true)}
+            className="shrink-0 w-8 h-8 rounded-lg object-contain bg-white p-[3px]"
+          />
+        ) : (
+          <div className={`shrink-0 w-8 h-8 rounded-lg flex items-center justify-center text-[11px] font-semibold ${avatar.color}`}>
+            {avatar.initials}
+          </div>
+        )}
         <div className="min-w-0 flex-1">
           <p className="text-sm font-medium text-zinc-100 truncate">{job.title}</p>
           <p className="text-xs text-zinc-400 truncate mt-0.5">{job.company}</p>
