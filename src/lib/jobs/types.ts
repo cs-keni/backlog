@@ -44,3 +44,48 @@ export interface FeedFilters {
 }
 
 export type SortOption = 'newest' | 'salary'
+
+// ─── Tracker types ────────────────────────────────────────────────────────────
+
+export type ApplicationStatus =
+  | 'saved'
+  | 'applied'
+  | 'phone_screen'
+  | 'technical'
+  | 'final'
+  | 'offer'
+  | 'rejected'
+
+export interface ApplicationJob {
+  id: string
+  title: string
+  company: string
+  location: string | null
+  salary_min: number | null
+  salary_max: number | null
+  url: string
+  is_remote: boolean
+  tags: string[] | null
+}
+
+export interface ApplicationWithJob {
+  id: string
+  user_id: string
+  job_id: string
+  status: ApplicationStatus
+  applied_at: string | null
+  last_updated: string
+  notes: Record<string, unknown> | null
+  recruiter_name: string | null
+  recruiter_email: string | null
+  jobs: ApplicationJob
+}
+
+export interface TimelineEntry {
+  id: string
+  application_id: string
+  from_status: ApplicationStatus | null
+  to_status: ApplicationStatus
+  changed_at: string
+  note: string | null
+}

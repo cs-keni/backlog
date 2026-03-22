@@ -1,5 +1,31 @@
 import { createClient } from '@/lib/supabase/server'
 
+export async function GET() {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const { data, error } = await supabase
+    .from('applications')
+    .select(`
+      id, status, applied_at, last_updated, notes, recruiter_name, recruiter_email,
+      jobs (
+        id, title, company, location, salary_min, salary_max, url, is_remote, tags
+      )
+    `)
+    .eq('user_id', user.id)
+    .order('last_updated', { ascending: false })
+
+  if (error) {
+    console.error('[GET /api/applications]', error)
+    return Response.json({ error: 'Failed to fetch applications' }, { status: 500 })
+  }
+
+  return Response.json(data)
+}
+
 export async function POST(request: Request) {
   const supabase = await createClient()
 

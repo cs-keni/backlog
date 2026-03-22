@@ -431,13 +431,13 @@ Additional sources (LinkedIn, Indeed, Glassdoor) are deferred to a future phase 
 
 ### Phase 4 — Application Tracker
 
-- [ ] Kanban board with drag-and-drop (`@dnd-kit/core` for DnD logic, Framer Motion for animation)
-- [ ] Application stages: Saved → Applied → Phone Screen → Technical → Final → Offer / Rejected
-- [ ] Every status transition writes a row to `application_timeline` — never update status without logging the change
-- [ ] Application detail panel: Tiptap rich-text notes (stored as `jsonb`), recruiter info, application URL, timeline rendered from `application_timeline`
-- [ ] "Quick apply" action from feed card
-- [ ] Application age and follow-up nudges
-- [ ] Animations: card entrance, drag physics, stage transition
+- [x] Kanban board with drag-and-drop (`@dnd-kit/core` for DnD logic, Framer Motion for animation)
+- [x] Application stages: Saved → Applied → Phone Screen → Technical → Final → Offer / Rejected
+- [x] Every status transition writes a row to `application_timeline` — never update status without logging the change
+- [x] Application detail panel: Tiptap rich-text notes (stored as `jsonb`), recruiter info, application URL, timeline rendered from `application_timeline`
+- [x] "Quick apply" action from feed card
+- [x] Application age and follow-up nudges
+- [x] Animations: card entrance, drag physics, stage transition
 - [ ] Unit tests: status transition logic, timeline write, optimistic update rollback
 - [ ] Integration tests: PATCH /applications/:id updates status + writes timeline row
 - [ ] E2E test: drag card from Applied → Phone Screen → verify timeline shows the change

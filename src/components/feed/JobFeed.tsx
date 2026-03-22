@@ -246,6 +246,7 @@ export function JobFeed() {
                     onClick={() =>
                       setSelectedJobId((prev) => (prev === job.id ? null : job.id))
                     }
+                    onQuickApply={(jobId) => handleApplicationChange(jobId, 'applied')}
                   />
                 ))}
 

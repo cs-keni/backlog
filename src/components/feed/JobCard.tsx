@@ -8,6 +8,7 @@ interface JobCardProps {
   job: Job
   isSelected: boolean
   onClick: () => void
+  onQuickApply?: (jobId: string) => void
   index: number
 }
 
@@ -157,9 +158,10 @@ function companyAvatar(name: string): { initials: string; color: string } {
   return { initials, color: AVATAR_COLORS[hash % AVATAR_COLORS.length] }
 }
 
-export function JobCard({ job, isSelected, onClick, index }: JobCardProps) {
+export function JobCard({ job, isSelected, onClick, onQuickApply, index }: JobCardProps) {
   const logoUrls = getLogoUrls(job.company, job.url)
   const [logoSourceIndex, setLogoSourceIndex] = useState(0)
+  const [quickApplyState, setQuickApplyState] = useState<'idle' | 'loading' | 'done'>('idle')
   const logoFailed = logoSourceIndex >= logoUrls.length
 
   const salary = formatSalary(job.salary_min, job.salary_max)
@@ -168,13 +170,39 @@ export function JobCard({ job, isSelected, onClick, index }: JobCardProps) {
   const application = job.applications?.[0]
   const avatar = companyAvatar(job.company)
 
+  const canQuickApply = onQuickApply && (!application || application.status === 'saved') && quickApplyState === 'idle'
+
+  async function handleQuickApply(e: React.MouseEvent) {
+    e.stopPropagation()
+    if (!onQuickApply || quickApplyState !== 'idle') return
+    setQuickApplyState('loading')
+    try {
+      const res = await fetch('/api/applications', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ job_id: job.id, status: 'applied' }),
+      })
+      if (res.ok) {
+        setQuickApplyState('done')
+        onQuickApply(job.id)
+      } else {
+        setQuickApplyState('idle')
+      }
+    } catch {
+      setQuickApplyState('idle')
+    }
+  }
+
   return (
-    <motion.button
+    <motion.div
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.2, delay: Math.min(index * 0.03, 0.3), ease: 'easeOut' }}
       onClick={onClick}
-      className={`w-full text-left rounded-xl border px-4 py-3.5 transition-colors cursor-pointer ${
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => e.key === 'Enter' && onClick()}
+      className={`w-full text-left rounded-xl border px-4 py-3.5 transition-colors cursor-pointer group ${
         isSelected
           ? 'border-zinc-600 bg-zinc-800'
           : 'border-zinc-800 bg-zinc-900 hover:border-zinc-700 hover:bg-zinc-800/60'
@@ -234,19 +262,34 @@ export function JobCard({ job, isSelected, onClick, index }: JobCardProps) {
         <span className="text-zinc-700 ml-auto text-xs">{timeLabel}</span>
       </div>
 
-      {/* Tags */}
-      {job.tags && job.tags.length > 0 && (
-        <div className="flex gap-1.5 mt-2 flex-wrap">
-          {job.tags.slice(0, 4).map((tag) => (
-            <span
-              key={tag}
-              className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400 border border-zinc-700"
-            >
-              {tag}
-            </span>
-          ))}
-        </div>
-      )}
-    </motion.button>
+      {/* Tags + quick-apply row */}
+      <div className="flex items-end justify-between gap-2 mt-2">
+        {job.tags && job.tags.length > 0 ? (
+          <div className="flex gap-1.5 flex-wrap">
+            {job.tags.slice(0, 4).map((tag) => (
+              <span
+                key={tag}
+                className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400 border border-zinc-700"
+              >
+                {tag}
+              </span>
+            ))}
+          </div>
+        ) : <div />}
+
+        {/* Quick-apply button — visible on hover for unapplied jobs */}
+        {canQuickApply && (
+          <button
+            onClick={handleQuickApply}
+            className="shrink-0 opacity-0 group-hover:opacity-100 text-[10px] font-medium px-2 py-0.5 rounded-full bg-blue-500/15 text-blue-400 border border-blue-500/25 hover:bg-blue-500/25 transition-all"
+          >
+            ✓ Applied
+          </button>
+        )}
+        {quickApplyState === 'loading' && (
+          <span className="shrink-0 text-[10px] text-zinc-500">Saving…</span>
+        )}
+      </div>
+    </motion.div>
   )
 }

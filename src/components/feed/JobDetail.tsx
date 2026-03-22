@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import Link from 'next/link'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Job } from '@/lib/jobs/types'
 
@@ -234,9 +235,12 @@ export function JobDetail({ job, onClose, onApplicationChange }: JobDetailProps)
                   </button>
                 </>
               ) : (
-                <div className="flex-1 py-2 rounded-lg border border-zinc-800 text-center text-sm text-zinc-500">
-                  {application.status.replace('_', ' ')} — view in Tracker
-                </div>
+                <Link
+                  href="/tracker"
+                  className="flex-1 py-2 rounded-lg border border-zinc-800 text-center text-sm text-zinc-500 hover:border-zinc-700 hover:text-zinc-400 transition-colors"
+                >
+                  {application.status.replace(/_/g, ' ')} — view in Tracker →
+                </Link>
               )}
             </div>
           </motion.aside>

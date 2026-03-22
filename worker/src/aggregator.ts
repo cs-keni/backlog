@@ -3,6 +3,7 @@ import { parseJobsTable } from './github/parser'
 import { normalizeEntries, type NormalizedJob } from './llm/normalizer'
 import { filterNewEntries } from './jobs/deduplicator'
 import { enrichJobs } from './jobs/enricher'
+import { backfillMissingSalaries } from './jobs/backfiller'
 import { writeJobs } from './db/writer'
 import { getOrCreateSource, updateSourceSha } from './db/sources'
 
@@ -54,6 +55,10 @@ export async function runAggregation(force = false): Promise<AggregationResult> 
       // Continue with next source — one failure shouldn't block the rest
     }
   }
+
+  // Backfill salary + description for already-stored jobs that are missing them.
+  // Runs after every cycle so the DB gradually gets enriched over time.
+  await backfillMissingSalaries(50)
 
   const elapsed = ((Date.now() - startedAt) / 1000).toFixed(1)
   console.log(`[aggregator] ─── All sources complete in ${elapsed}s (${totalWritten} total written) ───\n`)
