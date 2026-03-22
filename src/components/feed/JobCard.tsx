@@ -11,13 +11,26 @@ interface JobCardProps {
   index: number
 }
 
-function formatSalary(min: number | null, max: number | null): string | null {
+function formatSalary(min: number | null, max: number | null): { annual: string; hourly: string } | null {
   if (!min && !max) return null
-  const fmt = (n: number) =>
-    n >= 1000 ? `$${Math.round(n / 1000)}k` : `$${n}`
-  if (min && max) return `${fmt(min)} – ${fmt(max)}`
-  if (min) return `${fmt(min)}+`
-  return `Up to ${fmt(max!)}`
+  const fmtAnnual = (n: number) => n >= 1000 ? `$${Math.round(n / 1000)}k` : `$${n}`
+  const fmtHourly = (n: number) => `$${Math.round(n / 2080)}`
+
+  let annual: string
+  let hourly: string
+
+  if (min && max) {
+    annual = `${fmtAnnual(min)} – ${fmtAnnual(max)}`
+    hourly = `${fmtHourly(min)} – ${fmtHourly(max)}/hr`
+  } else if (min) {
+    annual = `${fmtAnnual(min)}+`
+    hourly = `${fmtHourly(min)}+/hr`
+  } else {
+    annual = `Up to ${fmtAnnual(max!)}`
+    hourly = `Up to ${fmtHourly(max!)}/hr`
+  }
+
+  return { annual, hourly }
 }
 
 function timeAgo(iso: string | null): { label: string; isNew: boolean } {
@@ -46,8 +59,6 @@ const ATS_PATTERNS: Array<{ domain: string; slugIndex: number }> = [
 ]
 
 const BLOCKED_DOMAINS = [
-  'workday.com',
-  'myworkdayjobs.com',
   'taleo.net',
   'icims.com',
   'jobvite.com',
@@ -56,32 +67,52 @@ const BLOCKED_DOMAINS = [
   'bamboohr.com',
 ]
 
-function getLogoUrl(company: string, jobUrl: string): string {
+// Workday URLs embed the company slug as the first subdomain:
+// e.g. generalmotors.wd5.myworkdayjobs.com → "generalmotors"
+const WORKDAY_PATTERNS = ['myworkdayjobs.com', 'workday.com']
+
+function getDomain(company: string, jobUrl: string): string {
   try {
     const u = new URL(jobUrl)
     const hostname = u.hostname
 
-    // Try to extract company slug from known ATS URL patterns
+    // ATS portals where the company slug is in the URL path
     for (const ats of ATS_PATTERNS) {
       if (hostname.includes(ats.domain)) {
         const parts = u.pathname.split('/').filter(Boolean)
         const slug = parts[ats.slugIndex - 1]
-        if (slug) return `https://logo.clearbit.com/${slug}.com`
+        if (slug) return `${slug}.com`
       }
     }
 
-    // Generic ATS portals where the domain tells us nothing useful
+    // Workday: company slug is the first subdomain segment
+    for (const wd of WORKDAY_PATTERNS) {
+      if (hostname.includes(wd)) {
+        const subdomain = hostname.split('.')[0]
+        if (subdomain) return `${subdomain}.com`
+      }
+    }
+
+    // Other generic ATS portals — fall back to sanitized company name
     if (BLOCKED_DOMAINS.some((d) => hostname.includes(d))) {
       const slug = company.toLowerCase().replace(/[^a-z0-9]/g, '')
-      return `https://logo.clearbit.com/${slug}.com`
+      return `${slug}.com`
     }
 
     // Real company domain — use it directly
-    return `https://logo.clearbit.com/${hostname.replace(/^www\./, '')}`
+    return hostname.replace(/^www\./, '')
   } catch {
     const slug = company.toLowerCase().replace(/[^a-z0-9]/g, '')
-    return `https://logo.clearbit.com/${slug}.com`
+    return `${slug}.com`
   }
+}
+
+function getLogoUrls(company: string, jobUrl: string): string[] {
+  const domain = getDomain(company, jobUrl)
+  return [
+    `https://logo.clearbit.com/${domain}`,
+    `https://icons.duckduckgo.com/ip3/${domain}.ico`,
+  ]
 }
 
 const statusColors: Record<string, string> = {
@@ -127,14 +158,15 @@ function companyAvatar(name: string): { initials: string; color: string } {
 }
 
 export function JobCard({ job, isSelected, onClick, index }: JobCardProps) {
-  const [logoError, setLogoError] = useState(false)
+  const logoUrls = getLogoUrls(job.company, job.url)
+  const [logoSourceIndex, setLogoSourceIndex] = useState(0)
+  const logoFailed = logoSourceIndex >= logoUrls.length
 
   const salary = formatSalary(job.salary_min, job.salary_max)
   // Fall back to fetched_at when posted_at is null (common for jobs ingested before date parsing was reliable)
   const { label: timeLabel, isNew } = timeAgo(job.posted_at ?? job.fetched_at)
   const application = job.applications?.[0]
   const avatar = companyAvatar(job.company)
-  const logoUrl = getLogoUrl(job.company, job.url)
 
   return (
     <motion.button
@@ -151,11 +183,11 @@ export function JobCard({ job, isSelected, onClick, index }: JobCardProps) {
       {/* Top row */}
       <div className="flex items-start gap-3 mb-1.5">
         {/* Company logo / avatar */}
-        {!logoError ? (
+        {!logoFailed ? (
           <img
-            src={logoUrl}
+            src={logoUrls[logoSourceIndex]}
             alt={job.company}
-            onError={() => setLogoError(true)}
+            onError={() => setLogoSourceIndex((i) => i + 1)}
             className="shrink-0 w-8 h-8 rounded-lg object-contain bg-white p-[3px]"
           />
         ) : (
@@ -194,7 +226,9 @@ export function JobCard({ job, isSelected, onClick, index }: JobCardProps) {
         {salary && (
           <>
             {job.location && <span className="text-zinc-700">·</span>}
-            <span className="text-xs text-zinc-500">{salary}</span>
+            <span className="text-xs text-zinc-500">{salary.annual}</span>
+            <span className="text-zinc-700">·</span>
+            <span className="text-xs text-zinc-600">{salary.hourly}</span>
           </>
         )}
         <span className="text-zinc-700 ml-auto text-xs">{timeLabel}</span>

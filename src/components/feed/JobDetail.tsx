@@ -10,12 +10,17 @@ interface JobDetailProps {
   onApplicationChange: (jobId: string, status: string, applicationId?: string) => void
 }
 
-function formatSalary(min: number | null, max: number | null): string | null {
+function formatSalary(min: number | null, max: number | null): { annual: string; hourly: string } | null {
   if (!min && !max) return null
-  const fmt = (n: number) => `$${n.toLocaleString()}`
-  if (min && max) return `${fmt(min)} – ${fmt(max)}`
-  if (min) return `${fmt(min)}+`
-  return `Up to ${fmt(max!)}`
+  const fmtAnnual = (n: number) => `$${n.toLocaleString()}`
+  const fmtHourly = (n: number) => `$${Math.round(n / 2080)}/hr`
+
+  if (min && max) return {
+    annual: `${fmtAnnual(min)} – ${fmtAnnual(max)}`,
+    hourly: `${fmtHourly(min)} – ${fmtHourly(max)}`,
+  }
+  if (min) return { annual: `${fmtAnnual(min)}+`, hourly: `${fmtHourly(min)}+` }
+  return { annual: `Up to ${fmtAnnual(max!)}`, hourly: `Up to ${fmtHourly(max!)}` }
 }
 
 function formatDate(iso: string): string {
@@ -122,9 +127,15 @@ export function JobDetail({ job, onClose, onApplicationChange }: JobDetailProps)
                 {job.is_remote && (
                   <Chip icon="🌐">Remote</Chip>
                 )}
-                {formatSalary(job.salary_min, job.salary_max) && (
-                  <Chip icon="💰">{formatSalary(job.salary_min, job.salary_max)!}</Chip>
-                )}
+                {formatSalary(job.salary_min, job.salary_max) && (() => {
+                  const sal = formatSalary(job.salary_min, job.salary_max)!
+                  return (
+                    <>
+                      <Chip icon="💰">{sal.annual} / yr</Chip>
+                      <Chip icon="⏱️">{sal.hourly}</Chip>
+                    </>
+                  )
+                })()}
                 {job.experience_level && (
                   <Chip icon="🎯">
                     {job.experience_level.charAt(0).toUpperCase() + job.experience_level.slice(1)}
