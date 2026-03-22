@@ -51,12 +51,14 @@ async function fetchFromGreenhouse(url: string): Promise<ExtractedJob | null> {
   }
 
   const description = stripHtml(data.content ?? '')
+  const { salary_min, salary_max } = extractSalaryFromText(description)
+
   return {
     title: data.title ?? 'Untitled',
     company: parsed.company,
     location: data.location?.name ?? null,
-    salary_min: null,
-    salary_max: null,
+    salary_min,
+    salary_max,
     description,
     url,
     is_remote: isRemoteLocation(data.location?.name),
@@ -89,12 +91,14 @@ async function fetchFromLever(url: string): Promise<ExtractedJob | null> {
     .filter(Boolean)
     .join('\n\n')
 
+  const { salary_min, salary_max } = extractSalaryFromText(description)
+
   return {
     title: data.text ?? 'Untitled',
     company: parsed.company,
     location: data.categories?.location ?? null,
-    salary_min: null,
-    salary_max: null,
+    salary_min,
+    salary_max,
     description,
     url,
     is_remote: isRemoteLocation(data.categories?.location),
@@ -117,10 +121,18 @@ async function fetchFromHtml(url: string): Promise<ExtractedJob | null> {
   if (!res.ok) return null
 
   const html = await res.text()
+
+  // Try JSON-LD structured data first (works for some ATS platforms)
+  const jsonLdResult = extractFromJsonLd(html)
+  if (jsonLdResult) return { ...jsonLdResult, url }
+
   // Rough text extraction — strip tags, collapse whitespace, cap at 8k chars
   const text = stripHtml(html).replace(/\s+/g, ' ').trim().slice(0, 8000)
 
   if (text.length < 100) return null // probably JS-rendered, insufficient content
+
+  // Try fast regex salary extraction before spending a GPT call
+  const { salary_min, salary_max } = extractSalaryFromText(text)
 
   const apiKey = process.env.OPENAI_API_KEY
   if (!apiKey) return null
@@ -155,8 +167,9 @@ If a field cannot be determined, use null or [].`,
       title: parsed.title ?? 'Untitled',
       company: parsed.company ?? 'Unknown',
       location: parsed.location ?? null,
-      salary_min: parsed.salary_min ?? null,
-      salary_max: parsed.salary_max ?? null,
+      // Prefer regex result if GPT missed it
+      salary_min: parsed.salary_min ?? salary_min,
+      salary_max: parsed.salary_max ?? salary_max,
       description: parsed.description ?? '',
       url,
       is_remote: parsed.is_remote ?? false,
@@ -169,6 +182,114 @@ If a field cannot be determined, use null or [].`,
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
+
+// Extracts salary range from plain text using common patterns:
+//   "$73,900 to $110,900"  |  "$80k – $120k"  |  "80000 to 120000"
+//   "salary range: $73,900 - $110,900"
+export function extractSalaryFromText(text: string): { salary_min: number | null; salary_max: number | null } {
+  // Pattern 1: $X[k] [to|–|—|-] $Y[k]  (explicit $ on both sides)
+  const dollarRange = text.match(/\$\s*([\d,]+\.?\d*)\s*k?\s*(?:to|–|—|-|\/)\s*\$\s*([\d,]+\.?\d*)\s*k?/i)
+  if (dollarRange) {
+    const min = parseAmount(dollarRange[1], dollarRange[0].toLowerCase().includes('k'))
+    const max = parseAmount(dollarRange[2], dollarRange[0].toLowerCase().includes('k'))
+    if (min > 1000 && max > 1000) return { salary_min: min, salary_max: max }
+  }
+
+  // Pattern 2: "compensation" / "salary" context with numbers
+  const contextRange = text.match(
+    /(?:salary|compensation|pay|wage)[^\n$]*\$\s*([\d,]+\.?\d*)\s*k?\s*(?:to|–|—|-)\s*\$?\s*([\d,]+\.?\d*)\s*k?/i
+  )
+  if (contextRange) {
+    const min = parseAmount(contextRange[1], contextRange[0].toLowerCase().includes('k'))
+    const max = parseAmount(contextRange[2], contextRange[0].toLowerCase().includes('k'))
+    if (min > 10000 && max > 10000) return { salary_min: min, salary_max: max }
+  }
+
+  // Pattern 3: lone $ value with "up to" or "+"
+  const singleDollar = text.match(/\$\s*([\d,]+\.?\d*)\s*k?\s*\+/i)
+  if (singleDollar) {
+    const min = parseAmount(singleDollar[1], singleDollar[0].toLowerCase().includes('k'))
+    if (min > 10000) return { salary_min: min, salary_max: null }
+  }
+
+  return { salary_min: null, salary_max: null }
+}
+
+function parseAmount(raw: string, forceK = false): number {
+  const n = parseFloat(raw.replace(/,/g, ''))
+  if (isNaN(n)) return 0
+  return forceK && n < 1000 ? n * 1000 : n
+}
+
+// Extracts a JobPosting from JSON-LD structured data embedded in the page <head>.
+// Returns a partial ExtractedJob (without url — caller fills it in).
+function extractFromJsonLd(html: string): Omit<ExtractedJob, 'url'> | null {
+  const scriptBlocks = html.matchAll(/<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi)
+
+  for (const match of scriptBlocks) {
+    let data: Record<string, unknown>
+    try {
+      data = JSON.parse(match[1]) as Record<string, unknown>
+    } catch {
+      continue
+    }
+
+    if (data['@type'] !== 'JobPosting') continue
+
+    const rawDesc = typeof data.description === 'string' ? data.description : ''
+    const description = stripHtml(rawDesc).replace(/\s+/g, ' ').trim().slice(0, 8000)
+
+    let salary_min: number | null = null
+    let salary_max: number | null = null
+
+    // Try schema.org baseSalary
+    const baseSalary = data.baseSalary as Record<string, unknown> | undefined
+    if (baseSalary) {
+      const value = baseSalary.value as Record<string, unknown> | undefined
+      if (value) {
+        if (typeof value.minValue === 'number') salary_min = value.minValue
+        if (typeof value.maxValue === 'number') salary_max = value.maxValue
+        if (typeof value.value === 'number') salary_min = value.value
+      }
+    }
+
+    // If JSON-LD has no salary but we have description, try regex on it
+    if (salary_min === null && salary_max === null && description) {
+      const extracted = extractSalaryFromText(description)
+      salary_min = extracted.salary_min
+      salary_max = extracted.salary_max
+    }
+
+    const hiringOrg = data.hiringOrganization as Record<string, unknown> | undefined
+    const company = typeof hiringOrg?.name === 'string' ? hiringOrg.name : 'Unknown'
+    const title = typeof data.title === 'string' ? data.title
+      : typeof data.name === 'string' ? data.name : 'Untitled'
+
+    const jobLocation = data.jobLocation as Record<string, unknown> | undefined
+    const address = jobLocation?.address as Record<string, unknown> | undefined
+    const city = typeof address?.addressLocality === 'string' ? address.addressLocality : null
+    const region = typeof address?.addressRegion === 'string' ? address.addressRegion : null
+    const location = [city, region].filter(Boolean).join(', ') || null
+
+    const remote = typeof data.jobLocationType === 'string'
+      ? data.jobLocationType === 'TELECOMMUTE'
+      : isRemoteLocation(location)
+
+    return {
+      title,
+      company,
+      location,
+      salary_min,
+      salary_max,
+      description,
+      is_remote: remote,
+      experience_level: null,
+      tags: [],
+    }
+  }
+
+  return null
+}
 
 function stripHtml(html: string): string {
   return html

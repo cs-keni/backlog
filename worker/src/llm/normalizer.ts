@@ -12,6 +12,7 @@ export interface NormalizedJob {
   tags: string[]
   url: string
   posted_at: string | null // ISO 8601
+  description: string | null
 }
 
 const BATCH_SIZE = 20
@@ -88,6 +89,7 @@ Return ONLY the JSON object, no markdown, no explanation.`
         tags: Array.isArray(item.tags) ? item.tags.map(String) : [],
         url: raw.url,
         posted_at: parsePostedDate(raw.rawDate),
+        description: null,
       }
     })
   } catch (err) {
@@ -109,6 +111,7 @@ function fallbackNormalize(raw: RawJobEntry): NormalizedJob {
     tags: [],
     url: raw.url,
     posted_at: parsePostedDate(raw.rawDate),
+    description: null,
   }
 }
 

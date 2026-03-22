@@ -2,6 +2,7 @@ import { fetchLatestCommitSha, fetchReadmeContent } from './github/fetcher'
 import { parseJobsTable } from './github/parser'
 import { normalizeEntries, type NormalizedJob } from './llm/normalizer'
 import { filterNewEntries } from './jobs/deduplicator'
+import { enrichJobs } from './jobs/enricher'
 import { writeJobs } from './db/writer'
 import { getOrCreateSource, updateSourceSha } from './db/sources'
 
@@ -103,12 +104,16 @@ async function runSourceAggregation(
   console.log(`[aggregator] ${config.name}: Normalizing ${newEntries.length} new entries...`)
   const normalizedJobs = await normalizeEntries(newEntries)
 
+  // 5b. Enrich with salary + description by fetching each job URL
+  console.log(`[aggregator] ${config.name}: Enriching ${normalizedJobs.length} jobs...`)
+  const enrichedJobs = await enrichJobs(normalizedJobs)
+
   // 6. Write to Supabase (role_type comes from source config, not LLM)
-  const written = await writeJobs(normalizedJobs, config.roleType)
-  console.log(`[aggregator] ${config.name}: Wrote ${written}/${normalizedJobs.length} jobs`)
+  const written = await writeJobs(enrichedJobs, config.roleType)
+  console.log(`[aggregator] ${config.name}: Wrote ${written}/${enrichedJobs.length} jobs`)
 
   // 7. Update SHA
   await updateSourceSha(source.id, latestSha)
 
-  return { written, newJobs: normalizedJobs, skipped: false }
+  return { written, newJobs: enrichedJobs, skipped: false }
 }
