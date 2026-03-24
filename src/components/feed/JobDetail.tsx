@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Job } from '@/lib/jobs/types'
 
@@ -33,6 +34,7 @@ function formatDate(iso: string): string {
 }
 
 export function JobDetail({ job, onClose, onApplicationChange }: JobDetailProps) {
+  const router = useRouter()
   const [actionState, setActionState] = useState<'idle' | 'loading'>('idle')
 
   const application = job?.applications?.[0]
@@ -71,6 +73,8 @@ export function JobDetail({ job, onClose, onApplicationChange }: JobDetailProps)
         if (res.ok) {
           const data = await res.json() as { id: string; status: string }
           onApplicationChange(job.id, data.status, data.id)
+          // Invalidate router cache so /tracker shows the new entry immediately
+          router.refresh()
         }
       } finally {
         setActionState('idle')

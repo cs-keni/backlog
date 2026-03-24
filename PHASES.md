@@ -416,7 +416,9 @@ Additional sources (LinkedIn, Indeed, Glassdoor) are deferred to a future phase 
 - [x] Date range filter (All time / 24h / 7 days / 30 days / 1 year) — sidebar preset buttons + API `posted_at` filter
 - [x] Fix infinite scroll — cursor switched from `posted_at` (nullable) to `fetched_at` (always non-null); eliminates duplicate page loads
 - [x] Company logos via Clearbit API — ATS-aware domain extraction (Greenhouse/Lever slug → domain); falls back to letter avatar
-- [x] Idle auto-logout — 8h of inactivity triggers sign-out; `IdleLogout` client component in app layout
+- [x] Idle auto-logout — 10min of inactivity triggers sign-out; `IdleLogout` client component in app layout
+- [x] Bug fix: `IdleLogout` was signing users out immediately on login due to stale `backlog_last_seen` in localStorage — login page now resets the key on successful auth
+- [x] Bug fix: clicking "Apply →" in job detail didn't appear in Tracker until hard refresh — fixed by calling `router.refresh()` post-apply + `force-dynamic` on tracker page
 - [x] Refresh button moved from fixed bottom-left overlay into FeedHeader inline (next to sort tabs)
 - [x] Fix aggregation parser — README switched from markdown pipe tables to HTML `<table>` format; parser rewritten to handle `<tr>`/`<td>` rows and new `Xd` age format
 - [x] **"Add Job from URL"** feature:
@@ -450,12 +452,15 @@ Additional sources (LinkedIn, Indeed, Glassdoor) are deferred to a future phase 
 - [ ] Skills list (user-managed tags)
 - [ ] Pre-written answers (`saved_answers` table): user can add question/answer pairs for common prompts — these will be used by the extension before falling back to LLM
 - [ ] PDF resume upload → text extraction via `pdf-parse` (`lib/pdf/parser.ts`) → store in `users.resume_text`; auto-extract skills and populate suggestions
-- [ ] **Resume match scoring** (`lib/llm/matcher.ts`):
-  - Lazy: compute on first time a user views a job, not at ingest time
-  - Cache: store in `match_scores (user_id, job_id, score, rationale, computed_at, is_stale)`
-  - Invalidate: when `users.resume_text` changes, set all user's `match_scores.is_stale = true`
+- [ ] **Job fit score** (`lib/llm/matcher.ts`) — percentage 0–100 shown on every job card and detail panel:
+  - Inputs: `users.skills[]` (available without resume upload) + `users.resume_text` (if uploaded) vs job `tags[]` + `description`
+  - Skills-only mode: if no resume, compare `users.skills[]` against job `tags[]` — simple overlap score, no LLM needed, available as soon as user adds skills
+  - Full mode: once resume is uploaded, GPT-4o-mini compares full resume text vs JD → score + 1-line rationale
+  - Lazy: compute on first view per (user, job), cache in `match_scores`
+  - Invalidate: set `is_stale = true` on all user's scores when skills or resume changes
   - Recompute stale scores on next view
-- [ ] Replace Phase 3 match score placeholder with real scores on job cards
+  - Display: color-coded ring (green ≥70%, yellow 40–69%, red <40%) with percentage + rationale tooltip
+- [ ] Replace Phase 3 match score placeholder with real scores on job cards and detail panel
 - [ ] **"Tailor resume for this job"** — Claude Sonnet rewrites resume bullets aligned to JD:
   - Save tailored version to `resume_versions` table with `job_id` reference
   - Generate PDF via `@react-pdf/renderer` (`lib/pdf/generator.ts`)

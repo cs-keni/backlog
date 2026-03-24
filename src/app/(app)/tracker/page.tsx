@@ -2,6 +2,8 @@ import { createClient } from '@/lib/supabase/server'
 import { TrackerBoard } from '@/components/tracker/TrackerBoard'
 import type { ApplicationWithJob } from '@/lib/jobs/types'
 
+export const dynamic = 'force-dynamic'
+
 export default async function TrackerPage() {
   const supabase = await createClient()
   const {
