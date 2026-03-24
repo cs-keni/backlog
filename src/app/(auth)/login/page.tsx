@@ -33,6 +33,9 @@ function LoginForm() {
       return
     }
 
+    // Reset idle timeout so IdleLogout doesn't immediately sign us out
+    localStorage.setItem('backlog_last_seen', Date.now().toString())
+
     router.push(redirectedFrom)
     router.refresh()
   }

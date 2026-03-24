@@ -4,8 +4,8 @@ import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 
-// Sign out after 8 hours of inactivity
-const IDLE_TIMEOUT_MS = 8 * 60 * 60 * 1000
+// Sign out after 10 minutes of inactivity
+const IDLE_TIMEOUT_MS = 10 * 60 * 1000
 const LAST_SEEN_KEY = 'backlog_last_seen'
 
 export function IdleLogout() {
