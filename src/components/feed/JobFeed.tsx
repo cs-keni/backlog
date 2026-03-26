@@ -274,8 +274,8 @@ export function JobFeed() {
       </div>
 
       {/* Right: job detail drawer */}
-      <div className={`hidden lg:block transition-all duration-300 ${selectedJobId ? 'w-[480px]' : 'w-0'} shrink-0 overflow-hidden border-l border-zinc-800`}>
-        <div className="w-[480px] h-full overflow-hidden">
+      <div className={`hidden lg:flex lg:flex-col transition-all duration-300 ${selectedJobId ? 'w-[480px]' : 'w-0'} shrink-0 overflow-hidden border-l border-zinc-800`}>
+        <div className="w-[480px] flex-1 min-h-0 overflow-hidden">
           <JobDetail
             job={selectedJob}
             onClose={() => setSelectedJobId(null)}
