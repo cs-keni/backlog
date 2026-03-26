@@ -103,7 +103,7 @@ export function JobDetail({ job, onClose, onApplicationChange }: JobDetailProps)
             animate={{ x: 0, opacity: 1 }}
             exit={{ x: '100%', opacity: 0 }}
             transition={{ type: 'spring', stiffness: 350, damping: 35 }}
-            className="fixed top-0 right-0 h-full w-full max-w-xl bg-zinc-950 border-l border-zinc-800 z-30 flex flex-col overflow-hidden lg:relative lg:top-auto lg:right-auto lg:h-auto lg:max-w-none lg:border-l lg:z-auto"
+            className="fixed top-0 right-0 h-full w-full max-w-xl bg-zinc-950 border-l border-zinc-800 z-30 flex flex-col overflow-hidden lg:relative lg:top-auto lg:right-auto lg:h-full lg:max-w-none lg:border-l lg:z-auto"
           >
             {/* Header */}
             <div className="flex items-start justify-between gap-3 p-5 border-b border-zinc-800 shrink-0">
