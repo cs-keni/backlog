@@ -93,6 +93,16 @@ function SaveButton({ saving, saved, onClick }: { saving: boolean; saved: boolea
   )
 }
 
+// ─── Phone formatting ─────────────────────────────────────────────────────────
+
+function formatPhone(raw: string): string {
+  const digits = raw.replace(/\D/g, '')
+  // Strip leading country code if 11 digits starting with 1
+  const d = digits.length === 11 && digits[0] === '1' ? digits.slice(1) : digits
+  if (d.length === 10) return `(${d.slice(0, 3)}) ${d.slice(3, 6)}-${d.slice(6)}`
+  return raw // Return as-is if we can't format
+}
+
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export function ProfileClient({
@@ -196,7 +206,11 @@ export function ProfileClient({
             <Input
               value={profile.phone ?? ''}
               onChange={e => setProfile(p => ({ ...p, phone: e.target.value }))}
-              placeholder="+1 555 000 0000"
+              onBlur={e => {
+                const formatted = formatPhone(e.target.value)
+                if (formatted !== e.target.value) setProfile(p => ({ ...p, phone: formatted }))
+              }}
+              placeholder="(555) 000-0000"
             />
           </Field>
         </div>
@@ -374,8 +388,10 @@ export function ProfileClient({
           <SkillsInput
             skills={profile.preferred_locations ?? []}
             onChange={locs => setProfile(p => ({ ...p, preferred_locations: locs }))}
+            enterOnly
+            placeholder="Type a city or region and press Enter…"
           />
-          <p className="text-xs text-zinc-600 mt-1">Press Enter to add cities or regions.</p>
+          <p className="text-xs text-zinc-600 mt-1">Press Enter to add cities or regions (e.g. Portland, OR).</p>
         </Field>
         <Field label="Role Types">
           <div className="flex flex-wrap gap-2">

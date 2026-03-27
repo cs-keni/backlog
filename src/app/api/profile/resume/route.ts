@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { extractTextFromPdf } from '@/lib/pdf/parser'
 
 export async function POST(request: Request) {
@@ -27,12 +28,13 @@ export async function POST(request: Request) {
     return Response.json({ error: 'File must be under 5 MB' }, { status: 400 })
   }
 
-  // Upload to Supabase Storage
+  // Upload to Supabase Storage (use admin client to bypass RLS)
   const arrayBuffer = await file.arrayBuffer()
   const buffer = Buffer.from(arrayBuffer)
   const fileName = `${user.id}/resume.pdf`
+  const adminSupabase = createAdminClient()
 
-  const { error: uploadError } = await supabase.storage
+  const { error: uploadError } = await adminSupabase.storage
     .from('resumes')
     .upload(fileName, buffer, {
       contentType: 'application/pdf',
@@ -44,7 +46,7 @@ export async function POST(request: Request) {
     return Response.json({ error: 'Upload failed' }, { status: 500 })
   }
 
-  const { data: { publicUrl } } = supabase.storage
+  const { data: { publicUrl } } = adminSupabase.storage
     .from('resumes')
     .getPublicUrl(fileName)
 

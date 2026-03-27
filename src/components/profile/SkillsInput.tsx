@@ -5,9 +5,11 @@ import { useState, useRef, KeyboardEvent } from 'react'
 interface SkillsInputProps {
   skills: string[]
   onChange: (skills: string[]) => void
+  enterOnly?: boolean
+  placeholder?: string
 }
 
-export function SkillsInput({ skills, onChange }: SkillsInputProps) {
+export function SkillsInput({ skills, onChange, enterOnly = false, placeholder }: SkillsInputProps) {
   const [input, setInput] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
 
@@ -26,7 +28,7 @@ export function SkillsInput({ skills, onChange }: SkillsInputProps) {
   }
 
   function handleKeyDown(e: KeyboardEvent<HTMLInputElement>) {
-    if (e.key === 'Enter' || e.key === ',') {
+    if (e.key === 'Enter' || (!enterOnly && e.key === ',')) {
       e.preventDefault()
       addSkill(input)
     } else if (e.key === 'Backspace' && !input && skills.length > 0) {
@@ -61,7 +63,7 @@ export function SkillsInput({ skills, onChange }: SkillsInputProps) {
         onChange={e => setInput(e.target.value)}
         onKeyDown={handleKeyDown}
         onBlur={() => { if (input.trim()) addSkill(input) }}
-        placeholder={skills.length === 0 ? 'Type a skill and press Enter…' : ''}
+        placeholder={skills.length === 0 ? (placeholder ?? 'Type a skill and press Enter…') : ''}
         className="flex-1 min-w-[120px] bg-transparent text-sm text-zinc-100 placeholder:text-zinc-600 outline-none"
       />
     </div>
