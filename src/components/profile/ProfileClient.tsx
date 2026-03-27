@@ -188,6 +188,23 @@ export function ProfileClient({
         <ResumeUpload
           resumeUrl={profile.resume_url}
           hasResumeText={!!(profile.resume_text && profile.resume_text.length > 0)}
+          onAnalyze={({ skills_extracted, answers_generated }) => {
+            if (skills_extracted.length > 0) {
+              setProfile(p => {
+                const existingLower = new Set((p.skills ?? []).map(s => s.toLowerCase()))
+                const newSkills = skills_extracted.filter(s => !existingLower.has(s.toLowerCase()))
+                return { ...p, skills: [...(p.skills ?? []), ...newSkills] }
+              })
+            }
+            if (answers_generated > 0) {
+              fetch('/api/profile/saved-answers')
+                .then(r => r.json())
+                .then((data: { id: string; user_id: string; question: string; answer: string; created_at: string }[]) => {
+                  if (Array.isArray(data)) setAnswers(data)
+                })
+                .catch(() => {})
+            }
+          }}
           onUpload={({ resume_url, skills_extracted, answers_generated }) => {
             setProfile(p => {
               const existingLower = new Set((p.skills ?? []).map(s => s.toLowerCase()))

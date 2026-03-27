@@ -1,3 +1,5 @@
+export const maxDuration = 60 // seconds — needed for PDF extraction + LLM analysis
+
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { extractTextFromPdf } from '@/lib/pdf/parser'
