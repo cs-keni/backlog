@@ -55,10 +55,17 @@ export async function POST(request: Request) {
 
   // Extract text
   let resumeText = ''
+  let extractionError: string | null = null
   try {
     resumeText = await extractTextFromPdf(buffer)
+    console.log(`[POST /api/profile/resume] extracted ${resumeText.length} chars`)
   } catch (err) {
+    extractionError = err instanceof Error ? err.message : String(err)
     console.error('[POST /api/profile/resume] pdf parse error', err)
+  }
+
+  if (!resumeText || resumeText.length < 50) {
+    console.warn('[POST /api/profile/resume] extraction returned empty/short text:', resumeText.length, 'chars. Error:', extractionError)
   }
 
   // Update users row with file URL and raw text
@@ -201,14 +208,16 @@ export async function POST(request: Request) {
         }
       }
     } catch (err) {
-      console.error('[POST /api/profile/resume] analysis error', err)
-      // Non-fatal — upload already succeeded
+      const msg = err instanceof Error ? err.message : String(err)
+      console.error('[POST /api/profile/resume] analysis error', msg)
+      extractionError = extractionError ?? `AI analysis failed: ${msg}`
     }
   }
 
   return Response.json({
     resume_url: publicUrl,
     resume_text_length: resumeText.length,
+    extraction_error: extractionError,
     skills_extracted: skillsExtracted,
     answers_generated: answersGenerated,
     work_history_added: workHistoryAdded,

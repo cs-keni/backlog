@@ -5,6 +5,8 @@ import { motion, AnimatePresence } from 'framer-motion'
 
 interface UploadResult {
   resume_url: string
+  resume_text_length: number
+  extraction_error: string | null
   skills_extracted: string[]
   answers_generated: number
   work_history_added: number
@@ -153,7 +155,22 @@ export function ResumeUpload({ resumeUrl, hasResumeText, onUpload, onAnalyze }: 
             {error}
           </motion.p>
         )}
-        {lastResult && (
+        {lastResult && lastResult.resume_text_length === 0 && (
+          <motion.div
+            key="extract-warn"
+            initial={{ opacity: 0, y: -4 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0 }}
+            className="rounded-lg border border-yellow-800/50 bg-yellow-950/30 px-3 py-2 space-y-1"
+          >
+            <p className="text-xs text-yellow-400 font-medium">Resume uploaded but text extraction failed</p>
+            <p className="text-xs text-zinc-400">
+              The PDF was saved but couldn&apos;t be read — AI analysis was skipped.
+              {lastResult.extraction_error && <> Error: <span className="text-zinc-300">{lastResult.extraction_error}</span></>}
+            </p>
+          </motion.div>
+        )}
+        {lastResult && lastResult.resume_text_length > 0 && (
           <motion.div
             key="success"
             initial={{ opacity: 0, y: -4 }}
