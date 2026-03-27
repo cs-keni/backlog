@@ -89,3 +89,75 @@ export interface TimelineEntry {
   changed_at: string
   note: string | null
 }
+
+// ─── Profile types ────────────────────────────────────────────────────────────
+
+export interface UserProfile {
+  id: string
+  email: string | null
+  full_name: string | null
+  phone: string | null
+  address: string | null
+  linkedin_url: string | null
+  github_url: string | null
+  portfolio_url: string | null
+  citizenship_status: string | null
+  visa_sponsorship_required: boolean
+  willing_to_relocate: boolean
+  resume_text: string | null
+  resume_url: string | null
+  preferred_locations: string[] | null
+  preferred_salary_min: number | null
+  preferred_role_types: string[] | null
+  remote_preference: 'remote' | 'hybrid' | 'onsite' | 'any' | null
+  skills: string[] | null
+  experience_level: string | null
+  years_of_experience: number | null
+  notification_email: boolean
+  notification_push: boolean
+  notification_sms: boolean
+  notification_quiet_hours_start: string | null
+  notification_quiet_hours_end: string | null
+  alert_match_threshold: number
+}
+
+export interface WorkHistory {
+  id: string
+  user_id: string
+  company: string
+  title: string
+  start_date: string | null
+  end_date: string | null
+  is_current: boolean
+  description: string | null
+  display_order: number
+}
+
+export interface Education {
+  id: string
+  user_id: string
+  school: string
+  degree: string | null
+  field_of_study: string | null
+  gpa: number | null
+  graduation_year: number | null
+  display_order: number
+}
+
+export interface SavedAnswer {
+  id: string
+  user_id: string
+  question: string
+  answer: string
+  created_at: string
+}
+
+export interface MatchScore {
+  id: string
+  user_id: string
+  job_id: string
+  score: number
+  rationale: string | null
+  computed_at: string
+  is_stale: boolean
+}

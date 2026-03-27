@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Job } from '@/lib/jobs/types'
+import { MatchScoreBadge } from './MatchScoreBadge'
 
 interface JobDetailProps {
   job: Job | null
@@ -165,17 +166,8 @@ export function JobDetail({ job, onClose, onApplicationChange }: JobDetailProps)
                 )}
               </div>
 
-              {/* Match score placeholder */}
-              <div className="rounded-lg border border-zinc-800 bg-zinc-900 px-4 py-3 flex items-center gap-3">
-                <div className="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center shrink-0">
-                  <svg className="w-4 h-4 text-zinc-500" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                  </svg>
-                </div>
-                <p className="text-xs text-zinc-500">
-                  Upload your resume on the Profile page to see your match score for this role.
-                </p>
-              </div>
+              {/* Match score */}
+              <MatchScoreBadge jobId={job.id} />
 
               {/* Company panel */}
               {job.company_profiles && (
