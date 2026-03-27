@@ -198,7 +198,7 @@ export function ProfileClient({
               // Re-fetch saved answers so the section updates without a page reload
               fetch('/api/profile/saved-answers')
                 .then(r => r.json())
-                .then((data: { id: string; question: string; answer: string; created_at: string }[]) => {
+                .then((data: { id: string; user_id: string; question: string; answer: string; created_at: string }[]) => {
                   if (Array.isArray(data)) setAnswers(data)
                 })
                 .catch(() => {})
