@@ -62,23 +62,36 @@ export function JobDetail({ job, onClose, onApplicationChange }: JobDetailProps)
     // Open job URL in new tab; status change tracked by extension or manually
     window.open(job.url, '_blank', 'noopener,noreferrer')
 
-    if (!application) {
-      setActionState('loading')
-      try {
-        const res = await fetch('/api/applications', {
+    // Only update status if not already applied or further along
+    const alreadyApplied = application && application.status !== 'saved'
+    if (alreadyApplied) return
+
+    setActionState('loading')
+    try {
+      let res: Response
+      if (application?.id) {
+        // Existing saved application — promote to applied
+        res = await fetch(`/api/applications/${application.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: 'applied' }),
+        })
+      } else {
+        // No application yet — create one
+        res = await fetch('/api/applications', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ job_id: job.id, status: 'applied' }),
         })
-        if (res.ok) {
-          const data = await res.json() as { id: string; status: string }
-          onApplicationChange(job.id, data.status, data.id)
-          // Invalidate router cache so /tracker shows the new entry immediately
-          router.refresh()
-        }
-      } finally {
-        setActionState('idle')
       }
+      if (res.ok) {
+        const data = await res.json() as { id: string; status: string }
+        onApplicationChange(job.id, data.status, data.id)
+        // Invalidate router cache so /tracker shows the new entry immediately
+        router.refresh()
+      }
+    } finally {
+      setActionState('idle')
     }
   }
 
