@@ -183,7 +183,7 @@ export function JobFeed() {
   }
 
   // ─── Render ──────────────────────────────────────────────────────────────────
-
+  // Layout: filter sidebar | scrollable feed | job detail panel (desktop only)
   return (
     <div className="flex h-full overflow-hidden">
       {/* Left: filter sidebar */}
