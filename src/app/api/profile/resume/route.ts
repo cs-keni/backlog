@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { extractTextFromPdf } from '@/lib/pdf/parser'
+import { analyzeResume } from '@/lib/llm/resume-analyzer'
 
 export async function POST(request: Request) {
   const supabase = await createClient()
@@ -28,7 +29,7 @@ export async function POST(request: Request) {
     return Response.json({ error: 'File must be under 5 MB' }, { status: 400 })
   }
 
-  // Upload to Supabase Storage (use admin client to bypass RLS)
+  // Upload to Supabase Storage (admin client bypasses RLS)
   const arrayBuffer = await file.arrayBuffer()
   const buffer = Buffer.from(arrayBuffer)
   const fileName = `${user.id}/resume.pdf`
@@ -56,10 +57,9 @@ export async function POST(request: Request) {
     resumeText = await extractTextFromPdf(buffer)
   } catch (err) {
     console.error('[POST /api/profile/resume] pdf parse error', err)
-    // Continue even if extraction fails — store the file, just no text
   }
 
-  // Update users row
+  // Update users row with file URL and raw text
   const { error: updateError } = await supabase
     .from('users')
     .update({ resume_url: publicUrl, resume_text: resumeText || null })
@@ -70,14 +70,68 @@ export async function POST(request: Request) {
     return Response.json({ error: 'Failed to save resume info' }, { status: 500 })
   }
 
-  // Mark all match scores stale — resume changed
+  // Mark match scores stale
   await supabase
     .from('match_scores')
     .update({ is_stale: true })
     .eq('user_id', user.id)
 
+  // AI analysis — extract skills + generate Q&A answers
+  let skillsExtracted: string[] = []
+  let answersGenerated = 0
+
+  if (resumeText.length > 100) {
+    try {
+      const analysis = await analyzeResume(resumeText)
+
+      // Merge extracted skills with existing (deduplicate, preserve existing order)
+      if (analysis.skills.length > 0) {
+        const { data: profileRow } = await supabase
+          .from('users')
+          .select('skills')
+          .eq('id', user.id)
+          .single()
+
+        const existing: string[] = profileRow?.skills ?? []
+        const existingLower = new Set(existing.map(s => s.toLowerCase()))
+        const newSkills = analysis.skills.filter(s => !existingLower.has(s.toLowerCase()))
+        const merged = [...existing, ...newSkills]
+
+        await supabase
+          .from('users')
+          .update({ skills: merged })
+          .eq('id', user.id)
+
+        skillsExtracted = newSkills
+      }
+
+      // Save Q&A pairs to saved_answers (skip duplicates by question text)
+      if (analysis.qa_pairs.length > 0) {
+        const { data: existing } = await supabase
+          .from('saved_answers')
+          .select('question')
+          .eq('user_id', user.id)
+
+        const existingQs = new Set((existing ?? []).map(r => r.question.toLowerCase()))
+        const toInsert = analysis.qa_pairs
+          .filter(p => !existingQs.has(p.question.toLowerCase()))
+          .map(p => ({ user_id: user.id, question: p.question, answer: p.answer }))
+
+        if (toInsert.length > 0) {
+          await supabase.from('saved_answers').insert(toInsert)
+          answersGenerated = toInsert.length
+        }
+      }
+    } catch (err) {
+      console.error('[POST /api/profile/resume] analysis error', err)
+      // Non-fatal — upload already succeeded
+    }
+  }
+
   return Response.json({
     resume_url: publicUrl,
     resume_text_length: resumeText.length,
+    skills_extracted: skillsExtracted,
+    answers_generated: answersGenerated,
   })
 }

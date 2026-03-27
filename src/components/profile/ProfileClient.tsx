@@ -188,7 +188,22 @@ export function ProfileClient({
         <ResumeUpload
           resumeUrl={profile.resume_url}
           hasResumeText={!!(profile.resume_text && profile.resume_text.length > 0)}
-          onUpload={(url) => setProfile(p => ({ ...p, resume_url: url }))}
+          onUpload={({ resume_url, skills_extracted, answers_generated }) => {
+            setProfile(p => {
+              const existingLower = new Set((p.skills ?? []).map(s => s.toLowerCase()))
+              const newSkills = skills_extracted.filter(s => !existingLower.has(s.toLowerCase()))
+              return { ...p, resume_url, skills: [...(p.skills ?? []), ...newSkills], resume_text: 'extracted' }
+            })
+            if (answers_generated > 0) {
+              // Re-fetch saved answers so the section updates without a page reload
+              fetch('/api/profile/saved-answers')
+                .then(r => r.json())
+                .then((data: { id: string; question: string; answer: string; created_at: string }[]) => {
+                  if (Array.isArray(data)) setAnswers(data)
+                })
+                .catch(() => {})
+            }
+          }}
         />
       </Section>
 
