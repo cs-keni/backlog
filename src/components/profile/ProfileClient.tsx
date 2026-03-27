@@ -99,7 +99,7 @@ function formatPhone(raw: string): string {
   const digits = raw.replace(/\D/g, '')
   // Strip leading country code if 11 digits starting with 1
   const d = digits.length === 11 && digits[0] === '1' ? digits.slice(1) : digits
-  if (d.length === 10) return `(${d.slice(0, 3)}) ${d.slice(3, 6)}-${d.slice(6)}`
+  if (d.length === 10) return `+1 (${d.slice(0, 3)}) ${d.slice(3, 6)}-${d.slice(6)}`
   return raw // Return as-is if we can't format
 }
 
@@ -188,38 +188,34 @@ export function ProfileClient({
         <ResumeUpload
           resumeUrl={profile.resume_url}
           hasResumeText={!!(profile.resume_text && profile.resume_text.length > 0)}
-          onAnalyze={({ skills_extracted, answers_generated }) => {
-            if (skills_extracted.length > 0) {
-              setProfile(p => {
-                const existingLower = new Set((p.skills ?? []).map(s => s.toLowerCase()))
-                const newSkills = skills_extracted.filter(s => !existingLower.has(s.toLowerCase()))
-                return { ...p, skills: [...(p.skills ?? []), ...newSkills] }
-              })
-            }
-            if (answers_generated > 0) {
-              fetch('/api/profile/saved-answers')
-                .then(r => r.json())
-                .then((data: { id: string; user_id: string; question: string; answer: string; created_at: string }[]) => {
-                  if (Array.isArray(data)) setAnswers(data)
-                })
-                .catch(() => {})
-            }
+          onAnalyze={() => {
+            // Re-fetch all profile sections that may have been updated
+            Promise.all([
+              fetch('/api/profile').then(r => r.json()),
+              fetch('/api/profile/saved-answers').then(r => r.json()),
+              fetch('/api/profile/work-history').then(r => r.json()),
+              fetch('/api/profile/education').then(r => r.json()),
+            ]).then(([profileData, answersData, workData, eduData]) => {
+              if (profileData && !profileData.error) setProfile(profileData as UserProfile)
+              if (Array.isArray(answersData)) setAnswers(answersData)
+              if (Array.isArray(workData)) setWork(workData)
+              if (Array.isArray(eduData)) setEdu(eduData)
+            }).catch(() => {})
           }}
-          onUpload={({ resume_url, skills_extracted, answers_generated }) => {
-            setProfile(p => {
-              const existingLower = new Set((p.skills ?? []).map(s => s.toLowerCase()))
-              const newSkills = skills_extracted.filter(s => !existingLower.has(s.toLowerCase()))
-              return { ...p, resume_url, skills: [...(p.skills ?? []), ...newSkills], resume_text: 'extracted' }
-            })
-            if (answers_generated > 0) {
-              // Re-fetch saved answers so the section updates without a page reload
-              fetch('/api/profile/saved-answers')
-                .then(r => r.json())
-                .then((data: { id: string; user_id: string; question: string; answer: string; created_at: string }[]) => {
-                  if (Array.isArray(data)) setAnswers(data)
-                })
-                .catch(() => {})
-            }
+          onUpload={({ resume_url }) => {
+            setProfile(p => ({ ...p, resume_url, resume_text: 'extracted' }))
+            // Re-fetch all profile sections that may have been updated by AI analysis
+            Promise.all([
+              fetch('/api/profile').then(r => r.json()),
+              fetch('/api/profile/saved-answers').then(r => r.json()),
+              fetch('/api/profile/work-history').then(r => r.json()),
+              fetch('/api/profile/education').then(r => r.json()),
+            ]).then(([profileData, answersData, workData, eduData]) => {
+              if (profileData && !profileData.error) setProfile(p => ({ ...profileData as UserProfile, resume_url: p.resume_url ?? resume_url }))
+              if (Array.isArray(answersData)) setAnswers(answersData)
+              if (Array.isArray(workData)) setWork(workData)
+              if (Array.isArray(eduData)) setEdu(eduData)
+            }).catch(() => {})
           }}
         />
       </Section>

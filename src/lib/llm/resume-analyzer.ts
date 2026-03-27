@@ -13,27 +13,73 @@ const COMMON_QUESTIONS = [
   'What makes you a strong candidate for this role?',
 ]
 
+export interface ResumePersonalInfo {
+  full_name: string | null
+  phone: string | null
+  address: string | null
+}
+
+export interface ResumeWorkEntry {
+  company: string
+  title: string
+  start_date: string | null  // YYYY-MM-DD
+  end_date: string | null    // YYYY-MM-DD
+  is_current: boolean
+  description: string | null
+}
+
+export interface ResumeEducationEntry {
+  school: string
+  degree: string | null
+  field_of_study: string | null
+  graduation_year: number | null
+}
+
 export interface ResumeAnalysis {
+  personal_info: ResumePersonalInfo
   skills: string[]
+  work_history: ResumeWorkEntry[]
+  education: ResumeEducationEntry[]
   qa_pairs: Array<{ question: string; answer: string }>
 }
 
 export async function analyzeResume(resumeText: string): Promise<ResumeAnalysis> {
-  const truncated = resumeText.slice(0, 6000)
+  const truncated = resumeText.slice(0, 8000)
 
   const response = await openai.chat.completions.create({
     model: 'gpt-4o-mini',
-    temperature: 0.3,
-    max_tokens: 2000,
+    temperature: 0.2,
+    max_tokens: 4000,
     response_format: { type: 'json_object' },
     messages: [
       {
         role: 'system',
-        content: `You are a resume parser and career coach. Given a resume, output a JSON object with exactly two fields:
-- "skills": an array of technical skills, tools, languages, and frameworks extracted from the resume. Each skill should be properly capitalized (e.g. "TypeScript", "React", "PostgreSQL"). Max 30 skills. No soft skills.
-- "qa_pairs": an array of objects with "question" and "answer" fields. Write a first-person answer for each of the ${COMMON_QUESTIONS.length} questions provided, grounded in the resume content. Answers should be 2–4 sentences, specific, and ready to paste into a job application. Questions: ${JSON.stringify(COMMON_QUESTIONS)}
+        content: `You are a precise resume parser. Given a resume, output a JSON object with exactly these fields:
 
-Output only valid JSON matching this shape: { "skills": string[], "qa_pairs": [{ "question": string, "answer": string }] }`,
+"personal_info": object with:
+  - "full_name": string or null
+  - "phone": string or null — digits only, no formatting (e.g. "5035551234")
+  - "address": string or null — city and state (e.g. "Portland, OR")
+
+"skills": array of technical skills, tools, languages, and frameworks. Properly capitalized (e.g. "TypeScript", "React", "PostgreSQL"). Max 30. No soft skills.
+
+"work_history": array ordered most-recent first. Each entry:
+  - "company": string
+  - "title": string
+  - "start_date": "YYYY-MM-01" or null
+  - "end_date": "YYYY-MM-01" or null (null if current)
+  - "is_current": boolean
+  - "description": string or null — 2–3 sentence summary of responsibilities and impact
+
+"education": array. Each entry:
+  - "school": string
+  - "degree": string or null (e.g. "Bachelor of Science")
+  - "field_of_study": string or null (e.g. "Computer Science")
+  - "graduation_year": number or null
+
+"qa_pairs": array with "question" and "answer" fields. Write a first-person answer for each question listed, grounded in the resume. Answers should be 2–4 sentences, specific, ready to paste into a job application. Questions: ${JSON.stringify(COMMON_QUESTIONS)}
+
+Only include data you can extract from the resume. Use null for anything not present. Output only valid JSON.`,
       },
       {
         role: 'user',
@@ -43,12 +89,50 @@ Output only valid JSON matching this shape: { "skills": string[], "qa_pairs": [{
   })
 
   const raw = response.choices[0]?.message?.content?.trim() ?? '{}'
-  const parsed = JSON.parse(raw) as { skills?: unknown; qa_pairs?: unknown }
+  const parsed = JSON.parse(raw) as Record<string, unknown>
 
+  // personal_info
+  const pi = (parsed.personal_info ?? {}) as Record<string, unknown>
+  const personal_info: ResumePersonalInfo = {
+    full_name: typeof pi.full_name === 'string' ? pi.full_name : null,
+    phone: typeof pi.phone === 'string' ? pi.phone.replace(/\D/g, '') : null,
+    address: typeof pi.address === 'string' ? pi.address : null,
+  }
+
+  // skills
   const skills = Array.isArray(parsed.skills)
     ? (parsed.skills as unknown[]).filter((s): s is string => typeof s === 'string').slice(0, 30)
     : []
 
+  // work_history
+  const work_history: ResumeWorkEntry[] = Array.isArray(parsed.work_history)
+    ? (parsed.work_history as unknown[])
+        .filter((e): e is Record<string, unknown> => typeof e === 'object' && e !== null)
+        .filter(e => typeof e.company === 'string' && typeof e.title === 'string')
+        .map(e => ({
+          company: e.company as string,
+          title: e.title as string,
+          start_date: typeof e.start_date === 'string' ? e.start_date : null,
+          end_date: typeof e.end_date === 'string' ? e.end_date : null,
+          is_current: e.is_current === true,
+          description: typeof e.description === 'string' ? e.description : null,
+        }))
+    : []
+
+  // education
+  const education: ResumeEducationEntry[] = Array.isArray(parsed.education)
+    ? (parsed.education as unknown[])
+        .filter((e): e is Record<string, unknown> => typeof e === 'object' && e !== null)
+        .filter(e => typeof e.school === 'string')
+        .map(e => ({
+          school: e.school as string,
+          degree: typeof e.degree === 'string' ? e.degree : null,
+          field_of_study: typeof e.field_of_study === 'string' ? e.field_of_study : null,
+          graduation_year: typeof e.graduation_year === 'number' ? e.graduation_year : null,
+        }))
+    : []
+
+  // qa_pairs
   const qa_pairs = Array.isArray(parsed.qa_pairs)
     ? (parsed.qa_pairs as unknown[]).filter(
         (p): p is { question: string; answer: string } =>
@@ -57,5 +141,5 @@ Output only valid JSON matching this shape: { "skills": string[], "qa_pairs": [{
       )
     : []
 
-  return { skills, qa_pairs }
+  return { personal_info, skills, work_history, education, qa_pairs }
 }

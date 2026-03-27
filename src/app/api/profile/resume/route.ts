@@ -78,43 +78,119 @@ export async function POST(request: Request) {
     .update({ is_stale: true })
     .eq('user_id', user.id)
 
-  // AI analysis — extract skills + generate Q&A answers
+  // AI analysis
   let skillsExtracted: string[] = []
   let answersGenerated = 0
+  let workHistoryAdded = 0
+  let educationAdded = 0
+  const profileFieldsFilled: string[] = []
 
   if (resumeText.length > 100) {
     try {
       const analysis = await analyzeResume(resumeText)
 
-      // Merge extracted skills with existing (deduplicate, preserve existing order)
-      if (analysis.skills.length > 0) {
-        const { data: profileRow } = await supabase
-          .from('users')
-          .select('skills')
-          .eq('id', user.id)
-          .single()
+      // ── Personal info ──────────────────────────────────────────────────────
+      // Only fill fields that are currently null/empty in the DB
+      const { data: currentProfile } = await supabase
+        .from('users')
+        .select('full_name, phone, address, skills')
+        .eq('id', user.id)
+        .single()
 
-        const existing: string[] = profileRow?.skills ?? []
+      const personalUpdates: Record<string, unknown> = {}
+      if (!currentProfile?.full_name && analysis.personal_info.full_name) {
+        personalUpdates.full_name = analysis.personal_info.full_name
+        profileFieldsFilled.push('full_name')
+      }
+      if (!currentProfile?.phone && analysis.personal_info.phone) {
+        personalUpdates.phone = analysis.personal_info.phone
+        profileFieldsFilled.push('phone')
+      }
+      if (!currentProfile?.address && analysis.personal_info.address) {
+        personalUpdates.address = analysis.personal_info.address
+        profileFieldsFilled.push('address')
+      }
+
+      // ── Skills ────────────────────────────────────────────────────────────
+      if (analysis.skills.length > 0) {
+        const existing: string[] = currentProfile?.skills ?? []
         const existingLower = new Set(existing.map(s => s.toLowerCase()))
         const newSkills = analysis.skills.filter(s => !existingLower.has(s.toLowerCase()))
         const merged = [...existing, ...newSkills]
-
-        await supabase
-          .from('users')
-          .update({ skills: merged })
-          .eq('id', user.id)
-
-        skillsExtracted = newSkills
+        personalUpdates.skills = merged
+        skillsExtracted = newSkills.length > 0 ? newSkills : analysis.skills
       }
 
-      // Save Q&A pairs to saved_answers (skip duplicates by question text)
+      if (Object.keys(personalUpdates).length > 0) {
+        await supabase.from('users').update(personalUpdates).eq('id', user.id)
+      }
+
+      // ── Work history ──────────────────────────────────────────────────────
+      if (analysis.work_history.length > 0) {
+        const { data: existingWork } = await supabase
+          .from('work_history')
+          .select('company, title')
+          .eq('user_id', user.id)
+
+        const existingKeys = new Set(
+          (existingWork ?? []).map(e => `${e.company.toLowerCase()}|${e.title.toLowerCase()}`)
+        )
+
+        const toInsert = analysis.work_history
+          .filter(e => !existingKeys.has(`${e.company.toLowerCase()}|${e.title.toLowerCase()}`))
+          .map((e, i) => ({
+            user_id: user.id,
+            company: e.company,
+            title: e.title,
+            start_date: e.start_date,
+            end_date: e.end_date,
+            is_current: e.is_current,
+            description: e.description,
+            display_order: i,
+          }))
+
+        if (toInsert.length > 0) {
+          const { error: whErr } = await supabase.from('work_history').insert(toInsert)
+          if (!whErr) workHistoryAdded = toInsert.length
+        }
+      }
+
+      // ── Education ─────────────────────────────────────────────────────────
+      if (analysis.education.length > 0) {
+        const { data: existingEdu } = await supabase
+          .from('education')
+          .select('school')
+          .eq('user_id', user.id)
+
+        const existingSchools = new Set(
+          (existingEdu ?? []).map(e => e.school.toLowerCase())
+        )
+
+        const toInsert = analysis.education
+          .filter(e => !existingSchools.has(e.school.toLowerCase()))
+          .map((e, i) => ({
+            user_id: user.id,
+            school: e.school,
+            degree: e.degree,
+            field_of_study: e.field_of_study,
+            graduation_year: e.graduation_year,
+            display_order: i,
+          }))
+
+        if (toInsert.length > 0) {
+          const { error: eduErr } = await supabase.from('education').insert(toInsert)
+          if (!eduErr) educationAdded = toInsert.length
+        }
+      }
+
+      // ── Q&A pairs ─────────────────────────────────────────────────────────
       if (analysis.qa_pairs.length > 0) {
-        const { data: existing } = await supabase
+        const { data: existingAnswers } = await supabase
           .from('saved_answers')
           .select('question')
           .eq('user_id', user.id)
 
-        const existingQs = new Set((existing ?? []).map(r => r.question.toLowerCase()))
+        const existingQs = new Set((existingAnswers ?? []).map(r => r.question.toLowerCase()))
         const toInsert = analysis.qa_pairs
           .filter(p => !existingQs.has(p.question.toLowerCase()))
           .map(p => ({ user_id: user.id, question: p.question, answer: p.answer }))
@@ -135,5 +211,8 @@ export async function POST(request: Request) {
     resume_text_length: resumeText.length,
     skills_extracted: skillsExtracted,
     answers_generated: answersGenerated,
+    work_history_added: workHistoryAdded,
+    education_added: educationAdded,
+    profile_fields_filled: profileFieldsFilled,
   })
 }

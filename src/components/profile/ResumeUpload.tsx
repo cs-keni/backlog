@@ -7,12 +7,18 @@ interface UploadResult {
   resume_url: string
   skills_extracted: string[]
   answers_generated: number
+  work_history_added: number
+  education_added: number
+  profile_fields_filled: string[]
 }
 
 interface AnalyzeResult {
   skills_extracted: string[]
   all_skills: string[]
   answers_generated: number
+  work_history_added: number
+  education_added: number
+  profile_fields_filled: string[]
 }
 
 interface ResumeUploadProps {
@@ -157,18 +163,33 @@ export function ResumeUpload({ resumeUrl, hasResumeText, onUpload, onAnalyze }: 
           >
             <p className="text-xs text-emerald-400 font-medium">Resume analyzed successfully</p>
             <div className="flex flex-wrap gap-x-4 gap-y-0.5">
+              {lastResult.profile_fields_filled.length > 0 && (
+                <p className="text-xs text-zinc-400">
+                  Personal info filled ({lastResult.profile_fields_filled.map(f => f.replace('_', ' ')).join(', ')})
+                </p>
+              )}
               {lastResult.skills_extracted.length > 0 && (
                 <p className="text-xs text-zinc-400">
-                  +{lastResult.skills_extracted.length} skills added to your profile
+                  +{lastResult.skills_extracted.length} skills added
+                </p>
+              )}
+              {lastResult.work_history_added > 0 && (
+                <p className="text-xs text-zinc-400">
+                  {lastResult.work_history_added} work {lastResult.work_history_added === 1 ? 'role' : 'roles'} added
+                </p>
+              )}
+              {lastResult.education_added > 0 && (
+                <p className="text-xs text-zinc-400">
+                  {lastResult.education_added} education {lastResult.education_added === 1 ? 'entry' : 'entries'} added
                 </p>
               )}
               {lastResult.answers_generated > 0 && (
                 <p className="text-xs text-zinc-400">
-                  {lastResult.answers_generated} answers saved below
+                  {lastResult.answers_generated} answers saved
                 </p>
               )}
-              {lastResult.skills_extracted.length === 0 && lastResult.answers_generated === 0 && (
-                <p className="text-xs text-zinc-400">File stored · scroll down to review your profile</p>
+              {lastResult.profile_fields_filled.length === 0 && lastResult.skills_extracted.length === 0 && lastResult.work_history_added === 0 && lastResult.education_added === 0 && lastResult.answers_generated === 0 && (
+                <p className="text-xs text-zinc-400">Scroll down to review your profile</p>
               )}
             </div>
           </motion.div>
@@ -223,13 +244,28 @@ export function ResumeUpload({ resumeUrl, hasResumeText, onUpload, onAnalyze }: 
           >
             <p className="text-xs text-emerald-400 font-medium">Analysis complete</p>
             <div className="flex flex-wrap gap-x-4 gap-y-0.5">
+              {analyzeResult.profile_fields_filled.length > 0 && (
+                <p className="text-xs text-zinc-400">
+                  Personal info filled ({analyzeResult.profile_fields_filled.map(f => f.replace('_', ' ')).join(', ')})
+                </p>
+              )}
               {analyzeResult.skills_extracted.length > 0 ? (
                 <p className="text-xs text-zinc-400">+{analyzeResult.skills_extracted.length} new skills added</p>
               ) : (
                 <p className="text-xs text-zinc-400">{analyzeResult.all_skills.length} skills found (all already in your profile)</p>
               )}
+              {analyzeResult.work_history_added > 0 && (
+                <p className="text-xs text-zinc-400">
+                  {analyzeResult.work_history_added} work {analyzeResult.work_history_added === 1 ? 'role' : 'roles'} added
+                </p>
+              )}
+              {analyzeResult.education_added > 0 && (
+                <p className="text-xs text-zinc-400">
+                  {analyzeResult.education_added} education {analyzeResult.education_added === 1 ? 'entry' : 'entries'} added
+                </p>
+              )}
               {analyzeResult.answers_generated > 0 && (
-                <p className="text-xs text-zinc-400">{analyzeResult.answers_generated} answers saved below</p>
+                <p className="text-xs text-zinc-400">{analyzeResult.answers_generated} answers saved</p>
               )}
             </div>
           </motion.div>
