@@ -467,12 +467,15 @@ Additional sources (LinkedIn, Indeed, Glassdoor) are deferred to a future phase 
 
 ### Phase 6 — Cover Letters
 
-- [ ] Cover letter template definitions: `formal`, `casual`, `startup-focused`
-- [ ] "Generate Cover Letter" button on job detail page
-- [ ] Claude Sonnet reads JD + company profile + user resume → selects template → generates letter
-- [ ] Inline editor for reviewing and editing generated letter
-- [ ] Save finalized letter to `cover_letters` table with `application_id`
-- [ ] Template override option (user can force a specific template)
+- [x] Cover letter template definitions: `formal`, `casual`, `startup`
+- [x] "Generate Cover Letter" button on job detail page
+- [x] Claude Sonnet reads JD + company profile + user resume → auto-selects template → generates letter
+- [x] Inline editor for reviewing and editing generated letter
+- [x] Save finalized letter to `cover_letters` table with `application_id`
+- [x] Auto-create saved application if none exists when generating cover letter
+- [x] Template override option (user can force a specific template before generating)
+- [x] Re-generate with new template from the done state
+- [x] Copy to clipboard button
 - [ ] Unit tests: template selection logic, cover letter prompt builder
 - [ ] Integration test: generate → save → retrieve by application_id
 

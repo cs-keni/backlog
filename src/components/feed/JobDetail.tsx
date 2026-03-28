@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Job } from '@/lib/jobs/types'
 import { MatchScoreBadge } from './MatchScoreBadge'
+import { CoverLetterSection } from './CoverLetterSection'
 
 interface JobDetailProps {
   job: Job | null
@@ -318,6 +319,9 @@ export function JobDetail({ job, onClose, onApplicationChange }: JobDetailProps)
                   )}
                 </div>
               </div>
+
+              {/* Cover Letter */}
+              <CoverLetterSection jobId={job.id} />
 
               {/* Description */}
               {job.description && (
