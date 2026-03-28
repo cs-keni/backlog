@@ -33,7 +33,7 @@ export async function GET(
     content: letter.content,
   })
 
-  return new Response(pdfBuffer, {
+  return new Response(pdfBuffer.buffer as ArrayBuffer, {
     headers: {
       'Content-Type': 'application/pdf',
       'Content-Disposition': 'attachment; filename="cover-letter.pdf"',
