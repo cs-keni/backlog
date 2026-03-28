@@ -262,16 +262,6 @@ export function JobDetail({ job, onClose, onApplicationChange }: JobDetailProps)
                 </div>
               )}
 
-              {/* Description */}
-              {job.description && (
-                <div className="space-y-2">
-                  <h3 className="text-xs font-semibold text-zinc-400 uppercase tracking-wide">Job Description</h3>
-                  <div className="text-xs text-zinc-400 leading-relaxed whitespace-pre-wrap">
-                    {job.description}
-                  </div>
-                </div>
-              )}
-
               {/* Tailor resume */}
               <div className="space-y-2">
                 <h3 className="text-xs font-semibold text-zinc-400 uppercase tracking-wide">Resume</h3>
@@ -328,6 +318,16 @@ export function JobDetail({ job, onClose, onApplicationChange }: JobDetailProps)
                   )}
                 </div>
               </div>
+
+              {/* Description */}
+              {job.description && (
+                <div className="space-y-2">
+                  <h3 className="text-xs font-semibold text-zinc-400 uppercase tracking-wide">Job Description</h3>
+                  <div className="text-xs text-zinc-400 leading-relaxed whitespace-pre-wrap">
+                    {job.description}
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Action footer */}
