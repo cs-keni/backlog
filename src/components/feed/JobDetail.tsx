@@ -41,6 +41,14 @@ interface ResumeVersion {
   created_at: string
 }
 
+interface EnrichedCompany {
+  description: string | null
+  headcount_range: string | null
+  funding_stage: string | null
+  tech_stack: string[] | null
+  enriched_at: string | null
+}
+
 export function JobDetail({ job, onClose, onApplicationChange }: JobDetailProps) {
   const router = useRouter()
   const [actionState, setActionState] = useState<'idle' | 'loading'>('idle')
@@ -48,12 +56,14 @@ export function JobDetail({ job, onClose, onApplicationChange }: JobDetailProps)
   const tailoring = tailorState === 'loading'
   const [tailoredVersion, setTailoredVersion] = useState<ResumeVersion | null>(null)
   const [tailorError, setTailorError] = useState<string | null>(null)
+  const [enrichedCompany, setEnrichedCompany] = useState<EnrichedCompany | null>(null)
 
   // Load existing tailored version when job changes
   useEffect(() => {
     if (!job) return
     setTailoredVersion(null)
     setTailorState('idle')
+    setEnrichedCompany(null)
     fetch(`/api/resume/tailor?job_id=${job.id}`)
       .then(r => r.json())
       .then((data: ResumeVersion | null) => {
@@ -64,6 +74,18 @@ export function JobDetail({ job, onClose, onApplicationChange }: JobDetailProps)
       })
       .catch(() => {})
   }, [job?.id])
+
+  // Trigger lazy enrichment when company hasn't been enriched yet
+  useEffect(() => {
+    if (!job?.company_id) return
+    if (job.company_profiles?.enriched_at) return
+    fetch(`/api/company/${job.company_id}/enrich`, { method: 'POST' })
+      .then(r => r.ok ? r.json() : null)
+      .then((data: EnrichedCompany | null) => {
+        if (data) setEnrichedCompany(data)
+      })
+      .catch(() => {})
+  }, [job?.company_id, job?.company_profiles?.enriched_at])
 
   async function handleTailor() {
     if (!job || tailorState === 'loading') return
@@ -222,29 +244,54 @@ export function JobDetail({ job, onClose, onApplicationChange }: JobDetailProps)
               <MatchScoreBadge jobId={job.id} />
 
               {/* Company panel */}
-              {job.company_profiles && (
-                <div className="space-y-2">
-                  <h3 className="text-xs font-semibold text-zinc-400 uppercase tracking-wide">Company</h3>
-                  <div className="rounded-lg border border-zinc-800 bg-zinc-900 px-4 py-3 space-y-1.5">
-                    <p className="text-sm font-medium text-zinc-200">{job.company_profiles.name}</p>
-                    {job.company_profiles.description && (
-                      <p className="text-xs text-zinc-500 leading-relaxed">{job.company_profiles.description}</p>
-                    )}
-                    <div className="flex gap-3 pt-1">
-                      {job.company_profiles.headcount_range && (
-                        <span className="text-xs text-zinc-500">
-                          👥 {job.company_profiles.headcount_range}
-                        </span>
+              {job.company_profiles && (() => {
+                const cp = job.company_profiles
+                const enriched = enrichedCompany
+                const description = enriched?.description || cp.description
+                const headcount = enriched?.headcount_range || cp.headcount_range
+                const funding = enriched?.funding_stage || cp.funding_stage
+                const techStack = enriched?.tech_stack || cp.tech_stack
+                const glassdoorUrl = `https://www.glassdoor.com/Search/Results.htm?keyword=${encodeURIComponent(cp.name)}`
+
+                return (
+                  <div className="space-y-2">
+                    <h3 className="text-xs font-semibold text-zinc-400 uppercase tracking-wide">Company</h3>
+                    <div className="rounded-lg border border-zinc-800 bg-zinc-900 px-4 py-3 space-y-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-sm font-medium text-zinc-200">{cp.name}</p>
+                        <a
+                          href={glassdoorUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs text-zinc-600 hover:text-zinc-400 transition-colors shrink-0"
+                        >
+                          Glassdoor →
+                        </a>
+                      </div>
+                      {description && (
+                        <p className="text-xs text-zinc-500 leading-relaxed">{description}</p>
                       )}
-                      {job.company_profiles.funding_stage && (
-                        <span className="text-xs text-zinc-500">
-                          💼 {job.company_profiles.funding_stage}
-                        </span>
+                      <div className="flex flex-wrap gap-x-4 gap-y-1">
+                        {headcount && (
+                          <span className="text-xs text-zinc-500">👥 {headcount}</span>
+                        )}
+                        {funding && funding !== 'Unknown' && (
+                          <span className="text-xs text-zinc-500">💼 {funding}</span>
+                        )}
+                      </div>
+                      {techStack && techStack.length > 0 && (
+                        <div className="flex flex-wrap gap-1 pt-0.5">
+                          {techStack.map(t => (
+                            <span key={t} className="text-xs px-1.5 py-0.5 rounded bg-zinc-800 border border-zinc-700 text-zinc-400">
+                              {t}
+                            </span>
+                          ))}
+                        </div>
                       )}
                     </div>
                   </div>
-                </div>
-              )}
+                )
+              })()}
 
               {/* Tags */}
               {job.tags && job.tags.length > 0 && (
@@ -322,6 +369,15 @@ export function JobDetail({ job, onClose, onApplicationChange }: JobDetailProps)
 
               {/* Cover Letter */}
               <CoverLetterSection jobId={job.id} />
+
+              {/* Prep link */}
+              <Link
+                href={`/prep?job_id=${job.id}`}
+                className="flex items-center justify-between rounded-lg border border-zinc-800 px-4 py-2.5 text-xs text-zinc-500 hover:border-zinc-700 hover:text-zinc-300 transition-colors group"
+              >
+                <span>Prep for interview</span>
+                <span className="group-hover:translate-x-0.5 transition-transform">→</span>
+              </Link>
 
               {/* Description */}
               {job.description && (

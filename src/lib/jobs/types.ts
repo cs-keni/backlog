@@ -4,6 +4,22 @@ export interface CompanyProfile {
   description: string | null
   headcount_range: string | null
   funding_stage: string | null
+  tech_stack: string[] | null
+  enriched_at: string | null
+}
+
+export interface StarResponse {
+  id: string
+  user_id: string
+  company_id: string | null
+  question: string
+  situation: string | null
+  task: string | null
+  action: string | null
+  result: string | null
+  full_response: string | null
+  created_at: string
+  updated_at: string
 }
 
 export interface Application {

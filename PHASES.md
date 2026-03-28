@@ -482,15 +482,22 @@ Additional sources (LinkedIn, Indeed, Glassdoor) are deferred to a future phase 
 
 ### Phase 7 — Company Intelligence & Interview Prep
 
-- [ ] **Enrich `company_profiles` stubs** from Phase 2 — LLM reads accumulated job postings for a company and fills in description, headcount estimate, funding stage, inferred tech stack
-- [ ] Glassdoor rating: integrate a third-party data source (Clearbit, RapidAPI wrapper, or similar) — do not use LLM for this, it cannot look up live ratings
-- [ ] Company panel on job detail now renders full enriched data
-- [ ] Behavioral and technical question bank per company (LLM-generated from job descriptions, community-sourced)
-- [ ] Per-application "Prep" tab surfacing company-specific questions
-- [ ] STAR response builder: input question → Claude drafts structured response (S/T/A/R sections) using user profile + resume → user edits and saves to `star_responses` table
-- [ ] Saved responses linked to `company_id` (nullable for general-purpose responses); surfaced on any application to that company; used as few-shot context by extension LLM calls
-- [ ] Unit tests: STAR prompt builder, response storage/retrieval
-- [ ] E2E test: open prep tab → generate STAR response → save → verify persisted
+**Company enrichment**
+- [x] `POST /api/company/[id]/enrich` — lazy enrichment triggered on first job detail view for a company; LLM reads all accumulated job postings for that company and fills in description, headcount estimate, funding stage, inferred tech stack; marks `enriched_at` on `company_profiles`; subsequent views use cached data, no re-call
+- [x] No Glassdoor API integration — Clearbit is sunset and third-party wrappers are unreliable; instead surface a "View on Glassdoor" link that constructs a glassdoor.com search URL from the company name
+- [x] Company panel on job detail renders enriched data: description, headcount estimate, funding stage, tech stack chips, and Glassdoor search link
+
+**Interview prep**
+- [x] Question bank per company: `GET /api/company/[id]/questions` — lazily generated on first Prep tab open for a given company; GPT-4o-mini reads that company's job descriptions and generates a mix of behavioral and technical questions; stored in `company_profiles.behavioral_questions` + `technical_questions`; subsequent opens use cached questions
+- [x] Per-application "Prep" tab with three sections:
+  - **Materials** — tailored resume download link (if a `resume_versions` row exists for this job) and cover letter download link (if a `cover_letters` row exists for this application); both shown as cards so everything is in one place before an interview
+  - **Questions** — company-specific behavioral and technical questions loaded from the question bank
+  - **STAR Responses** — list of saved responses for this company; prompt to add new ones
+- [x] STAR response builder: input question → Claude drafts structured response (S/T/A/R sections) using user profile + work history as context → user edits and saves to `star_responses` table
+- [x] Saved STAR responses linked to `company_id` (nullable for general-purpose); surfaced on any application to that company; used as few-shot context in Phase 10 extension LLM calls
+- [x] "Prep for interview →" link in job detail panel navigates to `/prep?job_id=xxx`
+- [ ] Unit tests: enrichment prompt builder, question bank prompt builder, STAR prompt builder
+- [ ] E2E test: open Prep tab → generate STAR response → save → verify persisted
 
 ### Phase 8 — Notifications & Alerts
 

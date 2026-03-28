@@ -1,9 +1,10 @@
-export default function PrepPage() {
-  return (
-    <div className="flex h-full items-center justify-center">
-      <div className="text-center">
-        <p className="text-sm text-zinc-500">Interview prep coming in Phase 7</p>
-      </div>
-    </div>
-  )
+import { PrepClient } from '@/components/prep/PrepClient'
+
+interface PrepPageProps {
+  searchParams: Promise<{ job_id?: string }>
+}
+
+export default async function PrepPage({ searchParams }: PrepPageProps) {
+  const { job_id } = await searchParams
+  return <PrepClient jobId={job_id ?? null} />
 }

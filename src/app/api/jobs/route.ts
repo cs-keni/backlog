@@ -54,7 +54,9 @@ export async function GET(request: NextRequest) {
         name,
         description,
         headcount_range,
-        funding_stage
+        funding_stage,
+        tech_stack,
+        enriched_at
       ),
       applications!left (
         id,
