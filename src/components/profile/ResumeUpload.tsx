@@ -163,10 +163,9 @@ export function ResumeUpload({ resumeUrl, hasResumeText, onUpload, onAnalyze }: 
             exit={{ opacity: 0 }}
             className="rounded-lg border border-yellow-800/50 bg-yellow-950/30 px-3 py-2 space-y-1"
           >
-            <p className="text-xs text-yellow-400 font-medium">Resume uploaded but text extraction failed</p>
+            <p className="text-xs text-yellow-400 font-medium">Resume saved, but text could not be extracted</p>
             <p className="text-xs text-zinc-400">
-              The PDF was saved but couldn&apos;t be read — AI analysis was skipped.
-              {lastResult.extraction_error && <> Error: <span className="text-zinc-300">{lastResult.extraction_error}</span></>}
+              Your PDF appears to be image-based (scanned or printed). Re-export it directly from Word, Google Docs, or Figma using &quot;Save as PDF&quot; — not a scan or print-to-PDF — then re-upload.
             </p>
           </motion.div>
         )}
