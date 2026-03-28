@@ -446,26 +446,20 @@ Additional sources (LinkedIn, Indeed, Glassdoor) are deferred to a future phase 
 
 ### Phase 5 — Resume & Profile
 
-- [ ] Profile page with all structured fields from `users` schema: personal info, contact, work authorization, preferences, experience level, years of experience
-- [ ] Work history section (`work_history` table): add/edit/delete structured entries (company, title, dates, description, is_current)
-- [ ] Education section (`education` table): add/edit/delete structured entries (school, degree, field, GPA, graduation year)
-- [ ] Skills list (user-managed tags)
-- [ ] Pre-written answers (`saved_answers` table): user can add question/answer pairs for common prompts — these will be used by the extension before falling back to LLM
-- [ ] PDF resume upload → text extraction via `pdf-parse` (`lib/pdf/parser.ts`) → store in `users.resume_text`; auto-extract skills and populate suggestions
-- [ ] **Job fit score** (`lib/llm/matcher.ts`) — percentage 0–100 shown on every job card and detail panel:
-  - Inputs: `users.skills[]` (available without resume upload) + `users.resume_text` (if uploaded) vs job `tags[]` + `description`
-  - Skills-only mode: if no resume, compare `users.skills[]` against job `tags[]` — simple overlap score, no LLM needed, available as soon as user adds skills
-  - Full mode: once resume is uploaded, GPT-4o-mini compares full resume text vs JD → score + 1-line rationale
-  - Lazy: compute on first view per (user, job), cache in `match_scores`
-  - Invalidate: set `is_stale = true` on all user's scores when skills or resume changes
-  - Recompute stale scores on next view
-  - Display: color-coded ring (green ≥70%, yellow 40–69%, red <40%) with percentage + rationale tooltip
-- [ ] Replace Phase 3 match score placeholder with real scores on job cards and detail panel
-- [ ] **"Tailor resume for this job"** — Claude Sonnet rewrites resume bullets aligned to JD:
-  - Save tailored version to `resume_versions` table with `job_id` reference
-  - Generate PDF via `@react-pdf/renderer` (`lib/pdf/generator.ts`)
+- [x] Profile page with all structured fields from `users` schema: personal info, contact, work authorization, preferences, experience level, years of experience
+- [x] Work history section (`work_history` table): add/edit/delete structured entries (company, title, dates, description, is_current)
+- [x] Education section (`education` table): add/edit/delete structured entries (school, degree, field, GPA, graduation year)
+- [x] Skills list (user-managed tags)
+- [x] Pre-written answers (`saved_answers` table): user can add question/answer pairs for common prompts — these will be used by the extension before falling back to LLM
+- [x] PDF resume upload → text extraction (`lib/pdf/parser.ts`, unpdf + pdf-parse fallback) → store in `users.resume_text`; AI auto-extracts skills, work history, education, personal info, and Q&A pairs
+- [x] **Job fit score** (`lib/llm/matcher.ts`) — percentage 0–100 shown on every job card and detail panel
+- [x] Replace Phase 3 match score placeholder with real scores on job cards and detail panel
+- [x] **"Tailor resume for this job"** — Claude Sonnet rewrites resume bullets aligned to JD:
+  - Saved to `resume_versions` table with `job_id` reference
+  - PDF generated via `@react-pdf/renderer` (`lib/pdf/resume-generator.tsx`)
   - Base `users.resume_url` is never overwritten
-- [ ] Profile completeness indicator with per-section breakdown and callouts ("Add work history to improve auto-fill accuracy")
+  - "Re-tailor" option regenerates if job description changes
+- [x] Profile completeness indicator
 - [ ] Unit tests: PDF text extraction, resume version creation, score cache invalidation logic
 - [ ] Integration tests: match score API returns cached score on second call; upload new resume → existing scores marked stale
 

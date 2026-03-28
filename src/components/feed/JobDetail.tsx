@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -34,9 +34,60 @@ function formatDate(iso: string): string {
   })
 }
 
+interface ResumeVersion {
+  id: string
+  pdf_url: string
+  created_at: string
+}
+
 export function JobDetail({ job, onClose, onApplicationChange }: JobDetailProps) {
   const router = useRouter()
   const [actionState, setActionState] = useState<'idle' | 'loading'>('idle')
+  const [tailorState, setTailorState] = useState<'idle' | 'loading' | 'done' | 'error'>('idle')
+  const tailoring = tailorState === 'loading'
+  const [tailoredVersion, setTailoredVersion] = useState<ResumeVersion | null>(null)
+  const [tailorError, setTailorError] = useState<string | null>(null)
+
+  // Load existing tailored version when job changes
+  useEffect(() => {
+    if (!job) return
+    setTailoredVersion(null)
+    setTailorState('idle')
+    fetch(`/api/resume/tailor?job_id=${job.id}`)
+      .then(r => r.json())
+      .then((data: ResumeVersion | null) => {
+        if (data?.pdf_url) {
+          setTailoredVersion(data)
+          setTailorState('done')
+        }
+      })
+      .catch(() => {})
+  }, [job?.id])
+
+  async function handleTailor() {
+    if (!job || tailorState === 'loading') return
+    setTailorState('loading')
+    setTailorError(null)
+    try {
+      const res = await fetch('/api/resume/tailor', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ job_id: job.id }),
+      })
+      if (res.ok) {
+        const data = await res.json() as ResumeVersion
+        setTailoredVersion(data)
+        setTailorState('done')
+      } else {
+        const err = await res.json() as { error: string }
+        setTailorError(err.error ?? 'Tailoring failed')
+        setTailorState('error')
+      }
+    } catch {
+      setTailorError('Something went wrong — please try again')
+      setTailorState('error')
+    }
+  }
 
   const application = job?.applications?.[0]
 
@@ -220,6 +271,63 @@ export function JobDetail({ job, onClose, onApplicationChange }: JobDetailProps)
                   </div>
                 </div>
               )}
+
+              {/* Tailor resume */}
+              <div className="space-y-2">
+                <h3 className="text-xs font-semibold text-zinc-400 uppercase tracking-wide">Resume</h3>
+                <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-3 space-y-2">
+                  {tailorState === 'done' && tailoredVersion ? (
+                    <div className="space-y-2">
+                      <p className="text-xs text-zinc-400">
+                        Tailored resume ready{' '}
+                        <span className="text-zinc-500">
+                          · {new Date(tailoredVersion.created_at).toLocaleDateString()}
+                        </span>
+                      </p>
+                      <div className="flex gap-2">
+                        <a
+                          href={tailoredVersion.pdf_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex-1 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-center text-xs text-zinc-200 transition-colors"
+                        >
+                          Download PDF
+                        </a>
+                        <button
+                          onClick={handleTailor}
+                          disabled={tailoring}
+                          className="px-3 py-1.5 rounded-lg border border-zinc-700 text-xs text-zinc-400 hover:text-zinc-200 hover:border-zinc-600 transition-colors disabled:opacity-50"
+                        >
+                          Re-tailor
+                        </button>
+                      </div>
+                    </div>
+                  ) : tailorState === 'loading' ? (
+                    <div className="flex items-center gap-2 py-1">
+                      <svg className="animate-spin h-3.5 w-3.5 text-zinc-500 shrink-0" viewBox="0 0 24 24" fill="none">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                      </svg>
+                      <span className="text-xs text-zinc-500">Claude is tailoring your resume…</span>
+                    </div>
+                  ) : (
+                    <div className="space-y-1.5">
+                      <p className="text-xs text-zinc-500">
+                        Generate a version of your resume tailored to this job&apos;s requirements.
+                      </p>
+                      {tailorState === 'error' && tailorError && (
+                        <p className="text-xs text-red-400">{tailorError}</p>
+                      )}
+                      <button
+                        onClick={handleTailor}
+                        className="w-full py-1.5 rounded-lg border border-dashed border-zinc-700 text-xs text-zinc-400 hover:text-zinc-200 hover:border-zinc-500 transition-colors"
+                      >
+                        ✦ Tailor resume for this job
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
 
             {/* Action footer */}
