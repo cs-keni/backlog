@@ -147,6 +147,15 @@ export function CoverLetterSection({ jobId }: CoverLetterSectionProps) {
                   {copied ? 'Copied!' : 'Copy'}
                 </button>
                 {!editing && (
+                  <a
+                    href={`/api/cover-letter/${letter.id}/pdf`}
+                    download="cover-letter.pdf"
+                    className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors px-2 py-1 rounded hover:bg-zinc-800"
+                  >
+                    Download PDF
+                  </a>
+                )}
+                {!editing && (
                   <button
                     onClick={() => {
                       setDraftContent(letter.content)

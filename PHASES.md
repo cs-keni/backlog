@@ -476,6 +476,7 @@ Additional sources (LinkedIn, Indeed, Glassdoor) are deferred to a future phase 
 - [x] Template override option (user can force a specific template before generating)
 - [x] Re-generate with new template from the done state
 - [x] Copy to clipboard button
+- [x] Download as PDF button
 - [ ] Unit tests: template selection logic, cover letter prompt builder
 - [ ] Integration test: generate → save → retrieve by application_id
 
