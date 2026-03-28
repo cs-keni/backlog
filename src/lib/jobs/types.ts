@@ -2,6 +2,9 @@ export interface CompanyProfile {
   id: string
   name: string
   description: string | null
+  mission: string | null
+  notable_products: string[] | null
+  website_url: string | null
   headcount_range: string | null
   funding_stage: string | null
   tech_stack: string[] | null

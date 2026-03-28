@@ -15,7 +15,8 @@ export async function GET(
     .select(`
       id, title, company, company_id,
       company_profiles (
-        id, name, description, headcount_range, funding_stage, tech_stack, enriched_at
+        id, name, description, mission, notable_products, website_url,
+        headcount_range, funding_stage, tech_stack, enriched_at
       ),
       applications!left ( id, status )
     `)

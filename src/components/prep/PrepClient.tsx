@@ -6,18 +6,15 @@ import { motion } from 'framer-motion'
 import { MaterialsSection } from './MaterialsSection'
 import { QuestionBank } from './QuestionBank'
 import { StarResponseSection } from './StarResponseSection'
-import type { StarResponse } from '@/lib/jobs/types'
+import { CompanyIntelligence } from './CompanyIntelligence'
+import type { StarResponse, CompanyProfile } from '@/lib/jobs/types'
 
 interface JobSummary {
   id: string
   title: string
   company: string
   company_id: string | null
-  company_profiles: {
-    id: string
-    name: string
-    enriched_at: string | null
-  } | null
+  company_profiles: CompanyProfile | null
 }
 
 interface ApplicationSummary {
@@ -126,16 +123,25 @@ function PrepView({ jobId }: PrepViewProps) {
   const [job, setJob] = useState<JobSummary | null>(null)
   const [loading, setLoading] = useState(true)
   const [starResponses, setStarResponses] = useState<StarResponse[]>([])
+  const [enriching, setEnriching] = useState(false)
+  const [companyProfile, setCompanyProfile] = useState<CompanyProfile | null>(null)
 
   useEffect(() => {
     fetch(`/api/jobs/${jobId}`)
       .then(r => r.json())
       .then((data: JobSummary) => {
         setJob(data)
+        setCompanyProfile(data.company_profiles)
 
-        // Fire-and-forget enrichment if not yet done
         if (data.company_id && !data.company_profiles?.enriched_at) {
-          fetch(`/api/company/${data.company_id}/enrich`, { method: 'POST' }).catch(() => {})
+          setEnriching(true)
+          fetch(`/api/company/${data.company_id}/enrich`, { method: 'POST' })
+            .then(r => r.ok ? r.json() : null)
+            .then((enriched: CompanyProfile | null) => {
+              if (enriched) setCompanyProfile(enriched)
+            })
+            .catch(() => {})
+            .finally(() => setEnriching(false))
         }
       })
       .catch(() => {})
@@ -181,6 +187,11 @@ function PrepView({ jobId }: PrepViewProps) {
         <h1 className="text-base font-semibold text-zinc-100">{job.title}</h1>
         <p className="text-sm text-zinc-500">{job.company}</p>
       </div>
+
+      {/* Company intelligence */}
+      {companyProfile && (
+        <CompanyIntelligence company={companyProfile} enriching={enriching} />
+      )}
 
       {/* Materials */}
       <MaterialsSection jobId={jobId} />

@@ -1,8 +1,10 @@
-export const maxDuration = 30
+export const maxDuration = 45
 
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { enrichCompany } from '@/lib/llm/company-enricher'
+
+const FULL_SELECT = 'id, name, description, mission, notable_products, website_url, headcount_range, funding_stage, tech_stack, enriched_at'
 
 export async function POST(
   _request: Request,
@@ -14,10 +16,9 @@ export async function POST(
 
   const { id } = await params
 
-  // Return cached enrichment if it already exists
   const { data: company } = await supabase
     .from('company_profiles')
-    .select('id, name, description, headcount_range, funding_stage, tech_stack, enriched_at')
+    .select(FULL_SELECT)
     .eq('id', id)
     .single()
 
@@ -27,12 +28,11 @@ export async function POST(
     return Response.json(company)
   }
 
-  // Fetch up to 5 job descriptions for this company
+  // Fetch up to 5 recent jobs — include URL for website extraction
   const { data: jobs } = await supabase
     .from('jobs')
-    .select('title, description')
+    .select('title, description, url')
     .eq('company_id', id)
-    .not('description', 'is', null)
     .order('fetched_at', { ascending: false })
     .limit(5)
 
@@ -43,13 +43,16 @@ export async function POST(
     .from('company_profiles')
     .update({
       description: result.description || company.description,
+      mission: result.mission || null,
+      notable_products: result.notable_products.length ? result.notable_products : null,
+      website_url: result.website_url || null,
       headcount_range: result.headcount_range || company.headcount_range,
       funding_stage: result.funding_stage || company.funding_stage,
-      tech_stack: result.tech_stack,
+      tech_stack: result.tech_stack.length ? result.tech_stack : null,
       enriched_at: new Date().toISOString(),
     })
     .eq('id', id)
-    .select('id, name, description, headcount_range, funding_stage, tech_stack, enriched_at')
+    .select(FULL_SELECT)
     .single()
 
   return Response.json(updated ?? company)
