@@ -11,6 +11,7 @@ interface ApplicationDetailProps {
   onClose: () => void
   onStatusChange: (appId: string, newStatus: ApplicationStatus) => void
   onUpdate: (appId: string, patch: Partial<ApplicationWithJob>) => void
+  onDelete: (appId: string) => void
 }
 
 const STATUS_SEQUENCE: ApplicationStatus[] = [
@@ -59,11 +60,12 @@ function useDebounce<T>(value: T, delay: number): T {
   return debounced
 }
 
-export function ApplicationDetail({ app, onClose, onStatusChange, onUpdate }: ApplicationDetailProps) {
+export function ApplicationDetail({ app, onClose, onStatusChange, onUpdate, onDelete }: ApplicationDetailProps) {
   const [timeline, setTimeline] = useState<TimelineEntry[]>([])
   const [recruiterName, setRecruiterName] = useState('')
   const [recruiterEmail, setRecruiterEmail] = useState('')
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved'>('idle')
+  const [deleteState, setDeleteState] = useState<'idle' | 'confirm' | 'deleting'>('idle')
   const prevAppId = useRef<string | null>(null)
 
   const debouncedName = useDebounce(recruiterName, 800)
@@ -77,6 +79,7 @@ export function ApplicationDetail({ app, onClose, onStatusChange, onUpdate }: Ap
 
     setRecruiterName(app.recruiter_name ?? '')
     setRecruiterEmail(app.recruiter_email ?? '')
+    setDeleteState('idle')
     setTimeline([])
 
     fetch(`/api/applications/${app.id}`)
@@ -116,6 +119,21 @@ export function ApplicationDetail({ app, onClose, onStatusChange, onUpdate }: Ap
     onUpdate(app.id, { notes })
     await saveField({ notes })
   }, [app, saveField, onUpdate])
+
+  async function handleDelete() {
+    if (!app) return
+    if (deleteState === 'idle') {
+      setDeleteState('confirm')
+      // Auto-reset confirm state after 3s if not acted on
+      setTimeout(() => setDeleteState((s) => s === 'confirm' ? 'idle' : s), 3000)
+      return
+    }
+    if (deleteState === 'confirm') {
+      setDeleteState('deleting')
+      await fetch(`/api/applications/${app.id}`, { method: 'DELETE' })
+      onDelete(app.id)
+    }
+  }
 
   async function handleStatusChange(newStatus: ApplicationStatus) {
     if (!app || newStatus === app.status) return
@@ -167,6 +185,23 @@ export function ApplicationDetail({ app, onClose, onStatusChange, onUpdate }: Ap
                     {saveState === 'saving' ? 'Saving…' : 'Saved'}
                   </span>
                 )}
+                <button
+                  onClick={handleDelete}
+                  disabled={deleteState === 'deleting'}
+                  className={`text-xs px-2 py-0.5 rounded transition-all disabled:opacity-50 ${
+                    deleteState === 'confirm'
+                      ? 'text-red-400 border border-red-500/50 bg-red-500/10'
+                      : 'text-zinc-600 hover:text-red-400 transition-colors'
+                  }`}
+                  aria-label="Delete application"
+                  title={deleteState === 'confirm' ? 'Click again to confirm' : 'Delete application'}
+                >
+                  {deleteState === 'confirm' ? 'Confirm?' : deleteState === 'deleting' ? '…' : (
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                  )}
+                </button>
                 <button
                   onClick={onClose}
                   className="text-zinc-500 hover:text-zinc-300 transition-colors"

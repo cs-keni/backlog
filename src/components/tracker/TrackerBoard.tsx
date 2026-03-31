@@ -109,6 +109,11 @@ export function TrackerBoard({ initialApplications }: TrackerBoardProps) {
     )
   }, [])
 
+  const handleDelete = useCallback((appId: string) => {
+    setApplications((prev) => prev.filter((a) => a.id !== appId))
+    setSelectedId(null)
+  }, [])
+
   const appsByStatus = COLUMNS.reduce<Record<string, ApplicationWithJob[]>>((acc, col) => {
     acc[col.id] = applications.filter((a) => a.status === col.id)
     return acc
@@ -166,6 +171,7 @@ export function TrackerBoard({ initialApplications }: TrackerBoardProps) {
               onClose={() => setSelectedId(null)}
               onStatusChange={handleStatusChange}
               onUpdate={handleUpdate}
+              onDelete={handleDelete}
             />
           </motion.div>
         )}
@@ -178,6 +184,7 @@ export function TrackerBoard({ initialApplications }: TrackerBoardProps) {
           onClose={() => setSelectedId(null)}
           onStatusChange={handleStatusChange}
           onUpdate={handleUpdate}
+          onDelete={handleDelete}
         />
       </div>
     </div>
