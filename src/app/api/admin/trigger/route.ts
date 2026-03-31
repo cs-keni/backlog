@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 
-// Worker responds immediately (fire-and-forget), so this doesn't need a long timeout
-export const maxDuration = 10
+// Worker responds immediately once awake, but Render free tier has ~30-60s cold starts
+export const maxDuration = 60
 
 export async function POST(request: Request) {
   const workerUrl = process.env.WORKER_URL
