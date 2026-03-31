@@ -80,9 +80,9 @@ const server = http.createServer(async (req, res) => {
     return
   }
 
-  if (req.method === 'GET' && req.url === '/health') {
+  if ((req.method === 'GET' || req.method === 'HEAD') && req.url === '/health') {
     res.writeHead(200, { 'Content-Type': 'application/json' })
-    res.end(JSON.stringify({ ok: true }))
+    res.end(req.method === 'HEAD' ? undefined : JSON.stringify({ ok: true }))
     return
   }
 
