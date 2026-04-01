@@ -80,6 +80,7 @@ export async function PATCH(
   if (body.notes !== undefined) updates.notes = body.notes
   if (body.recruiter_name !== undefined) updates.recruiter_name = body.recruiter_name
   if (body.recruiter_email !== undefined) updates.recruiter_email = body.recruiter_email
+  if (body.is_archived !== undefined) updates.is_archived = Boolean(body.is_archived)
   // Stamp applied_at the first time status reaches 'applied'
   if (body.status === 'applied') updates.applied_at = new Date().toISOString()
 

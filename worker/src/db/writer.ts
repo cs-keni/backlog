@@ -1,10 +1,16 @@
 import { supabase } from './client'
 import type { NormalizedJob } from '../llm/normalizer'
 
-export async function writeJobs(jobs: NormalizedJob[], roleType: 'full_time' | 'internship'): Promise<number> {
-  if (jobs.length === 0) return 0
+export interface WriteResult {
+  written: number
+  jobIds: string[]
+}
+
+export async function writeJobs(jobs: NormalizedJob[], roleType: 'full_time' | 'internship'): Promise<WriteResult> {
+  if (jobs.length === 0) return { written: 0, jobIds: [] }
 
   let written = 0
+  const writtenUrls: string[] = []
 
   for (const job of jobs) {
     const companyId = await getOrCreateCompany(job.company)
@@ -33,10 +39,21 @@ export async function writeJobs(jobs: NormalizedJob[], roleType: 'full_time' | '
       console.error(`[writer] Failed to write job "${job.title}" (${job.url}): ${error.message}`)
     } else {
       written++
+      writtenUrls.push(job.url)
     }
   }
 
-  return written
+  // Fetch IDs for the written jobs by URL
+  let jobIds: string[] = []
+  if (writtenUrls.length > 0) {
+    const { data } = await supabase
+      .from('jobs')
+      .select('id')
+      .in('url', writtenUrls)
+    jobIds = (data ?? []).map((r: { id: string }) => r.id)
+  }
+
+  return { written, jobIds }
 }
 
 // Upsert a minimal company_profiles stub — name only.

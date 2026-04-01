@@ -92,6 +92,7 @@ export interface ApplicationWithJob {
   user_id: string
   job_id: string
   status: ApplicationStatus
+  is_archived: boolean
   applied_at: string | null
   last_updated: string
   notes: Record<string, unknown> | null

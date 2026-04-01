@@ -12,6 +12,7 @@ interface ApplicationDetailProps {
   onStatusChange: (appId: string, newStatus: ApplicationStatus) => void
   onUpdate: (appId: string, patch: Partial<ApplicationWithJob>) => void
   onDelete: (appId: string) => void
+  onArchive: (appId: string, archived: boolean) => void
 }
 
 const STATUS_SEQUENCE: ApplicationStatus[] = [
@@ -60,7 +61,7 @@ function useDebounce<T>(value: T, delay: number): T {
   return debounced
 }
 
-export function ApplicationDetail({ app, onClose, onStatusChange, onUpdate, onDelete }: ApplicationDetailProps) {
+export function ApplicationDetail({ app, onClose, onStatusChange, onUpdate, onDelete, onArchive }: ApplicationDetailProps) {
   const [timeline, setTimeline] = useState<TimelineEntry[]>([])
   const [recruiterName, setRecruiterName] = useState('')
   const [recruiterEmail, setRecruiterEmail] = useState('')
@@ -119,6 +120,17 @@ export function ApplicationDetail({ app, onClose, onStatusChange, onUpdate, onDe
     onUpdate(app.id, { notes })
     await saveField({ notes })
   }, [app, saveField, onUpdate])
+
+  async function handleArchive() {
+    if (!app) return
+    const newArchived = !app.is_archived
+    onArchive(app.id, newArchived)
+    await fetch(`/api/applications/${app.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ is_archived: newArchived }),
+    })
+  }
 
   async function handleDelete() {
     if (!app) return
@@ -185,6 +197,16 @@ export function ApplicationDetail({ app, onClose, onStatusChange, onUpdate, onDe
                     {saveState === 'saving' ? 'Saving…' : 'Saved'}
                   </span>
                 )}
+                <button
+                  onClick={handleArchive}
+                  className={`transition-colors ${app.is_archived ? 'text-amber-400 hover:text-zinc-400' : 'text-zinc-600 hover:text-amber-400'}`}
+                  aria-label={app.is_archived ? 'Unarchive' : 'Archive'}
+                  title={app.is_archived ? 'Unarchive' : 'Archive'}
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" />
+                  </svg>
+                </button>
                 <button
                   onClick={handleDelete}
                   disabled={deleteState === 'deleting'}

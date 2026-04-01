@@ -15,7 +15,7 @@ export default async function TrackerPage() {
   const { data } = await supabase
     .from('applications')
     .select(`
-      id, status, applied_at, last_updated, notes, recruiter_name, recruiter_email,
+      id, status, is_archived, applied_at, last_updated, notes, recruiter_name, recruiter_email,
       jobs (
         id, title, company, location, salary_min, salary_max, url, is_remote, tags
       )

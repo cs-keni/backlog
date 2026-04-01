@@ -2,7 +2,7 @@ import 'dotenv/config' // only needed locally; Render injects env vars directly
 import http from 'http'
 import cron from 'node-cron'
 import { runAggregation } from './aggregator'
-import { sendJobsNotification } from './notifications/discord'
+import { dispatchNotifications } from './notifications/dispatcher'
 
 // Validate required env vars at startup rather than at first use
 const REQUIRED_ENV = [
@@ -41,7 +41,7 @@ async function runAndNotify(force = false): Promise<{ written: number; skipped: 
   try {
     const result = await runAggregation(force)
     if (result.written > 0) {
-      await sendJobsNotification(result.newJobs, result.written)
+      await dispatchNotifications(result.newJobs, result.writtenJobIds)
     }
     return { written: result.written, skipped: result.skipped }
   } finally {

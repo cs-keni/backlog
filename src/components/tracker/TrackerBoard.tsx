@@ -15,6 +15,7 @@ import { useDroppable } from '@dnd-kit/core'
 import { motion, AnimatePresence } from 'framer-motion'
 import { ApplicationCard } from './ApplicationCard'
 import { ApplicationDetail } from './ApplicationDetail'
+import { ApplicationList } from './ApplicationList'
 import type { ApplicationWithJob, ApplicationStatus } from '@/lib/jobs/types'
 
 interface TrackerBoardProps {
@@ -35,6 +36,11 @@ export function TrackerBoard({ initialApplications }: TrackerBoardProps) {
   const [applications, setApplications] = useState<ApplicationWithJob[]>(initialApplications)
   const [activeId, setActiveId] = useState<string | null>(null)
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [view, setView] = useState<'kanban' | 'list'>('kanban')
+  const [showArchived, setShowArchived] = useState(false)
+
+  const archivedCount = applications.filter(a => a.is_archived).length
+  const visibleApps = showArchived ? applications : applications.filter(a => !a.is_archived)
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } })
@@ -114,78 +120,139 @@ export function TrackerBoard({ initialApplications }: TrackerBoardProps) {
     setSelectedId(null)
   }, [])
 
+  const handleArchive = useCallback((appId: string, archived: boolean) => {
+    setApplications((prev) =>
+      prev.map((a) => a.id === appId ? { ...a, is_archived: archived } : a)
+    )
+    // Close detail panel when archiving (card leaves active view)
+    if (archived && !showArchived) setSelectedId(null)
+  }, [showArchived])
+
   const appsByStatus = COLUMNS.reduce<Record<string, ApplicationWithJob[]>>((acc, col) => {
-    acc[col.id] = applications.filter((a) => a.status === col.id)
+    acc[col.id] = visibleApps.filter((a) => a.status === col.id)
     return acc
   }, {})
 
   return (
-    <div className="flex h-full overflow-hidden">
-      {/* Kanban */}
-      <div className="flex-1 overflow-x-auto">
-        <DndContext
-          sensors={sensors}
-          collisionDetection={closestCenter}
-          onDragStart={handleDragStart}
-          onDragEnd={handleDragEnd}
-        >
-          <div className="flex gap-3 p-5 h-full min-w-max">
-            {COLUMNS.map((col) => (
-              <KanbanColumn
-                key={col.id}
-                column={col}
-                apps={appsByStatus[col.id] ?? []}
-                selectedId={selectedId}
-                onCardClick={setSelectedId}
-              />
-            ))}
-          </div>
+    <div className="flex flex-col h-full overflow-hidden">
+      {/* Toolbar */}
+      <div className="shrink-0 flex items-center gap-2 px-4 py-2 border-b border-zinc-800">
+        {/* View toggle */}
+        <div className="flex items-center rounded-md border border-zinc-800 p-0.5 bg-zinc-900">
+          <button
+            onClick={() => setView('kanban')}
+            className={`p-1.5 rounded transition-colors ${view === 'kanban' ? 'bg-zinc-700 text-zinc-100' : 'text-zinc-500 hover:text-zinc-300'}`}
+            title="Kanban view"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 4H5a1 1 0 00-1 1v14a1 1 0 001 1h4a1 1 0 001-1V5a1 1 0 00-1-1zm10 0h-4a1 1 0 00-1 1v6a1 1 0 001 1h4a1 1 0 001-1V5a1 1 0 00-1-1z" />
+            </svg>
+          </button>
+          <button
+            onClick={() => setView('list')}
+            className={`p-1.5 rounded transition-colors ${view === 'list' ? 'bg-zinc-700 text-zinc-100' : 'text-zinc-500 hover:text-zinc-300'}`}
+            title="List view"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 10h16M4 14h16M4 18h16" />
+            </svg>
+          </button>
+        </div>
 
-          <DragOverlay dropAnimation={{ duration: 160, easing: 'ease-out' }}>
-            {activeApp && (
-              <ApplicationCard
-                app={activeApp}
-                index={0}
-                isSelected={false}
-                isDragOverlay
-                onClick={() => {}}
-              />
-            )}
-          </DragOverlay>
-        </DndContext>
+        {/* Archive toggle */}
+        {archivedCount > 0 && (
+          <button
+            onClick={() => setShowArchived(s => !s)}
+            className={`flex items-center gap-1.5 text-[11px] px-2.5 py-1 rounded-md border transition-colors ${
+              showArchived
+                ? 'border-amber-500/40 bg-amber-500/10 text-amber-400'
+                : 'border-zinc-700 text-zinc-500 hover:text-zinc-300 hover:border-zinc-600'
+            }`}
+          >
+            <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" />
+            </svg>
+            {showArchived ? 'Hide archived' : `Show archived (${archivedCount})`}
+          </button>
+        )}
       </div>
 
-      {/* Desktop detail panel */}
-      <AnimatePresence>
-        {selectedApp && (
-          <motion.div
-            key="detail-panel"
-            initial={{ width: 0, opacity: 0 }}
-            animate={{ width: 380, opacity: 1 }}
-            exit={{ width: 0, opacity: 0 }}
-            transition={{ type: 'spring', stiffness: 350, damping: 35 }}
-            className="shrink-0 hidden lg:block border-l border-zinc-800 overflow-hidden"
-          >
-            <ApplicationDetail
-              app={selectedApp}
-              onClose={() => setSelectedId(null)}
-              onStatusChange={handleStatusChange}
-              onUpdate={handleUpdate}
-              onDelete={handleDelete}
+      <div className="flex flex-1 overflow-hidden">
+        {/* Kanban / List */}
+        <div className="flex-1 overflow-x-auto">
+          {view === 'kanban' ? (
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragStart={handleDragStart}
+              onDragEnd={handleDragEnd}
+            >
+              <div className="flex gap-3 p-5 h-full min-w-max">
+                {COLUMNS.map((col) => (
+                  <KanbanColumn
+                    key={col.id}
+                    column={col}
+                    apps={appsByStatus[col.id] ?? []}
+                    selectedId={selectedId}
+                    onCardClick={setSelectedId}
+                  />
+                ))}
+              </div>
+              <DragOverlay dropAnimation={{ duration: 160, easing: 'ease-out' }}>
+                {activeApp && (
+                  <ApplicationCard
+                    app={activeApp}
+                    index={0}
+                    isSelected={false}
+                    isDragOverlay
+                    onClick={() => {}}
+                  />
+                )}
+              </DragOverlay>
+            </DndContext>
+          ) : (
+            <ApplicationList
+              applications={visibleApps}
+              selectedId={selectedId}
+              onSelect={(id) => setSelectedId(selectedId === id ? null : id)}
             />
-          </motion.div>
-        )}
-      </AnimatePresence>
+          )}
+        </div>
 
-      {/* Mobile detail (full-screen overlay via ApplicationDetail's own AnimatePresence) */}
-      <div className="lg:hidden">
-        <ApplicationDetail
-          app={selectedApp}
-          onClose={() => setSelectedId(null)}
-          onStatusChange={handleStatusChange}
-          onUpdate={handleUpdate}
-          onDelete={handleDelete}
-        />
+        {/* Desktop detail panel */}
+        <AnimatePresence>
+          {selectedApp && (
+            <motion.div
+              key="detail-panel"
+              initial={{ width: 0, opacity: 0 }}
+              animate={{ width: 380, opacity: 1 }}
+              exit={{ width: 0, opacity: 0 }}
+              transition={{ type: 'spring', stiffness: 350, damping: 35 }}
+              className="shrink-0 hidden lg:block border-l border-zinc-800 overflow-hidden"
+            >
+              <ApplicationDetail
+                app={selectedApp}
+                onClose={() => setSelectedId(null)}
+                onStatusChange={handleStatusChange}
+                onUpdate={handleUpdate}
+                onDelete={handleDelete}
+                onArchive={handleArchive}
+              />
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Mobile detail */}
+        <div className="lg:hidden">
+          <ApplicationDetail
+            app={selectedApp}
+            onClose={() => setSelectedId(null)}
+            onStatusChange={handleStatusChange}
+            onUpdate={handleUpdate}
+            onDelete={handleDelete}
+            onArchive={handleArchive}
+          />
+        </div>
       </div>
     </div>
   )
