@@ -1,0 +1,37 @@
+{
+  "manifest_version": 3,
+  "name": "Backlog",
+  "version": "1.0.0",
+  "description": "Auto-fill job applications and track them in Backlog",
+  "permissions": [
+    "storage",
+    "activeTab",
+    "scripting",
+    "tabs"
+  ],
+  "host_permissions": [
+    "https://*/*",
+    "http://*/*"
+  ],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Backlog"
+  },
+  "web_accessible_resources": [
+    {
+      "resources": ["chunks/*"],
+      "matches": ["<all_urls>"]
+    }
+  ]
+}

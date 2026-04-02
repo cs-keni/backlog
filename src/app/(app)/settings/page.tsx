@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { NotificationSettings } from '@/components/settings/NotificationSettings'
+import { ApiKeySettings } from '@/components/settings/ApiKeySettings'
 
 export const dynamic = 'force-dynamic'
 
@@ -27,6 +28,10 @@ export default async function SettingsPage() {
         <h1 className="text-lg font-semibold text-zinc-100">Settings</h1>
         <p className="text-sm text-zinc-500 mt-0.5">Manage how Backlog notifies you about new jobs.</p>
       </div>
+
+      <ApiKeySettings />
+
+      <div className="border-t border-zinc-800" />
 
       <NotificationSettings
         initialPrefs={{
