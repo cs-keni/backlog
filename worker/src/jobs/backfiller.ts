@@ -41,6 +41,7 @@ export async function backfillMissingSalaries(limit = 50): Promise<void> {
     title: row.title,
     company: row.company,
     location: row.location,
+    country: null,
     is_remote: row.is_remote,
     salary_min: null,
     salary_max: null,

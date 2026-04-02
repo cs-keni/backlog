@@ -36,6 +36,7 @@ export interface Job {
   company: string
   company_id: string | null
   location: string | null
+  country: string | null
   salary_min: number | null
   salary_max: number | null
   url: string
@@ -56,6 +57,7 @@ export type DateRange = '' | '24h' | '7d' | '30d' | '1y'
 export interface FeedFilters {
   location: string
   isRemote: 'all' | 'remote' | 'onsite'
+  country: 'all' | 'us' | 'international'
   salaryMin: string
   experienceLevel: string
   roleType: string

@@ -5,6 +5,7 @@ export interface NormalizedJob {
   title: string
   company: string
   location: string | null
+  country: string | null // "United States" | "United Kingdom" | "Canada" | etc.
   is_remote: boolean
   salary_min: number | null
   salary_max: number | null
@@ -51,6 +52,7 @@ Each object must have these fields:
 - "title": string — cleaned job title
 - "company": string — company name
 - "location": string | null — primary location (null if truly unknown)
+- "country": string | null — full country name in English ("United States", "United Kingdom", "Canada", "Germany", "France", "Australia", "Singapore", "India", etc.); default to "United States" if the location is a US city/state or plain "Remote" with no other geographic indicator; null only if the location is truly absent
 - "is_remote": boolean — true if the role is remote or hybrid
 - "salary_min": number | null — annual USD minimum salary if mentioned, otherwise null
 - "salary_max": number | null — annual USD maximum salary if mentioned, otherwise null
@@ -82,6 +84,7 @@ Return ONLY the JSON object, no markdown, no explanation.`
         title: typeof item.title === 'string' ? item.title : raw.title,
         company: typeof item.company === 'string' ? item.company : raw.company,
         location: typeof item.location === 'string' ? item.location : null,
+        country: typeof item.country === 'string' ? item.country : null,
         is_remote: Boolean(item.is_remote),
         salary_min: typeof item.salary_min === 'number' ? item.salary_min : null,
         salary_max: typeof item.salary_max === 'number' ? item.salary_max : null,
@@ -104,6 +107,7 @@ function fallbackNormalize(raw: RawJobEntry): NormalizedJob {
     title: raw.title,
     company: raw.company,
     location: raw.location || null,
+    country: 'United States', // safe default: SimplifyJobs is a US-focused repo
     is_remote: loc.includes('remote') || loc.includes('hybrid'),
     salary_min: null,
     salary_max: null,

@@ -18,6 +18,7 @@ interface Cursor {
 const DEFAULT_FILTERS: FeedFilters = {
   location: '',
   isRemote: 'all',
+  country: 'all',
   salaryMin: '',
   experienceLevel: '',
   roleType: '',
@@ -34,6 +35,7 @@ function buildParams(
   if (filters.location) params.set('location', filters.location)
   if (filters.isRemote === 'remote') params.set('is_remote', 'true')
   if (filters.isRemote === 'onsite') params.set('is_remote', 'false')
+  if (filters.country !== 'all') params.set('country', filters.country)
   if (filters.salaryMin) params.set('salary_min', filters.salaryMin)
   if (filters.experienceLevel) params.set('experience_level', filters.experienceLevel)
   if (filters.roleType) params.set('role_type', filters.roleType)

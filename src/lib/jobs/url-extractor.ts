@@ -4,6 +4,7 @@ export interface ExtractedJob {
   title: string
   company: string
   location: string | null
+  country: string | null
   salary_min: number | null
   salary_max: number | null
   description: string
@@ -57,6 +58,7 @@ async function fetchFromGreenhouse(url: string): Promise<ExtractedJob | null> {
     title: data.title ?? 'Untitled',
     company: parsed.company,
     location: data.location?.name ?? null,
+    country: null,
     salary_min,
     salary_max,
     description,
@@ -97,6 +99,7 @@ async function fetchFromLever(url: string): Promise<ExtractedJob | null> {
     title: data.text ?? 'Untitled',
     company: parsed.company,
     location: data.categories?.location ?? null,
+    country: null,
     salary_min,
     salary_max,
     description,
@@ -167,6 +170,7 @@ If a field cannot be determined, use null or [].`,
       title: parsed.title ?? 'Untitled',
       company: parsed.company ?? 'Unknown',
       location: parsed.location ?? null,
+      country: null,
       // Prefer regex result if GPT missed it
       salary_min: parsed.salary_min ?? salary_min,
       salary_max: parsed.salary_max ?? salary_max,
@@ -279,6 +283,7 @@ function extractFromJsonLd(html: string): Omit<ExtractedJob, 'url'> | null {
       title,
       company,
       location,
+      country: null,
       salary_min,
       salary_max,
       description,
@@ -306,6 +311,23 @@ function stripHtml(html: string): string {
 function isRemoteLocation(location?: string | null): boolean {
   if (!location) return false
   return /remote/i.test(location)
+}
+
+// Infers country from a location string. Returns "United States" as the default
+// since most pasted job URLs are US-based; returns a specific country only when
+// the location string contains a clear non-US indicator.
+function inferCountry(location: string | null): string {
+  if (!location) return 'United States'
+  const loc = location.toLowerCase()
+  if (/\buk\b|united kingdom|england|scotland|wales/.test(loc)) return 'United Kingdom'
+  if (/\bcanada\b|toronto|vancouver|montreal|calgary|ottawa|\bon\b|\bbc\b|\bqc\b/.test(loc)) return 'Canada'
+  if (/\bgermany\b|berlin|munich|frankfurt|hamburg|stuttgart/.test(loc)) return 'Germany'
+  if (/\bfrance\b|\bparis\b.*france|france.*\bparis\b/.test(loc)) return 'France'
+  if (/\baustralia\b|sydney|melbourne|brisbane/.test(loc)) return 'Australia'
+  if (/\bsingapore\b/.test(loc)) return 'Singapore'
+  if (/\bindia\b|bangalore|bengaluru|mumbai|hyderabad|pune/.test(loc)) return 'India'
+  if (/\bnetherlands\b|amsterdam/.test(loc)) return 'Netherlands'
+  return 'United States'
 }
 
 // ─── Main export ──────────────────────────────────────────────────────────────
@@ -339,7 +361,7 @@ export async function extractJobFromUrl(url: string): Promise<ExtractResult> {
       }
     }
 
-    return { ok: true, job }
+    return { ok: true, job: { ...job, country: inferCountry(job.location) } }
   } catch (err) {
     const isTimeout =
       err instanceof Error && err.name === 'TimeoutError'

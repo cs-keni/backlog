@@ -21,6 +21,7 @@ export async function writeJobs(jobs: NormalizedJob[], roleType: 'full_time' | '
         company: job.company,
         company_id: companyId,
         location: job.location,
+        country: job.country,
         salary_min: job.salary_min,
         salary_max: job.salary_max,
         description: job.description ?? null,

@@ -71,6 +71,7 @@ export async function POST(request: Request) {
       company: job.company,
       company_id: companyId,
       location: job.location,
+      country: job.country,
       salary_min: job.salary_min,
       salary_max: job.salary_max,
       url: job.url,

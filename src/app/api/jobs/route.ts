@@ -23,6 +23,7 @@ export async function GET(request: NextRequest) {
   // Filters
   const location = searchParams.get('location')
   const isRemote = searchParams.get('is_remote') // 'true' | 'false' | null
+  const country = searchParams.get('country') // 'us' | 'international' | null
   const salaryMin = searchParams.get('salary_min')
   const experienceLevel = searchParams.get('experience_level')
   const roleType = searchParams.get('role_type') // 'full_time' | 'internship' | 'contract'
@@ -38,6 +39,7 @@ export async function GET(request: NextRequest) {
       company,
       company_id,
       location,
+      country,
       salary_min,
       salary_max,
       url,
@@ -82,6 +84,9 @@ export async function GET(request: NextRequest) {
   // Filters
   if (isRemote === 'true') query = query.eq('is_remote', true)
   if (isRemote === 'false') query = query.eq('is_remote', false)
+  // "us" includes jobs with country = 'United States' OR null (unlabeled remote = US default)
+  if (country === 'us') query = query.or('country.eq.United States,country.is.null')
+  if (country === 'international') query = query.not('country', 'eq', 'United States').not('country', 'is', null)
   if (location) query = query.ilike('location', `%${location}%`)
   if (salaryMin) query = query.gte('salary_min', parseInt(salaryMin, 10))
   if (experienceLevel) query = query.eq('experience_level', experienceLevel)

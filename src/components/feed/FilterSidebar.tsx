@@ -39,12 +39,13 @@ export function FilterSidebar({ filters, onChange }: FilterSidebarProps) {
   }
 
   function reset() {
-    onChange({ location: '', isRemote: 'all', salaryMin: '', experienceLevel: '', roleType: '', dateRange: '' })
+    onChange({ location: '', isRemote: 'all', country: 'all', salaryMin: '', experienceLevel: '', roleType: '', dateRange: '' })
   }
 
   const hasActiveFilters =
     filters.location ||
     filters.isRemote !== 'all' ||
+    filters.country !== 'all' ||
     filters.salaryMin ||
     filters.experienceLevel ||
     filters.roleType ||
@@ -106,6 +107,26 @@ export function FilterSidebar({ filters, onChange }: FilterSidebarProps) {
                       }`}
                     >
                       {opt === 'all' ? 'All' : opt === 'remote' ? 'Remote' : 'On-site'}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Country */}
+              <div className="space-y-1.5">
+                <label className="text-[11px] text-zinc-500 font-medium">Country</label>
+                <div className="flex gap-1">
+                  {(['all', 'us', 'international'] as const).map((opt) => (
+                    <button
+                      key={opt}
+                      onClick={() => update({ country: opt })}
+                      className={`flex-1 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                        filters.country === opt
+                          ? 'bg-zinc-700 text-zinc-100'
+                          : 'bg-zinc-800/50 text-zinc-500 hover:text-zinc-300'
+                      }`}
+                    >
+                      {opt === 'all' ? 'Any' : opt === 'us' ? 'US' : 'Intl'}
                     </button>
                   ))}
                 </div>
