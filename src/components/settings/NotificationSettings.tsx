@@ -206,6 +206,38 @@ export function NotificationSettings({ initialPrefs, recentLogs, vapidPublicKey 
         </div>
       </section>
 
+      {/* Match threshold */}
+      <section className="space-y-4">
+        <div>
+          <h2 className="text-sm font-semibold text-zinc-200">Match threshold</h2>
+          <p className="text-xs text-zinc-500 mt-0.5">Only notify me for jobs at or above this match score</p>
+        </div>
+        <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 px-4 py-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-zinc-500">Min score</span>
+            <span className="text-sm font-semibold text-zinc-100 tabular-nums">
+              {prefs.alert_match_threshold}%
+            </span>
+          </div>
+          <input
+            type="range"
+            min={0}
+            max={100}
+            step={5}
+            value={prefs.alert_match_threshold}
+            onChange={e => setPrefs(p => ({ ...p, alert_match_threshold: Number(e.target.value) }))}
+            onMouseUp={e => savePref('alert_match_threshold', Number((e.target as HTMLInputElement).value))}
+            onTouchEnd={e => savePref('alert_match_threshold', Number((e.target as HTMLInputElement).value))}
+            className="w-full accent-zinc-400 h-1.5 rounded-full cursor-pointer"
+          />
+          <div className="flex justify-between text-[10px] text-zinc-600">
+            <span>Any</span>
+            <span>50%</span>
+            <span>100%</span>
+          </div>
+        </div>
+      </section>
+
       {/* Quiet hours */}
       <section className="space-y-4">
         <div>
