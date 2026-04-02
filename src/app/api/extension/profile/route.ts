@@ -15,7 +15,7 @@ export async function GET(request: Request) {
   const [userResult, workResult, eduResult, answersResult, starResult] = await Promise.all([
     supabase
       .from('users')
-      .select('id, email, full_name, phone, address, linkedin_url, github_url, portfolio_url, citizenship_status, visa_sponsorship_required, willing_to_relocate, resume_url, skills, experience_level, years_of_experience, preferred_locations, remote_preference')
+      .select('id, email, full_name, phone, address, linkedin_url, github_url, portfolio_url, citizenship_status, visa_sponsorship_required, willing_to_relocate, resume_url, skills, experience_level, years_of_experience, preferred_locations, remote_preference, gender, race_ethnicity, hispanic_latino, veteran_status, disability_status, desired_salary')
       .eq('id', auth.userId)
       .single(),
     supabase
