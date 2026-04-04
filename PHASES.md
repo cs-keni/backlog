@@ -539,29 +539,106 @@ For free-text prompts ("Why do you want to work here?"), the extension first che
 
 **Workday note:** Workday uses Angular-rendered inputs that require synthetic `InputEvent` + `change` event dispatch rather than direct `value` assignment. Supported best-effort — some forms may require manual correction in the review step.
 
-- [ ] Chrome extension scaffold (Manifest V3, content script, background service worker, popup)
-- [ ] API key system: generate user-scoped key in Backlog Settings → stored as hash in `api_keys` table → extension authenticates with raw key, server verifies against hash
-- [ ] Extension loads full structured profile on init (one API call) and caches locally for the session
-- [ ] Content script: DOM traversal to detect all form fields (label text, input type, name/id attributes, dropdowns, textareas, file inputs)
-- [ ] Targeted parsers for major ATS platforms: Greenhouse, Lever, Workday (best-effort), iCIMS, BambooHR
-- [ ] Standard field filling from cached profile — no LLM
-- [ ] Open-ended field handling: check `saved_answers` first → fall back to Claude Sonnet
-- [ ] LLM answer generation uses STAR responses from Phase 7 as examples where relevant
+- [x] Chrome extension scaffold (Manifest V3, content script, background service worker, popup)
+- [x] API key system: generate user-scoped key in Backlog Settings → stored as hash in `api_keys` table → extension authenticates with raw key, server verifies against hash
+- [x] Extension loads full structured profile on init (one API call) and caches locally for the session
+- [x] Content script: DOM traversal to detect all form fields — label text, aria-labelledby, wrapping `<label>`, aria-label, placeholder, name attribute; handles Greenhouse compliance dropdowns where label is sibling to wrapper
+- [x] Targeted parsers for Greenhouse (ID-based), Lever (placeholder-based), plus generic label-based fill for all other sites (iCIMS, BambooHR, AshbyHQ, custom forms)
+- [x] Standard field filling from cached profile — no LLM; regex FIELD_MAP covers name, email, phone, address, city/state/zip, URLs, work auth, salary, education, EEO self-identification
+- [x] Cross-origin iframe detection — if main frame fills nothing, enumerates frames via `webNavigation.getAllFrames` and retries (handles Greenhouse/Lever embedded via iframe on company career pages)
+- [x] "Add to Backlog" button in extension popup: content script extracts page title, company, description → sends to Backlog API → normalized and added as `source = 'manual'`; solves JS-rendered page problem
+- [x] EEO fields + salary added to DB (`users` table — migration 10) and wired into extension fill logic: `gender`, `race_ethnicity`, `hispanic_latino`, `veteran_status`, `disability_status`, `desired_salary`
+- [x] **EEO & Salary fields UI in web app Profile page** — the DB columns and extension fill logic exist, but users have no way to set these values yet; add an "EEO & Compensation" section to `ProfileClient.tsx`
+- [x] Open-ended field handling: check `saved_answers` first → fall back to Claude Sonnet (`POST /api/extension/answer-question`)
+- [x] LLM answer generation uses STAR responses from Phase 7 as examples where relevant
 - [ ] Cover letter attachment: attaches generated cover letter for this job if one exists
-- [ ] Resume attachment: attaches `resume_versions` PDF for this job if exists, else base resume
-- [ ] Review UI: extension popup shows all filled fields with values, editable inline before confirming
+- [ ] Resume attachment: trigger `input[type="file"]` with `resume_versions` PDF for this job if exists, else base resume
+- [ ] Post-fill review UI: extension popup shows all filled fields with values; user reviews, edits if needed
 - [ ] User clicks site's native Submit button — extension never submits automatically
-- [ ] Post-submit: extension detects navigation/XHR success → calls Backlog API → job set to "Applied", `applied_at` stamped, `application_timeline` row written
-- [ ] **"Add to Backlog" button** in extension popup on any job posting page:
-  - Content script extracts page title, company, description from already-rendered DOM
-  - Sends to Backlog API → normalized via GPT-4o-mini → added as `source = 'manual'`
-  - Solves the JS-rendered page problem (browser already rendered it; no server-side fetch needed)
-  - Covers any site including Workday where URL-paste fallback fails
+- [ ] Post-submit: extension detects navigation or XHR success → calls Backlog API → job set to "Applied", `applied_at` stamped, `application_timeline` row written
 - [ ] "Initiate from Backlog" flow: clicking "Auto-Apply" on a job card opens ATS URL in new tab with extension pre-loaded
 - [ ] Settings page in extension: view linked account, API key, toggle auto-detect per site
 - [ ] Firefox support (Manifest V2 compatibility layer)
 - [ ] Unit tests: standard field detection and mapping, ATS-specific DOM parsers, saved_answers lookup
 - [ ] Integration test: mock ATS form → standard fields filled without LLM call → open-ended field triggers Claude → review panel renders
+
+---
+
+### Phase 10A — True Auto-Apply (Multi-Page Navigation)
+
+> Evolves the extension from a "field filler" into a genuine auto-apply engine. The distinguishing capability is navigating multi-step application forms end-to-end — detecting pages, filling each one, advancing, and pausing at the final step for user confirmation before submit.
+
+**Why Greenhouse isn't the real target:**
+Greenhouse is good for development and testing, but it has its own Easy Apply feature. The real value of this extension is on ATS platforms that don't have Easy Apply — Workday, AshbyHQ, iCIMS, BambooHR, Rippling, and custom career pages. The goal is ATS-agnostic auto-apply.
+
+**LLM strategy for field filling — hybrid approach:**
+
+The current regex FIELD_MAP handles ~80% of standard fields well. The remaining ~20% are:
+- Unusual label phrasing that doesn't match any regex ("How many years have you spent in your discipline?")
+- Dropdown options that don't match expected text (gender dropdown with "Man / Woman / Non-binary" vs "Male / Female")
+- Multi-select checkboxes
+- Dynamic/custom fields unique to a company's application
+
+Two approaches were considered:
+
+| Approach | Pros | Cons |
+|---|---|---|
+| **Deterministic only (current)** | Zero cost, zero latency, reliable on known fields | Silently skips anything outside regex patterns |
+| **LLM for every field** | Maximum coverage | Expensive, slow (~2s latency per page), overkill for name/email |
+| **Hybrid (chosen)** | Best coverage at minimal cost | Slightly more complex flow |
+
+**The hybrid strategy:**
+1. **Deterministic pass first** — regex FIELD_MAP fills all recognized standard fields instantly, no LLM
+2. **Page analysis call (Claude Haiku)** — after the deterministic pass, send all *unfilled* field labels + their types/options to Haiku in a single call → get back a JSON map of `{ selector → profile_field_or_generated_value }`; Haiku is used here because it's fast and cheap, not because quality matters
+3. **Open-ended question answers (Claude Sonnet)** — for any field identified as a free-text question that isn't in `saved_answers`, escalate to Sonnet with full profile + STAR context
+
+**Cost reality check (personal scale):**
+- Haiku page analysis: ~600 input + ~200 output tokens per page → ~$0.0001/page; 100 apps/month = **$0.01/month**
+- Sonnet open-ended answers: ~1,500 tokens per question → ~$0.005/question; 5 questions × 100 apps = **$2.50/month**
+- Total at heavy personal use: **under $3/month** — negligible
+
+**Why not full LLM (send everything to Claude)?** Latency. Sonnet on a full page analysis takes 2–4 seconds. Haiku is under 500ms. The user is watching the form fill in real time — speed matters. The deterministic pass is instant and handles the common cases; Haiku is fast for the long tail; Sonnet is reserved for actual writing tasks.
+
+**Multi-page navigation flow:**
+```
+1. Content script activates on page load
+2. Detect form fields → deterministic fill → Haiku analysis for unfilled → fill remaining
+3. Popup shows mini-review: "X fields filled on this page"
+4. Extension detects "Next" / "Continue" button (by text, aria-label, type=submit heuristics)
+5. User clicks Next in site OR extension auto-advances (optional mode — user opt-in)
+6. After navigation, content script re-activates on new page → repeat steps 2–4
+7. Extension detects final "Submit" page (no more Next button, submit button present)
+8. Popup shows full multi-page review: all filled values across all pages, grouped by page
+9. User clicks Submit in site — extension never auto-submits
+10. Extension detects submission → marks Applied in Backlog
+```
+
+**Eng review findings (2026-04-04):**
+- `fillGreenhouse()` removed — generic label filler already covers those fields; hardcoded IDs break silently when Greenhouse updates them
+- `setNativeValue` must dispatch `blur` event in addition to `input`+`change` — some ATS platforms (Lever, AshbyHQ) validate on blur
+- Multi-page state must use `chrome.storage.session` (not in-memory) — MV3 service workers terminate after ~30s of inactivity and lose all in-memory state
+- Haiku fill call is staged: run Tier 1 immediately (visible fills), then Tier 2 in background (second wave) — avoids "nothing happening for 500ms" UX
+- Vitest added to extension for unit tests
+
+**Tasks:**
+
+- [x] **Remove `fillGreenhouse()`** from `fill.ts` — use generic label-based filler for all ATS platforms; simpler, more maintainable, less brittle
+- [x] **Add `blur` event dispatch** to `setNativeValue` in `fill.ts` — some ATS platforms run validation on blur; without it, fields appear filled but the form rejects them on submit
+- [x] **Next-page detection** — heuristic to find "Next", "Continue", "Save and Continue" buttons; check for visible modals first (see TODOS.md); ignore "Save for Later" or "Cancel"
+- [x] **Page state tracking via `chrome.storage.session`** — persist state keyed by `tabId` (`{ [tabId]: { pageIndex, filledFields[] } }`) in `chrome.storage.session`; survives MV3 worker restarts; must clean up on `chrome.tabs.onRemoved` to prevent state bleed between sessions (note: `chrome.storage.session` persists for the entire browser session, not just until tab close)
+- [x] **Re-trigger on navigation** — listen for `chrome.tabs.onUpdated` AND patch `window.history.pushState` + `popstate` in content script using `world: MAIN` (required for MV3 CSP-strict sites — most major ATS platforms use strict CSPs that block content script injection into page context)
+- [x] **Staged fill UX** — run Tier 1 deterministic fill immediately (user sees fills appear); run Tier 2 Haiku in background; Tier 2 must ONLY fill fields left empty by Tier 1 (never overwrite); apply second wave of fills when Haiku returns; no blocking spinner
+- [x] **Multi-page review panel** — during each page fill, write filled fields to `chrome.storage.session` (DOM is gone after navigation, so must be stored at fill time); popup reads accumulated state and groups by page for final review
+- [x] **Haiku integration** — `POST /api/extension/analyze-page`: receives `{selector, label, type, options[]}[]` for unfilled fields, returns `{selector → value}` map; follows same API key auth pattern as `/api/extension/profile`; 5s timeout + fallback (see TODOS.md)
+- [x] **Sonnet integration for open-ended answers** — `POST /api/extension/answer-question`: checks `saved_answers` first (server-side), falls back to Sonnet with profile + STAR context; returns generated answer
+- [ ] **Submit detection** — listen for `fetch`/`XHR` completion or `chrome.webNavigation` to a confirmation/thank-you URL; configurable success URL patterns per ATS
+- [x] **Auto-advance mode (opt-in, per-tab)** — toggled in popup before starting a fill session; after filling a page, extension clicks Next automatically; disabled by default; pauses on final Submit page always
+- [ ] **Resume/cover letter file upload** — inject file into `input[type="file"]` using a Blob constructed from `resume_url` or `cover_letters.pdf_url` fetched via extension background worker
+- [x] **Workday Shadow DOM handling** — Workday uses Shadow DOM for inputs; need `shadowRoot.querySelector` traversal; best-effort with known patterns
+- [x] **Add Vitest to extension** — `extension/vitest.config.ts`; reuse project-level config; jsdom environment for DOM tests
+- [ ] Unit tests: `setNativeValue` dispatches blur, `setSelectValue` fuzzy match cases, `getLabelForInput` aria-labelledby path, next-button detection heuristic, page state accumulation, Haiku error fallback
+- [ ] E2E test (Playwright): 2-page mock form → extension navigates both pages → review shows all filled fields grouped by page
+- [ ] E2E test (Playwright): Haiku API returns 500 → extension falls back to deterministic only → no user-visible error, review still shows deterministic fields
 
 ### Phase 10.5 — Dashboard Home Page
 
@@ -606,3 +683,20 @@ For free-text prompts ("Why do you want to work here?"), the extension first che
 - [ ] Referral network: surface mutual connections at companies you're applying to (LinkedIn graph integration)
 - [ ] Salary negotiation assistant: LLM-powered coaching based on offer details and market data
 - [ ] Auto-submit mode: after user reviews and approves a filled form once, allow fully automated submission for similar ATS platforms with no review step
+
+---
+
+## GSTACK REVIEW REPORT
+
+| Review | Trigger | Why | Runs | Status | Findings |
+|--------|---------|-----|------|--------|----------|
+| CEO Review | `/plan-ceo-review` | Scope & strategy | 0 | — | — |
+| Outside Voice | Claude subagent | Independent 2nd opinion | 1 | issues_found | 10 issues raised, 4 critical incorporated into plan |
+| Eng Review | `/plan-eng-review` | Architecture & tests (required) | 1 | CLEAR (PLAN) | 6 issues found, all resolved |
+| Design Review | `/plan-design-review` | UI/UX gaps | 0 | — | — |
+
+**OUTSIDE VOICE:** 10 issues raised. 4 incorporated: (1) Tier 2 must not overwrite Tier 1, (2) `chrome.storage.session` is session-scoped not tab-scoped — need tabId key + onRemoved cleanup, (3) `history.pushState` patching requires `world: MAIN` for CSP-strict sites, (4) multi-page review must store filled fields at fill time (DOM is gone post-navigation). Remaining 6 are known risks accepted for personal-tool scope.
+
+**UNRESOLVED:** 0 decisions open.
+
+**VERDICT:** ENG REVIEW CLEARED — ready to implement. Suggested sequencing: Phase 10 immediate fixes first (remove fillGreenhouse, add blur dispatch, EEO profile UI, open-ended answer endpoint), then Phase 10A multi-page engine.

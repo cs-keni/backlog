@@ -37,6 +37,8 @@ export async function PATCH(request: Request) {
     'notification_email', 'notification_push', 'notification_sms',
     'notification_quiet_hours_start', 'notification_quiet_hours_end',
     'alert_match_threshold',
+    // EEO self-identification & compensation
+    'gender', 'race_ethnicity', 'hispanic_latino', 'veteran_status', 'disability_status', 'desired_salary',
   ]
   const updates: Record<string, unknown> = {}
   for (const key of allowed) {

@@ -141,6 +141,13 @@ export interface UserProfile {
   notification_quiet_hours_start: string | null
   notification_quiet_hours_end: string | null
   alert_match_threshold: number
+  // EEO self-identification & compensation (used by extension auto-fill)
+  gender: string | null
+  race_ethnicity: string | null
+  hispanic_latino: string | null
+  veteran_status: string | null
+  disability_status: string | null
+  desired_salary: string | null
 }
 
 export interface WorkHistory {

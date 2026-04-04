@@ -51,6 +51,31 @@ export async function markApplied(payload: {
   return res.json() as Promise<{ applicationId: string }>
 }
 
+export async function analyzePage(fields: Array<{
+  selector: string
+  label: string
+  type: string
+  options?: string[]
+}>): Promise<Array<{ type: string; selector: string; value?: string; question?: string }>> {
+  const res = await apiFetch('/api/extension/analyze-page', {
+    method: 'POST',
+    body: JSON.stringify({ fields }),
+  })
+  if (!res.ok) return []
+  const json = await res.json() as { results?: Array<{ type: string; selector: string; value?: string; question?: string }> }
+  return json.results ?? []
+}
+
+export async function answerQuestion(question: string): Promise<string | null> {
+  const res = await apiFetch('/api/extension/answer-question', {
+    method: 'POST',
+    body: JSON.stringify({ question }),
+  })
+  if (!res.ok) return null
+  const json = await res.json() as { answer?: string }
+  return json.answer ?? null
+}
+
 export async function addJob(payload: {
   url: string
   title: string

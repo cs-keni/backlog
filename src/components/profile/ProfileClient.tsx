@@ -459,6 +459,97 @@ export function ProfileClient({
         />
       </Section>
 
+      {/* EEO & Compensation */}
+      <Section title="EEO & Compensation">
+        <p className="text-xs text-zinc-500 -mt-2">
+          Used by the browser extension to auto-fill EEO self-identification and salary fields. All fields are optional and stored only in your profile.
+        </p>
+        <div className="grid grid-cols-2 gap-4">
+          <Field label="Gender">
+            <Select
+              value={profile.gender ?? ''}
+              onChange={e => setProfile(p => ({ ...p, gender: e.target.value || null }))}
+            >
+              <option value="">Prefer not to say</option>
+              <option value="Male">Male</option>
+              <option value="Female">Female</option>
+              <option value="Non-binary">Non-binary / Non-conforming</option>
+              <option value="Other">Other</option>
+              <option value="Decline">Decline to self-identify</option>
+            </Select>
+          </Field>
+          <Field label="Hispanic or Latino">
+            <Select
+              value={profile.hispanic_latino ?? ''}
+              onChange={e => setProfile(p => ({ ...p, hispanic_latino: e.target.value || null }))}
+            >
+              <option value="">Prefer not to say</option>
+              <option value="Yes">Yes, Hispanic or Latino</option>
+              <option value="No">No, not Hispanic or Latino</option>
+              <option value="Decline">Decline to self-identify</option>
+            </Select>
+          </Field>
+        </div>
+        <Field label="Race / Ethnicity">
+          <Select
+            value={profile.race_ethnicity ?? ''}
+            onChange={e => setProfile(p => ({ ...p, race_ethnicity: e.target.value || null }))}
+          >
+            <option value="">Prefer not to say</option>
+            <option value="American Indian or Alaska Native">American Indian or Alaska Native</option>
+            <option value="Asian">Asian</option>
+            <option value="Black or African American">Black or African American</option>
+            <option value="Native Hawaiian or Other Pacific Islander">Native Hawaiian or Other Pacific Islander</option>
+            <option value="White">White</option>
+            <option value="Two or More Races">Two or More Races</option>
+            <option value="Decline">Decline to self-identify</option>
+          </Select>
+        </Field>
+        <div className="grid grid-cols-2 gap-4">
+          <Field label="Veteran Status">
+            <Select
+              value={profile.veteran_status ?? ''}
+              onChange={e => setProfile(p => ({ ...p, veteran_status: e.target.value || null }))}
+            >
+              <option value="">Prefer not to say</option>
+              <option value="I am not a protected veteran">Not a protected veteran</option>
+              <option value="I am a protected veteran">Protected veteran</option>
+              <option value="Decline">Decline to self-identify</option>
+            </Select>
+          </Field>
+          <Field label="Disability Status">
+            <Select
+              value={profile.disability_status ?? ''}
+              onChange={e => setProfile(p => ({ ...p, disability_status: e.target.value || null }))}
+            >
+              <option value="">Prefer not to say</option>
+              <option value="Yes, I have a disability">Yes, I have a disability</option>
+              <option value="No, I do not have a disability">No, I do not have a disability</option>
+              <option value="Decline">Decline to self-identify</option>
+            </Select>
+          </Field>
+        </div>
+        <Field label="Desired Salary (e.g. $120,000 or 120000)">
+          <Input
+            value={profile.desired_salary ?? ''}
+            onChange={e => setProfile(p => ({ ...p, desired_salary: e.target.value || null }))}
+            placeholder="$120,000"
+          />
+        </Field>
+        <SaveButton
+          saving={sections['eeo']?.saving ?? false}
+          saved={sections['eeo']?.saved ?? false}
+          onClick={() => saveSection('eeo', {
+            gender: profile.gender,
+            race_ethnicity: profile.race_ethnicity,
+            hispanic_latino: profile.hispanic_latino,
+            veteran_status: profile.veteran_status,
+            disability_status: profile.disability_status,
+            desired_salary: profile.desired_salary,
+          })}
+        />
+      </Section>
+
       {/* Work History */}
       <Section title="Work History">
         <WorkHistorySection entries={work} onChange={setWork} />
