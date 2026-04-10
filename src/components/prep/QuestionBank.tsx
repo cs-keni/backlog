@@ -70,17 +70,24 @@ export function QuestionBank({
 }: QuestionBankProps) {
   const [response, setResponse] = useState<QuestionsResponse | null>(null)
   const [loading, setLoading] = useState(true)
+  const [fetchError, setFetchError] = useState(false)
   const [draft, setDraft] = useState<DraftState | null>(null)
   const [activeTab, setActiveTab] = useState<Tab>('questions')
 
-  useEffect(() => {
+  function loadQuestions() {
     setLoading(true)
+    setFetchError(false)
     fetch(`/api/company/${companyId}/questions`)
-      .then(r => r.json())
+      .then(r => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`)
+        return r.json()
+      })
       .then((data: QuestionsResponse) => setResponse(data))
-      .catch(() => setResponse({ guide: null, behavioral_questions: [], technical_questions: [] }))
+      .catch(() => setFetchError(true))
       .finally(() => setLoading(false))
-  }, [companyId])
+  }
+
+  useEffect(() => { loadQuestions() }, [companyId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   function openDraft(question: string) {
     const existing = savedResponses.find(r => r.question === question)
@@ -165,6 +172,23 @@ export function QuestionBank({
           {[1, 2, 3].map(i => (
             <div key={i} className="h-8 rounded-lg bg-zinc-800/50 animate-pulse" />
           ))}
+        </div>
+      </section>
+    )
+  }
+
+  if (fetchError) {
+    return (
+      <section className="space-y-3">
+        <h2 className="text-xs font-semibold text-zinc-400 uppercase tracking-wide">Interview Intelligence</h2>
+        <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 px-4 py-4 flex items-center justify-between gap-4">
+          <p className="text-xs text-zinc-500">Generation timed out — this can happen on the first load. Try again.</p>
+          <button
+            onClick={loadQuestions}
+            className="shrink-0 text-xs text-zinc-400 hover:text-zinc-200 transition-colors px-3 py-1.5 rounded border border-zinc-700 hover:border-zinc-500"
+          >
+            Retry
+          </button>
         </div>
       </section>
     )
