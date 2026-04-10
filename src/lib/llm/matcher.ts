@@ -2,7 +2,24 @@ import OpenAI from 'openai'
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
 
-// Skills-only Jaccard similarity — no LLM, available without resume
+// ─── Types ─────────────────────────────────────────────────────────────────────
+
+export interface MatchDimensions {
+  role_fit: number       // 0-100: title/scope alignment
+  tech_stack: number     // 0-100: required skills coverage
+  experience: number     // 0-100: seniority/level fit
+  compensation: number   // 0-100: salary alignment (50 if unknown)
+}
+
+export interface MatchResult {
+  score: number
+  rationale: string | null
+  dimensions: MatchDimensions | null
+  mode: 'skills' | 'resume' | 'none'
+}
+
+// ─── Skills-only Jaccard (no LLM, no resume) ─────────────────────────────────
+
 function jaccardScore(skills: string[], tags: string[]): number {
   if (!skills.length || !tags.length) return 0
   const a = new Set(skills.map(s => s.toLowerCase()))
@@ -12,11 +29,7 @@ function jaccardScore(skills: string[], tags: string[]): number {
   return Math.round((intersection / union) * 100)
 }
 
-export interface MatchResult {
-  score: number
-  rationale: string | null
-  mode: 'skills' | 'resume' | 'none'
-}
+// ─── Main function ─────────────────────────────────────────────────────────────
 
 export async function computeMatchScore(params: {
   skills: string[] | null
@@ -25,21 +38,28 @@ export async function computeMatchScore(params: {
   jobDescription: string | null
   jobTitle: string
   company: string
+  salaryMin?: number | null
+  salaryMax?: number | null
 }): Promise<MatchResult> {
-  const { skills, resumeText, jobTags, jobDescription, jobTitle, company } = params
+  const { skills, resumeText, jobTags, jobDescription, jobTitle, company, salaryMin, salaryMax } = params
 
   const hasSkills = skills && skills.length > 0
   const hasResume = resumeText && resumeText.length > 50
 
   if (!hasSkills && !hasResume) {
-    return { score: 0, rationale: null, mode: 'none' }
+    return { score: 0, rationale: null, dimensions: null, mode: 'none' }
   }
 
-  // Full resume mode — GPT-4o-mini
+  // Full resume mode — GPT-4o-mini with dimension breakdown
   if (hasResume) {
+    const salaryContext = salaryMin || salaryMax
+      ? `Salary: $${salaryMin ?? '?'}–$${salaryMax ?? '?'}`
+      : 'Salary: not listed'
+
     const jobContext = [
       `Job: ${jobTitle} at ${company}`,
       jobTags?.length ? `Required skills: ${jobTags.join(', ')}` : '',
+      salaryContext,
       jobDescription ? `Description (truncated): ${jobDescription.slice(0, 1500)}` : '',
     ].filter(Boolean).join('\n')
 
@@ -49,12 +69,22 @@ export async function computeMatchScore(params: {
       const response = await openai.chat.completions.create({
         model: 'gpt-4o-mini',
         temperature: 0,
-        max_tokens: 80,
+        max_tokens: 180,
         messages: [
           {
             role: 'system',
-            content:
-              'You are a recruiting assistant. Given a resume and job posting, output a JSON object with two fields: "score" (integer 0-100, how well the candidate matches) and "rationale" (one sentence, max 15 words, explaining the score). Output only valid JSON, nothing else.',
+            content: `You are a recruiting assistant. Evaluate how well a resume matches a job posting across 4 dimensions.
+
+Return a JSON object with these fields:
+- "score": integer 0-100, weighted average of the 4 dimensions
+- "rationale": one sentence max 15 words explaining the overall score
+- "dimensions": object with:
+  - "role_fit": 0-100 — does the candidate's background align with this role's scope and title?
+  - "tech_stack": 0-100 — what fraction of required skills does the candidate have?
+  - "experience": 0-100 — does the candidate's seniority match the role's expectations?
+  - "compensation": 0-100 — does the listed salary match the candidate's likely range? Use 50 if salary is not listed.
+
+Output only valid JSON, nothing else.`,
           },
           {
             role: 'user',
@@ -64,16 +94,38 @@ export async function computeMatchScore(params: {
       })
 
       const raw = response.choices[0]?.message?.content?.trim() ?? ''
-      const parsed = JSON.parse(raw) as { score?: number; rationale?: string }
+      const parsed = JSON.parse(raw) as {
+        score?: number
+        rationale?: string
+        dimensions?: Partial<MatchDimensions>
+      }
+
       const score = typeof parsed.score === 'number' ? Math.max(0, Math.min(100, parsed.score)) : 0
       const rationale = typeof parsed.rationale === 'string' ? parsed.rationale : null
-      return { score, rationale, mode: 'resume' }
+
+      let dimensions: MatchDimensions | null = null
+      if (parsed.dimensions && typeof parsed.dimensions === 'object') {
+        const d = parsed.dimensions
+        dimensions = {
+          role_fit: clamp(d.role_fit),
+          tech_stack: clamp(d.tech_stack),
+          experience: clamp(d.experience),
+          compensation: clamp(d.compensation ?? 50),
+        }
+      }
+
+      return { score, rationale, dimensions, mode: 'resume' }
     } catch {
-      // Fall back to skills-only on LLM failure
+      // Fall through to skills-only
     }
   }
 
-  // Skills-only mode
+  // Skills-only mode (no resume uploaded)
   const score = jaccardScore(skills ?? [], jobTags ?? [])
-  return { score, rationale: null, mode: 'skills' }
+  return { score, rationale: null, dimensions: null, mode: 'skills' }
+}
+
+function clamp(val: unknown, fallback = 50): number {
+  if (typeof val !== 'number' || isNaN(val)) return fallback
+  return Math.max(0, Math.min(100, Math.round(val)))
 }

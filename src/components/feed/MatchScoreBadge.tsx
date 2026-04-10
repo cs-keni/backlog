@@ -1,6 +1,8 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
+import { AnimatePresence, motion } from 'framer-motion'
+import type { MatchDimensions } from '@/lib/llm/matcher'
 
 interface MatchScoreBadgeProps {
   jobId: string
@@ -9,8 +11,11 @@ interface MatchScoreBadgeProps {
 interface ScoreResult {
   score: number | null
   rationale: string | null
+  dimensions: MatchDimensions | null
   mode: string
 }
+
+// ─── Score ring SVG ────────────────────────────────────────────────────────────
 
 function ScoreRing({ score }: { score: number }) {
   const color = score >= 70 ? 'text-emerald-400' : score >= 40 ? 'text-yellow-400' : 'text-red-400'
@@ -39,9 +44,55 @@ function ScoreRing({ score }: { score: number }) {
   )
 }
 
+// ─── Dimension bar ─────────────────────────────────────────────────────────────
+
+function DimensionBar({ label, value }: { label: string; value: number }) {
+  const color = value >= 70 ? 'bg-emerald-500' : value >= 40 ? 'bg-yellow-500' : 'bg-red-500'
+  return (
+    <div className="space-y-1">
+      <div className="flex items-center justify-between">
+        <span className="text-xs text-zinc-500">{label}</span>
+        <span className="text-xs text-zinc-400 tabular-nums">{value}%</span>
+      </div>
+      <div className="h-1 rounded-full bg-zinc-800 overflow-hidden">
+        <motion.div
+          className={`h-full rounded-full ${color}`}
+          initial={{ width: 0 }}
+          animate={{ width: `${value}%` }}
+          transition={{ duration: 0.4, ease: 'easeOut' }}
+        />
+      </div>
+    </div>
+  )
+}
+
+// ─── Dimension popover ─────────────────────────────────────────────────────────
+
+function DimensionPopover({ dimensions }: { dimensions: MatchDimensions }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 4, scale: 0.97 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, y: 2, scale: 0.97 }}
+      transition={{ duration: 0.15 }}
+      className="absolute top-full left-0 mt-2 z-50 w-56 rounded-lg border border-zinc-700 bg-zinc-900 shadow-xl p-3 space-y-2.5"
+    >
+      <p className="text-xs font-semibold text-zinc-400 uppercase tracking-wide mb-1">Breakdown</p>
+      <DimensionBar label="Role fit" value={dimensions.role_fit} />
+      <DimensionBar label="Tech stack" value={dimensions.tech_stack} />
+      <DimensionBar label="Experience" value={dimensions.experience} />
+      <DimensionBar label="Compensation" value={dimensions.compensation} />
+    </motion.div>
+  )
+}
+
+// ─── Main badge ────────────────────────────────────────────────────────────────
+
 export function MatchScoreBadge({ jobId }: MatchScoreBadgeProps) {
   const [result, setResult] = useState<ScoreResult | null>(null)
   const [loading, setLoading] = useState(true)
+  const [showBreakdown, setShowBreakdown] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -59,6 +110,18 @@ export function MatchScoreBadge({ jobId }: MatchScoreBadgeProps) {
       })
     return () => { cancelled = true }
   }, [jobId])
+
+  // Close popover on outside click
+  useEffect(() => {
+    if (!showBreakdown) return
+    function handleClick(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setShowBreakdown(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [showBreakdown])
 
   if (loading) {
     return (
@@ -89,18 +152,39 @@ export function MatchScoreBadge({ jobId }: MatchScoreBadgeProps) {
     )
   }
 
+  const hasDimensions = result.dimensions !== null && result.mode !== 'skills'
+
   return (
-    <div className="flex items-center gap-3 rounded-lg border border-zinc-800 bg-zinc-900 px-4 py-3">
-      <ScoreRing score={result.score} />
-      <div className="min-w-0">
-        <p className="text-xs font-medium text-zinc-200">
-          {result.score >= 70 ? 'Strong match' : result.score >= 40 ? 'Partial match' : 'Weak match'}
-          {result.mode === 'skills' && <span className="text-zinc-600 font-normal"> · skills only</span>}
-        </p>
-        {result.rationale && (
-          <p className="text-xs text-zinc-500 mt-0.5 leading-relaxed">{result.rationale}</p>
+    <div ref={ref} className="relative">
+      <div
+        className={`flex items-center gap-3 rounded-lg border border-zinc-800 bg-zinc-900 px-4 py-3 ${hasDimensions ? 'cursor-pointer hover:border-zinc-700 transition-colors' : ''}`}
+        onClick={() => hasDimensions && setShowBreakdown(s => !s)}
+      >
+        <ScoreRing score={result.score} />
+        <div className="min-w-0 flex-1">
+          <p className="text-xs font-medium text-zinc-200">
+            {result.score >= 70 ? 'Strong match' : result.score >= 40 ? 'Partial match' : 'Weak match'}
+            {result.mode === 'skills' && <span className="text-zinc-600 font-normal"> · skills only</span>}
+          </p>
+          {result.rationale && (
+            <p className="text-xs text-zinc-500 mt-0.5 leading-relaxed">{result.rationale}</p>
+          )}
+        </div>
+        {hasDimensions && (
+          <svg
+            className={`w-3.5 h-3.5 text-zinc-600 shrink-0 transition-transform ${showBreakdown ? 'rotate-180' : ''}`}
+            fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+          </svg>
         )}
       </div>
+
+      <AnimatePresence>
+        {showBreakdown && result.dimensions && (
+          <DimensionPopover dimensions={result.dimensions} />
+        )}
+      </AnimatePresence>
     </div>
   )
 }

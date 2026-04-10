@@ -2,7 +2,8 @@ export const maxDuration = 30
 
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { generateQuestions } from '@/lib/llm/question-generator'
+import { generateInterviewGuide } from '@/lib/llm/question-generator'
+import type { InterviewGuide } from '@/lib/llm/question-generator'
 
 export async function GET(
   _request: Request,
@@ -16,24 +17,30 @@ export async function GET(
 
   const { data: company } = await supabase
     .from('company_profiles')
-    .select('id, name, behavioral_questions, technical_questions')
+    .select('id, name, interview_guide, behavioral_questions, technical_questions')
     .eq('id', id)
     .single()
 
   if (!company) return Response.json({ error: 'Company not found' }, { status: 404 })
 
-  // Return cached questions if they exist
+  // Return cached interview guide if present (rich format)
+  if (company.interview_guide) {
+    return Response.json({ guide: company.interview_guide as InterviewGuide })
+  }
+
+  // Fall back to legacy simple arrays for already-cached entries
   if (
     (company.behavioral_questions?.length ?? 0) > 0 ||
     (company.technical_questions?.length ?? 0) > 0
   ) {
     return Response.json({
+      guide: null,
       behavioral_questions: company.behavioral_questions ?? [],
       technical_questions: company.technical_questions ?? [],
     })
   }
 
-  // Generate lazily
+  // Generate lazily — fetch recent job descriptions for context
   const { data: jobs } = await supabase
     .from('jobs')
     .select('title, description')
@@ -42,16 +49,18 @@ export async function GET(
     .order('fetched_at', { ascending: false })
     .limit(5)
 
-  const result = await generateQuestions(company.name, jobs ?? [])
+  const guide = await generateInterviewGuide(company.name, jobs ?? [])
 
+  // Persist interview_guide and backfill legacy columns for backward compat
   const admin = createAdminClient()
   await admin
     .from('company_profiles')
     .update({
-      behavioral_questions: result.behavioral_questions,
-      technical_questions: result.technical_questions,
+      interview_guide: guide,
+      behavioral_questions: guide.behavioral_questions.map(q => q.question),
+      technical_questions: guide.technical_questions.map(q => q.question),
     })
     .eq('id', id)
 
-  return Response.json(result)
+  return Response.json({ guide })
 }

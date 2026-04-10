@@ -19,13 +19,18 @@ export async function GET(
     .single()
 
   if (cached && !cached.is_stale) {
-    return Response.json({ score: cached.score, rationale: cached.rationale, mode: 'cached' })
+    return Response.json({
+      score: cached.score,
+      rationale: cached.rationale,
+      dimensions: cached.dimensions ?? null,
+      mode: 'cached',
+    })
   }
 
   // Fetch user profile and job in parallel
   const [profileResult, jobResult] = await Promise.all([
     supabase.from('users').select('skills, resume_text').eq('id', user.id).single(),
-    supabase.from('jobs').select('title, company, tags, description').eq('id', jobId).single(),
+    supabase.from('jobs').select('title, company, tags, description, salary_min, salary_max').eq('id', jobId).single(),
   ])
 
   if (profileResult.error || !profileResult.data) {
@@ -45,10 +50,12 @@ export async function GET(
     jobDescription: job.description,
     jobTitle: job.title,
     company: job.company,
+    salaryMin: job.salary_min,
+    salaryMax: job.salary_max,
   })
 
   if (result.mode === 'none') {
-    return Response.json({ score: null, rationale: null, mode: 'none' })
+    return Response.json({ score: null, rationale: null, dimensions: null, mode: 'none' })
   }
 
   // Upsert into cache
@@ -58,11 +65,17 @@ export async function GET(
       job_id: jobId,
       score: result.score,
       rationale: result.rationale,
+      dimensions: result.dimensions,
       computed_at: new Date().toISOString(),
       is_stale: false,
     },
     { onConflict: 'user_id,job_id' }
   )
 
-  return Response.json({ score: result.score, rationale: result.rationale, mode: result.mode })
+  return Response.json({
+    score: result.score,
+    rationale: result.rationale,
+    dimensions: result.dimensions,
+    mode: result.mode,
+  })
 }

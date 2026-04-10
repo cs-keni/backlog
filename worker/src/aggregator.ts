@@ -1,11 +1,12 @@
 import { fetchLatestCommitSha, fetchReadmeContent } from './github/fetcher'
 import { parseJobsTable } from './github/parser'
 import { normalizeEntries, type NormalizedJob } from './llm/normalizer'
-import { filterNewEntries } from './jobs/deduplicator'
+import { filterNewEntries, filterNewJobs } from './jobs/deduplicator'
 import { enrichJobs } from './jobs/enricher'
 import { backfillMissingSalaries } from './jobs/backfiller'
 import { writeJobs } from './db/writer'
 import { getOrCreateSource, updateSourceSha } from './db/sources'
+import { scanPortals } from './portals/index'
 
 interface SourceConfig {
   name: string
@@ -59,6 +60,17 @@ export async function runAggregation(force = false): Promise<AggregationResult> 
     }
   }
 
+  // Portal scan: fetch directly from Greenhouse / Lever APIs for curated companies.
+  // These APIs return structured JSON so no LLM normalization step is needed.
+  try {
+    const portalResult = await runPortalAggregation()
+    totalWritten += portalResult.written
+    allNewJobs.push(...portalResult.newJobs)
+    allWrittenJobIds.push(...portalResult.writtenJobIds)
+  } catch (err) {
+    console.error('[aggregator] Portal scan failed:', err)
+  }
+
   // Backfill salary + description for already-stored jobs that are missing them.
   // Runs after every cycle so the DB gradually gets enriched over time.
   await backfillMissingSalaries(50)
@@ -67,6 +79,40 @@ export async function runAggregation(force = false): Promise<AggregationResult> 
   console.log(`[aggregator] ─── All sources complete in ${elapsed}s (${totalWritten} total written) ───\n`)
 
   return { written: totalWritten, newJobs: allNewJobs, writtenJobIds: allWrittenJobIds, skipped: false }
+}
+
+async function runPortalAggregation(): Promise<AggregationResult> {
+  console.log('\n[aggregator] Running portal scan (Greenhouse + Lever)...')
+
+  const allJobs = await scanPortals()
+  if (allJobs.length === 0) {
+    console.log('[aggregator] Portals: no jobs fetched')
+    return { written: 0, newJobs: [], writtenJobIds: [], skipped: false }
+  }
+
+  // Deduplicate against what's already in the DB
+  const newJobs = await filterNewJobs(allJobs)
+  if (newJobs.length === 0) {
+    console.log('[aggregator] Portals: all jobs already stored')
+    return { written: 0, newJobs: [], writtenJobIds: [], skipped: false }
+  }
+
+  console.log(`[aggregator] Portals: writing ${newJobs.length} new jobs`)
+  // Portal jobs already have descriptions from the API — skip enricher for those that do,
+  // but still run it for the ones missing descriptions (Greenhouse requires per-job API calls).
+  const jobsToEnrich = newJobs.filter(j => !j.description)
+  const jobsWithDesc = newJobs.filter(j => !!j.description)
+
+  let enriched = jobsWithDesc
+  if (jobsToEnrich.length > 0) {
+    const enrichedMissing = await enrichJobs(jobsToEnrich)
+    enriched = [...jobsWithDesc, ...enrichedMissing]
+  }
+
+  const { written, jobIds } = await writeJobs(enriched, 'full_time', 'portal')
+  console.log(`[aggregator] Portals: wrote ${written}/${enriched.length} jobs`)
+
+  return { written, newJobs: enriched, writtenJobIds: jobIds, skipped: false }
 }
 
 async function runSourceAggregation(

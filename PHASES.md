@@ -653,14 +653,63 @@ Two approaches were considered:
 - [ ] **Upcoming prep nudges**: applications with interviews soon (by `updated_at`) — links to `/prep`
 - [ ] Animate widgets in on load (staggered Framer Motion entrance)
 
-### Phase 11 — Export & Integrations
+### Phase 11 — Intelligence Lift (inspired by career-ops)
+
+> Uplift job discovery and interview prep quality by adding direct portal scanning and a deeper interview intelligence layer.
+
+**Migrations required** (run in Supabase SQL editor before deploying):
+- `supabase/migrations/add_interview_guide.sql`
+- `supabase/migrations/add_story_bank.sql`
+- `supabase/migrations/add_match_dimensions.sql`
+
+#### 11a — Portal Scanning (Greenhouse + Lever APIs)
+
+Worker now scans 30+ company career portals directly in addition to SimplifyJobs, catching roles that never appear on GitHub aggregation repos.
+
+- [x] `worker/src/portals/companies.ts` — curated list of companies with Greenhouse/Lever slugs
+- [x] `worker/src/portals/greenhouse.ts` — fetch jobs from Greenhouse public API (no auth required)
+- [x] `worker/src/portals/lever.ts` — fetch jobs from Lever public postings API (no auth required)
+- [x] `worker/src/portals/index.ts` — orchestrate both sources, deduplicate, return new `NormalizedJob[]`
+- [x] `worker/src/jobs/deduplicator.ts` — add `filterNewJobs(NormalizedJob[])` alongside existing `filterNewEntries`
+- [x] `worker/src/aggregator.ts` — run portal scan after GitHub sources; use `source: 'portal'` in writer
+
+#### 11b — Interview Prep Upgrade (7-step intelligence model)
+
+Replace the basic GPT-4o-mini question list with a Claude-powered full interview guide: round breakdown, cultural signals, strong-answer hints, and interviewer questions.
+
+- [x] `supabase/migrations/add_interview_guide.sql` — add `interview_guide jsonb` column to `company_profiles`
+- [x] `src/lib/llm/question-generator.ts` — rewrite with Claude Sonnet; output `InterviewGuide` structure (overview, rounds, behavioral with hints, technical with hints, cultural signals, questions to ask)
+- [x] `src/app/api/company/[id]/questions/route.ts` — return `interview_guide` when present; fall back to old arrays for cached entries
+- [x] `src/components/prep/QuestionBank.tsx` — render new guide sections: process overview, cultural signals, questions to ask interviewer; show hint for each question inline
+
+#### 11c — Story Bank
+
+A persistent, company-agnostic bank of STAR+Reflection narratives. Build stories once, reuse them across every interview prep. During prep, the question bank cross-references stories to each question by theme.
+
+- [x] `supabase/migrations/add_story_bank.sql` — new `story_bank` table with RLS
+- [x] `src/app/api/story-bank/route.ts` — GET (list), POST (create)
+- [x] `src/app/api/story-bank/[id]/route.ts` — GET, PATCH, DELETE
+- [x] `src/components/prep/StoryBank.tsx` — full CRUD UI for managing stories (title, theme, STAR+R fields, tags)
+- [x] `src/components/prep/PrepClient.tsx` — add Story Bank tab alongside prep view; pass stories to QuestionBank for cross-referencing
+- [x] `src/components/prep/QuestionBank.tsx` — show matching story bank entries per question (matched by theme)
+
+#### 11d — Multi-Dimensional Match Scoring
+
+Upgrade the single-number match score to a 4-dimension breakdown: role fit, tech stack, experience level, compensation alignment.
+
+- [x] `supabase/migrations/add_match_dimensions.sql` — add `dimensions jsonb` column to `match_scores`
+- [x] `src/lib/llm/matcher.ts` — upgrade prompt to return `{score, rationale, dimensions}` with 4 sub-scores
+- [x] `src/app/api/jobs/[id]/match-score/route.ts` — store and return `dimensions` alongside score
+- [x] `src/components/feed/MatchScoreBadge.tsx` — show dimension breakdown in a tooltip/popover on hover
+
+### Phase 12 — Export & Integrations
 
 - [ ] CSV export of full application history
 - [ ] Google Sheets OAuth integration — push / sync tracker data on demand
 
 > Note: Google Sheets OAuth requires setting up a Google Cloud project, OAuth credentials, and a redirect URI. More infrastructure than it looks — scope this carefully.
 
-### Phase 12 — Polish, Performance & QoL
+### Phase 13 — Polish, Performance & QoL
 
 - [ ] Keyboard shortcuts (`F`, `K`/`J`, `A`, `?`, `Cmd+K`)
 - [ ] Command palette with fuzzy search via `cmdk` (jobs, applications, companies)

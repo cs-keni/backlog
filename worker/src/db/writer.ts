@@ -6,7 +6,11 @@ export interface WriteResult {
   jobIds: string[]
 }
 
-export async function writeJobs(jobs: NormalizedJob[], roleType: 'full_time' | 'internship'): Promise<WriteResult> {
+export async function writeJobs(
+  jobs: NormalizedJob[],
+  roleType: 'full_time' | 'internship',
+  source: 'github' | 'portal' = 'github',
+): Promise<WriteResult> {
   if (jobs.length === 0) return { written: 0, jobIds: [] }
 
   let written = 0
@@ -26,7 +30,7 @@ export async function writeJobs(jobs: NormalizedJob[], roleType: 'full_time' | '
         salary_max: job.salary_max,
         description: job.description ?? null,
         url: job.url,
-        source: 'github',
+        source,
         posted_at: job.posted_at,
         is_remote: job.is_remote,
         experience_level: job.experience_level,

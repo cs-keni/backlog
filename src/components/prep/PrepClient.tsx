@@ -7,6 +7,7 @@ import { MaterialsSection } from './MaterialsSection'
 import { QuestionBank } from './QuestionBank'
 import { StarResponseSection } from './StarResponseSection'
 import { CompanyIntelligence } from './CompanyIntelligence'
+import { StoryBank } from './StoryBank'
 import type { StarResponse, CompanyProfile } from '@/lib/jobs/types'
 
 interface JobSummary {
@@ -37,7 +38,6 @@ function ApplicationPicker() {
     fetch('/api/applications')
       .then(r => r.json())
       .then((data: ApplicationSummary[]) => {
-        // Only show active applications worth prepping for
         const active = data.filter(a =>
           ['saved', 'applied', 'phone_screen', 'technical', 'final'].includes(a.status)
         )
@@ -196,7 +196,7 @@ function PrepView({ jobId }: PrepViewProps) {
       {/* Materials */}
       <MaterialsSection jobId={jobId} />
 
-      {/* Question bank */}
+      {/* Question bank — rich guide with story bank cross-reference */}
       {job.company_id ? (
         <QuestionBank
           companyId={job.company_id}
@@ -235,10 +235,43 @@ function PrepView({ jobId }: PrepViewProps) {
 
 // ─── Root export ──────────────────────────────────────────────────────────────
 
+type PrepTab = 'prep' | 'stories'
+
 export function PrepClient({ jobId }: { jobId: string | null }) {
+  const [tab, setTab] = useState<PrepTab>('prep')
+
   return (
-    <div className="h-full overflow-y-auto">
-      {jobId ? <PrepView jobId={jobId} /> : <ApplicationPicker />}
+    <div className="h-full flex flex-col">
+      {/* Tab bar */}
+      <div className="flex items-center gap-1 px-6 pt-4 border-b border-zinc-800 shrink-0">
+        {([
+          { id: 'prep' as const, label: jobId ? 'Prep' : 'Interview Prep' },
+          { id: 'stories' as const, label: 'Story Bank' },
+        ]).map(t => (
+          <button
+            key={t.id}
+            onClick={() => setTab(t.id)}
+            className={`px-3 py-2 text-xs font-medium transition-colors border-b-2 -mb-px ${
+              tab === t.id
+                ? 'text-zinc-100 border-zinc-300'
+                : 'text-zinc-500 border-transparent hover:text-zinc-300'
+            }`}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Content */}
+      <div className="flex-1 overflow-y-auto">
+        {tab === 'prep' ? (
+          jobId ? <PrepView jobId={jobId} /> : <ApplicationPicker />
+        ) : (
+          <div className="p-6 max-w-2xl">
+            <StoryBank />
+          </div>
+        )}
+      </div>
     </div>
   )
 }
