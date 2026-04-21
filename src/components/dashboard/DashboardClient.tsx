@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { motion } from 'framer-motion'
+import { motion, type Variants } from 'framer-motion'
 import { BarChart, Bar, ResponsiveContainer, Tooltip } from 'recharts'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -120,12 +120,12 @@ function getLogoDomain(company: string, jobUrl: string): string {
 
 // ─── Animation variants ───────────────────────────────────────────────────────
 
-const containerVariants = {
+const containerVariants: Variants = {
   hidden: {},
   show: { transition: { staggerChildren: 0.06 } },
 }
 
-const itemVariants = {
+const itemVariants: Variants = {
   hidden: { opacity: 0, y: 14 },
   show: { opacity: 1, y: 0, transition: { duration: 0.3, ease: 'easeOut' } },
 }
