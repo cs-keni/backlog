@@ -2,6 +2,14 @@ import OpenAI from 'openai'
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
 
+interface ProjectInput {
+  name: string
+  description: string | null
+  role: string | null
+  tech_stack: string[]
+  highlights: string[]
+}
+
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
 export interface MatchDimensions {
@@ -31,9 +39,22 @@ function jaccardScore(skills: string[], tags: string[]): number {
 
 // ─── Main function ─────────────────────────────────────────────────────────────
 
+function serializeProjects(projects: ProjectInput[]): string {
+  return projects
+    .slice(0, 5)
+    .map(p => [
+      `Project: ${p.name}${p.tech_stack.length ? ` (${p.tech_stack.slice(0, 6).join(', ')})` : ''}`,
+      p.role ? `Role: ${p.role}` : null,
+      p.description ?? null,
+      p.highlights.length ? p.highlights.map(h => `• ${h}`).join('\n') : null,
+    ].filter(Boolean).join('\n'))
+    .join('\n\n')
+}
+
 export async function computeMatchScore(params: {
   skills: string[] | null
   resumeText: string | null
+  projects?: ProjectInput[] | null
   jobTags: string[] | null
   jobDescription: string | null
   jobTitle: string
@@ -41,7 +62,7 @@ export async function computeMatchScore(params: {
   salaryMin?: number | null
   salaryMax?: number | null
 }): Promise<MatchResult> {
-  const { skills, resumeText, jobTags, jobDescription, jobTitle, company, salaryMin, salaryMax } = params
+  const { skills, resumeText, projects, jobTags, jobDescription, jobTitle, company, salaryMin, salaryMax } = params
 
   const hasSkills = skills && skills.length > 0
   const hasResume = resumeText && resumeText.length > 50
@@ -64,6 +85,9 @@ export async function computeMatchScore(params: {
     ].filter(Boolean).join('\n')
 
     const resumeContext = resumeText!.slice(0, 3000)
+    const projectsContext = projects?.length
+      ? `\n\nCANDIDATE'S PROJECTS:\n${serializeProjects(projects)}`
+      : ''
 
     try {
       const response = await openai.chat.completions.create({
@@ -73,7 +97,7 @@ export async function computeMatchScore(params: {
         messages: [
           {
             role: 'system',
-            content: `You are a recruiting assistant. Evaluate how well a resume matches a job posting across 4 dimensions.
+            content: `You are a recruiting assistant. Evaluate how well a resume matches a job posting across 4 dimensions. Consider both work experience and personal projects when scoring tech_stack and role_fit.
 
 Return a JSON object with these fields:
 - "score": integer 0-100, weighted average of the 4 dimensions
@@ -88,7 +112,7 @@ Output only valid JSON, nothing else.`,
           },
           {
             role: 'user',
-            content: `RESUME:\n${resumeContext}\n\nJOB:\n${jobContext}`,
+            content: `RESUME:\n${resumeContext}${projectsContext}\n\nJOB:\n${jobContext}`,
           },
         ],
       })

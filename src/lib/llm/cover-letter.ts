@@ -2,6 +2,14 @@ import Anthropic from '@anthropic-ai/sdk'
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
+interface ProjectInput {
+  name: string
+  description: string | null
+  role: string | null
+  tech_stack: string[]
+  highlights: string[]
+}
+
 export type CoverLetterTemplate = 'formal' | 'casual' | 'startup'
 
 export interface CoverLetterResult {
@@ -33,10 +41,20 @@ export async function generateCoverLetter(
   skills: string[],
   fullName: string,
   templateOverride?: CoverLetterTemplate,
+  projects: ProjectInput[] = [],
 ): Promise<CoverLetterResult> {
   const workHistoryFormatted = workHistory
     .map(w => `${w.title} at ${w.company} (${w.start_date ?? '?'} – ${w.is_current ? 'Present' : (w.end_date ?? '?')})\n${w.description ?? ''}`)
     .join('\n\n')
+
+  const projectsFormatted = projects.length
+    ? '\n\nPROJECTS:\n' + projects.slice(0, 3).map(p => [
+        `${p.name}${p.tech_stack.length ? ` (${p.tech_stack.join(', ')})` : ''}`,
+        p.role ? `Role: ${p.role}` : null,
+        p.description ?? null,
+        p.highlights.length ? p.highlights.slice(0, 3).map(h => `• ${h}`).join('\n') : null,
+      ].filter(Boolean).join('\n')).join('\n\n')
+    : ''
 
   const templateInstruction = templateOverride
     ? `Use the "${templateOverride}" template style: ${TEMPLATE_GUIDANCE[templateOverride]}`
@@ -76,7 +94,7 @@ CANDIDATE'S RESUME TEXT:
 ${resumeText.slice(0, 3000)}
 
 STRUCTURED WORK HISTORY:
-${workHistoryFormatted}
+${workHistoryFormatted}${projectsFormatted}
 
 TEMPLATE GUIDANCE:
 ${templateInstruction}

@@ -22,7 +22,7 @@ export async function POST(request: Request) {
   }
 
   // ── Fetch all required data in parallel ────────────────────────────────────
-  const [profileResult, workResult, eduResult, jobResult] = await Promise.all([
+  const [profileResult, workResult, eduResult, jobResult, projectsResult] = await Promise.all([
     supabase
       .from('users')
       .select('full_name, email, phone, address, linkedin_url, github_url, skills, resume_text')
@@ -43,6 +43,11 @@ export async function POST(request: Request) {
       .select('id, title, company, description, tags')
       .eq('id', body.job_id)
       .single(),
+    supabase
+      .from('projects')
+      .select('name, description, role, tech_stack, highlights, start_date, end_date, is_current, display_order')
+      .eq('user_id', user.id)
+      .order('display_order'),
   ])
 
   const profile = profileResult.data
@@ -76,6 +81,7 @@ export async function POST(request: Request) {
     job.company,
     job.description ?? '',
     profile.skills ?? [],
+    projectsResult.data ?? [],
   )
 
   // ── Generate PDF ───────────────────────────────────────────────────────────

@@ -190,3 +190,19 @@ export interface MatchScore {
   computed_at: string
   is_stale: boolean
 }
+
+export interface Project {
+  id: string
+  user_id: string
+  name: string
+  description: string | null
+  role: string | null
+  tech_stack: string[]
+  url: string | null
+  highlights: string[]
+  start_date: string | null
+  end_date: string | null
+  is_current: boolean
+  display_order: number
+  created_at: string
+}

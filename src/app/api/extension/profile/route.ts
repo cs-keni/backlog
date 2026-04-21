@@ -12,7 +12,7 @@ export async function GET(request: Request) {
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   )
 
-  const [userResult, workResult, eduResult, answersResult, starResult] = await Promise.all([
+  const [userResult, workResult, eduResult, answersResult, starResult, projectsResult] = await Promise.all([
     supabase
       .from('users')
       .select('id, email, full_name, phone, address, linkedin_url, github_url, portfolio_url, citizenship_status, visa_sponsorship_required, willing_to_relocate, resume_url, skills, experience_level, years_of_experience, preferred_locations, remote_preference, gender, race_ethnicity, hispanic_latino, veteran_status, disability_status, desired_salary')
@@ -37,6 +37,11 @@ export async function GET(request: Request) {
       .select('question, full_response')
       .eq('user_id', auth.userId)
       .not('full_response', 'is', null),
+    supabase
+      .from('projects')
+      .select('name, description, role, tech_stack, highlights, url')
+      .eq('user_id', auth.userId)
+      .order('display_order'),
   ])
 
   return Response.json({
@@ -45,5 +50,6 @@ export async function GET(request: Request) {
     education: eduResult.data ?? [],
     savedAnswers: answersResult.data ?? [],
     starResponses: starResult.data ?? [],
+    projects: projectsResult.data ?? [],
   })
 }

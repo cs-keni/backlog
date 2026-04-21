@@ -2,10 +2,11 @@
 
 import { useState } from 'react'
 import { motion } from 'framer-motion'
-import { UserProfile, WorkHistory, Education, SavedAnswer } from '@/lib/jobs/types'
+import { UserProfile, WorkHistory, Education, SavedAnswer, Project } from '@/lib/jobs/types'
 import { WorkHistorySection } from './WorkHistorySection'
 import { EducationSection } from './EducationSection'
 import { SavedAnswersSection } from './SavedAnswersSection'
+import { ProjectsSection } from './ProjectsSection'
 import { SkillsInput } from './SkillsInput'
 import { ResumeUpload } from './ResumeUpload'
 
@@ -14,6 +15,7 @@ interface ProfileClientProps {
   initialWorkHistory: WorkHistory[]
   initialEducation: Education[]
   initialSavedAnswers: SavedAnswer[]
+  initialProjects: Project[]
 }
 
 // ─── Completeness ─────────────────────────────────────────────────────────────
@@ -110,11 +112,13 @@ export function ProfileClient({
   initialWorkHistory,
   initialEducation,
   initialSavedAnswers,
+  initialProjects,
 }: ProfileClientProps) {
   const [profile, setProfile] = useState(initialProfile)
   const [work, setWork] = useState(initialWorkHistory)
   const [edu, setEdu] = useState(initialEducation)
   const [answers, setAnswers] = useState(initialSavedAnswers)
+  const [projects, setProjects] = useState(initialProjects)
 
   // Per-section dirty / saving / saved state
   const [sections, setSections] = useState<Record<string, { saving: boolean; saved: boolean }>>({})
@@ -553,6 +557,14 @@ export function ProfileClient({
       {/* Work History */}
       <Section title="Work History">
         <WorkHistorySection entries={work} onChange={setWork} />
+      </Section>
+
+      {/* Projects */}
+      <Section title="Projects">
+        <p className="text-xs text-zinc-500 -mt-2">
+          Used in match scoring, resume tailoring, and cover letters. Especially valuable if work history is limited.
+        </p>
+        <ProjectsSection entries={projects} onChange={setProjects} />
       </Section>
 
       {/* Education */}

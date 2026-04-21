@@ -25,7 +25,7 @@ export async function POST(request: Request) {
     : undefined
 
   // ── Fetch all required data in parallel ────────────────────────────────────
-  const [profileResult, workResult, jobResult] = await Promise.all([
+  const [profileResult, workResult, jobResult, projectsResult] = await Promise.all([
     supabase
       .from('users')
       .select('full_name, email, skills, resume_text')
@@ -41,6 +41,11 @@ export async function POST(request: Request) {
       .select('id, title, company, description, tags')
       .eq('id', body.job_id)
       .single(),
+    supabase
+      .from('projects')
+      .select('name, description, role, tech_stack, highlights, start_date, end_date, is_current, display_order')
+      .eq('user_id', user.id)
+      .order('display_order'),
   ])
 
   const profile = profileResult.data
@@ -108,6 +113,7 @@ export async function POST(request: Request) {
     profile.skills ?? [],
     profile.full_name ?? '',
     templateOverride,
+    projectsResult.data ?? [],
   )
 
   // ── Upsert cover_letters row ───────────────────────────────────────────────

@@ -27,10 +27,11 @@ export async function GET(
     })
   }
 
-  // Fetch user profile and job in parallel
-  const [profileResult, jobResult] = await Promise.all([
+  // Fetch user profile, job, and projects in parallel
+  const [profileResult, jobResult, projectsResult] = await Promise.all([
     supabase.from('users').select('skills, resume_text').eq('id', user.id).single(),
     supabase.from('jobs').select('title, company, tags, description, salary_min, salary_max').eq('id', jobId).single(),
+    supabase.from('projects').select('name, description, role, tech_stack, highlights, start_date, end_date, is_current').eq('user_id', user.id).order('display_order'),
   ])
 
   if (profileResult.error || !profileResult.data) {
@@ -46,6 +47,7 @@ export async function GET(
   const result = await computeMatchScore({
     skills: profile.skills,
     resumeText: profile.resume_text,
+    projects: projectsResult.data ?? [],
     jobTags: job.tags,
     jobDescription: job.description,
     jobTitle: job.title,

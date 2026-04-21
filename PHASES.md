@@ -794,23 +794,27 @@ Current format is a single wall-of-text embed. Replace with one compact embed pe
 
 #### 16a — Data Layer
 
-- [ ] `supabase/migrations/add_projects.sql` — new `projects` table:
-  - `id uuid`, `user_id uuid`, `name text`, `description text`, `role text` (what you built / your contribution), `tech_stack text[]`, `url text` (nullable — GitHub, live demo), `highlights text[]` (bullet points, up to 5), `start_date date` (nullable), `end_date date` (nullable), `is_current bool`, `created_at`
+- [x] `supabase/migrations/015_add_projects.sql` — new `projects` table:
+  - `id uuid`, `user_id uuid`, `name text`, `description text`, `role text` (what you built / your contribution), `tech_stack text[]`, `url text` (nullable — GitHub, live demo), `highlights text[]` (bullet points, up to 5), `start_date date` (nullable), `end_date date` (nullable), `is_current bool`, `display_order int`, `created_at`
   - RLS: own rows only
 
 #### 16b — Profile UI
 
-- [ ] `src/app/api/profile/projects/route.ts` — GET (list by user), POST (create)
-- [ ] `src/app/api/profile/projects/[id]/route.ts` — PATCH, DELETE
-- [ ] `src/components/profile/ProjectsSection.tsx` — add/edit/delete cards; fields: name, role, description, tech stack tags, URL, highlights, dates; same card pattern as WorkHistorySection
-- [ ] `src/components/profile/ProfileClient.tsx` — add Projects section between Work History and Education (chronologically correct: projects usually alongside education for new grads)
+- [x] `src/app/api/profile/projects/route.ts` — GET (list by user), POST (create)
+- [x] `src/app/api/profile/projects/[id]/route.ts` — PATCH, DELETE
+- [x] `src/components/profile/ProjectsSection.tsx` — add/edit/delete cards; fields: name, role, description, tech stack tags, URL, highlights (dynamic list up to 5), dates; same card pattern as WorkHistorySection
+- [x] `src/components/profile/ProfileClient.tsx` — Projects section added between Work History and Education
+- [x] `src/app/(app)/profile/page.tsx` — fetches projects and passes as `initialProjects`
 
 #### 16c — LLM Integration
 
-- [ ] `src/lib/llm/matcher.ts` — include projects in the resume match scoring prompt context: serialize as `Project: {name} ({tech_stack}) — {description}` lines; append after resume text, capped at 800 tokens total for projects
-- [ ] `src/lib/llm/resume-tailor.ts` — include projects in tailoring context; Claude can strengthen project bullet points to align with JD
-- [ ] `src/lib/llm/cover-letter.ts` — include projects in cover letter context when work history is sparse; Claude picks the most relevant project to reference
-- [ ] `src/app/api/extension/profile/route.ts` — include `projects` in the profile payload returned to the extension
+- [x] `src/lib/llm/matcher.ts` — projects serialized and appended to resume context in prompt; `serializeProjects` helper; model instruction updated to consider projects for tech_stack + role_fit
+- [x] `src/lib/llm/resume-tailor.ts` — projects passed as optional param; formatted block appended after work history in tailoring prompt
+- [x] `src/lib/llm/cover-letter.ts` — projects passed as optional param (top 3); appended after work history context
+- [x] `src/app/api/extension/profile/route.ts` — `projects` included in profile payload
+- [x] `src/app/api/jobs/[id]/match-score/route.ts` — fetches projects and passes to `computeMatchScore`
+- [x] `src/app/api/resume/tailor/route.ts` — fetches projects and passes to `tailorResume`
+- [x] `src/app/api/cover-letter/route.ts` — fetches projects and passes to `generateCoverLetter`
 
 ---
 
@@ -1079,6 +1083,24 @@ Fast sanity checks run after every deploy. No mocking — hit the real deployed 
 
 - [ ] Audit `worker/src/portals/companies.ts` — verify slugs still resolve (404s already handled gracefully, but dead entries waste a fetch); add any notable missing companies (Stripe, Figma, Notion, Linear, Vercel, etc.)
 - [ ] Add a `worker/src/portals/validate-slugs.ts` script (run manually) that hits each slug's API endpoint and logs which ones 404 — makes future audits easy
+
+#### 18h — IdleLogout Event Listener Leak
+
+**The problem:** `IdleLogout.tsx` registers a `focus` listener with an inline arrow function `() => void checkIdle()`, but the cleanup tries to remove a *different* arrow function with the same shape — `removeEventListener` requires the exact same function reference to succeed. The focus listener is therefore never removed. On pages that remount the component (e.g. soft navigation), listeners accumulate, causing multiple parallel idle checks that can fire logout prematurely.
+
+- [ ] `src/components/auth/IdleLogout.tsx` — extract the focus handler to a stable reference (e.g. `useCallback` or a ref) before passing to both `addEventListener` and `removeEventListener`
+
+#### 18i — Open Redirect in Login Page
+
+**The problem:** `login/page.tsx` reads the `redirectedFrom` search param and passes it directly to `router.push()`. The middleware only ever sets this param to `pathname + search` (always a same-origin path), but the param itself is unguarded. A crafted link like `/login?redirectedFrom=//evil.com` would redirect the user off-site after a successful login.
+
+- [ ] `src/app/(auth)/login/page.tsx` — validate `redirectedFrom` before use: accept only values that start with `/` and not `//`; fall back to `/dashboard` on anything else
+
+#### 18j — Upsert Writes Duplicate Timeline Entry
+
+**The problem:** `POST /api/applications` does an upsert on `(user_id, job_id)` and then *always* inserts a timeline row with `from_status: null, to_status: <status>`. If the same user POSTs the same job twice (e.g. double-clicking "Save", or clicking "Save" on a job that was already saved), the upsert silently updates the row but a second `from_status: null` timeline row is written, corrupting the status history.
+
+- [ ] `src/app/api/applications/route.ts` — check whether the upsert actually inserted a new row (Supabase returns `count` on upsert when `returning: 'minimal'` is not set, or compare before/after status); only write the initial timeline row if the row is newly created, not on update
 
 ---
 

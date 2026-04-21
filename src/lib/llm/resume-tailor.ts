@@ -2,6 +2,17 @@ import Anthropic from '@anthropic-ai/sdk'
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
+interface ProjectInput {
+  name: string
+  description: string | null
+  role: string | null
+  tech_stack: string[]
+  highlights: string[]
+  start_date: string | null
+  end_date: string | null
+  is_current: boolean
+}
+
 export interface TailoredWorkEntry {
   company: string
   title: string
@@ -32,10 +43,20 @@ export async function tailorResume(
   jobCompany: string,
   jobDescription: string,
   skills: string[],
+  projects: ProjectInput[] = [],
 ): Promise<TailoredResume> {
   const workHistoryFormatted = workHistory
     .map(w => `${w.title} at ${w.company} (${w.start_date ?? '?'} – ${w.is_current ? 'Present' : (w.end_date ?? '?')})\n${w.description ?? ''}`)
     .join('\n\n')
+
+  const projectsFormatted = projects.length
+    ? '\n\nPROJECTS:\n' + projects.slice(0, 5).map(p => [
+        `${p.name}${p.tech_stack.length ? ` (${p.tech_stack.join(', ')})` : ''}`,
+        p.role ? `Role: ${p.role}` : null,
+        p.description ?? null,
+        p.highlights.length ? p.highlights.map(h => `• ${h}`).join('\n') : null,
+      ].filter(Boolean).join('\n')).join('\n\n')
+    : ''
 
   const message = await anthropic.messages.create({
     model: 'claude-sonnet-4-6',
@@ -51,6 +72,7 @@ IMPORTANT RULES:
 - Use strong action verbs and quantify impact where the original implies it
 - Each job should have 3-5 bullet points that emphasize relevance to the target role
 - Write a 2-3 sentence professional summary that directly addresses the job requirements
+- Projects can be referenced in the summary when they demonstrate relevant skills
 
 TARGET JOB:
 Title: ${jobTitle}
@@ -62,7 +84,7 @@ CANDIDATE'S CURRENT RESUME TEXT:
 ${resumeText.slice(0, 4000)}
 
 STRUCTURED WORK HISTORY:
-${workHistoryFormatted}
+${workHistoryFormatted}${projectsFormatted}
 
 SKILLS: ${skills.join(', ')}
 
