@@ -38,7 +38,7 @@ Backlog is primarily a personal tool, but it's architected for multiple users. A
 | Command Palette        | **cmdk**                                 | Headless command menu primitive powering Cmd+K fuzzy search                              |
 | Backend                | **Next.js API Routes + Render (worker)** | API routes for app logic; Render Web Service runs aggregation on 8h cron + `/run` endpoint for manual triggers |
 | Database               | **Supabase (PostgreSQL)**                | Managed Postgres with built-in auth, RLS, and real-time subscriptions                    |
-| LLM — High Frequency   | **GPT-4o-mini (OpenAI)**                 | $0.15/1M tokens, fast — job normalization, match scoring, URL job extraction             |
+| LLM — High Frequency   | **GPT-5 nano (OpenAI)**                  | $0.05/1M tokens, faster — job normalization, match scoring, URL job extraction           |
 | LLM — Quality Tasks    | **Claude Sonnet 4.6 (Anthropic)**        | Cover letters, resume tailoring, STAR responses, extension open-ended field answers      |
 | Email Notifications    | **Resend**                               | Simple REST API for transactional email, generous free tier                              |
 | Push Notifications     | **Web Push API**                         | Native browser push — no third-party service, works across Chrome and Firefox            |
@@ -701,6 +701,52 @@ Upgrade the single-number match score to a 4-dimension breakdown: role fit, tech
 - [x] `src/lib/llm/matcher.ts` — upgrade prompt to return `{score, rationale, dimensions}` with 4 sub-scores
 - [x] `src/app/api/jobs/[id]/match-score/route.ts` — store and return `dimensions` alongside score
 - [x] `src/components/feed/MatchScoreBadge.tsx` — show dimension breakdown in a tooltip/popover on hover
+
+### Phase 14 — Cost Optimization & Relevance Filtering
+
+> Cut OpenAI spend and reduce noise by (1) switching to a cheaper/better model, (2) dropping irrelevant job sources, and (3) filtering non-qualifying roles before they ever hit the LLM or DB.
+
+#### 14a — Switch to GPT-5 Nano
+
+GPT-5 nano is 3x cheaper on input ($0.05 vs $0.15/1M), 1.5x cheaper on output ($0.40 vs $0.60/1M), has 3x the context window (400K vs 128K), and is GPT-5 tier intelligence. No tradeoff — strictly better for our use cases.
+
+- [x] `worker/src/llm/normalizer.ts` — change `gpt-4o-mini` → `gpt-5-nano`
+- [x] `worker/src/jobs/enricher.ts` — change `gpt-4o-mini` → `gpt-5-nano`
+- [x] `src/lib/llm/matcher.ts` — change `gpt-4o-mini` → `gpt-5-nano`
+- [x] Update `PHASES.md` LLM strategy table to reflect new model
+
+#### 14b — Drop Internship Source
+
+The Summer2026-Internships GitHub source is no longer relevant; removing it eliminates one entire aggregation pipeline (fetch → parse → normalize → enrich → write) per cron cycle.
+
+- [x] `worker/src/aggregator.ts` — remove `SimplifyJobs/Summer2026-Internships` entry from `SOURCES` array
+
+#### 14c — Pre-Storage Relevance Filter
+
+Add a deterministic (no LLM, zero cost) filter that runs immediately after parsing/portal fetch and before deduplication + normalization. Filters out roles that a CS bachelor's new grad in the US does not qualify for or would not want.
+
+**Filter rules (all checked against title + location):**
+- **Country filter:** drop any job whose location string clearly indicates non-US (UK, Canada, Germany, France, Australia, Singapore, India, etc.) — or where `country !== 'United States'` after normalization; keep "Remote" and ambiguous (default US)
+- **Degree gating:** drop titles or descriptions containing `PhD`, `Doctorate`, `Ph.D`, `Postdoctoral`
+- **Non-CS role types to block:** Product Marketing, Marketing Manager/Specialist, Sales, Account Executive, Account Manager, Account Leader, Business Operations, Operations Manager (non-eng), Assistant Controller, Controller, Recruiter, HR, Talent Acquisition, Legal, Finance Analyst (non-quant), Administrative
+- **Seniority ceiling:** drop Director, VP, Vice President, C-level, Head of (unless technical), Principal (keep for Principal Engineer/SWE), Staff (keep for Staff Engineer/SWE)
+- **Manager filter:** drop Engineering Manager, Product Manager ← actually keep PM (CS grads do apply); drop Engineering Manager only
+- **Internship titles:** now that we're dropping the internship source, also block stray internship titles from portal scan that slip through (e.g. "Intern", "Co-op", "Cooperative Education")
+
+**Implementation:**
+- [ ] `worker/src/jobs/relevance-filter.ts` — `filterRelevantJobs(jobs: NormalizedJob[]): NormalizedJob[]` and `filterRelevantEntries(entries: RawJobEntry[]): RawJobEntry[]` (pre-normalization variant for GitHub sources)
+- [ ] `worker/src/aggregator.ts` — call `filterRelevantEntries(rawEntries)` after `parseJobsTable` and before `normalizeEntries` (saves tokens on filtered entries)
+- [ ] `worker/src/aggregator.ts` — call `filterRelevantJobs(newJobs)` after portal dedup and before `enrichJobs` (saves enrichment calls on filtered jobs)
+- [ ] Unit tests: title blocklist matches, country filter, PhD detection, edge cases (keep "Staff Engineer", "Principal SWE", block "Engineering Manager")
+
+#### 14d — Backfiller Rate Cap (QoL)
+
+The backfiller runs every 15-minute cron cycle and calls GPT on up to 50 jobs per run. With a large DB of jobs with missing descriptions this is a hidden cost driver.
+
+- [ ] `worker/src/jobs/backfiller.ts` — add a `last_enrichment_attempt` column check or reduce default `limit` from 50 → 10 until DB is caught up; add a cap so the same job is not retried more than 3 times (track attempt count or use a `enrichment_failed` flag)
+- [ ] `supabase/migrations/` — migration to add `enrichment_attempts` int column to `jobs` table; backfiller increments on each try, skips rows where `enrichment_attempts >= 3`
+
+---
 
 ### Phase 12 — Export & Integrations
 

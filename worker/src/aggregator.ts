@@ -24,13 +24,6 @@ const SOURCES: SourceConfig[] = [
     repo: 'New-Grad-Positions',
     roleType: 'full_time',
   },
-  {
-    name: 'SimplifyJobs/Summer2026-Internships',
-    url: 'https://github.com/SimplifyJobs/Summer2026-Internships',
-    owner: 'SimplifyJobs',
-    repo: 'Summer2026-Internships',
-    roleType: 'internship',
-  },
 ]
 
 export interface AggregationResult {
