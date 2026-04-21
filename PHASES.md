@@ -644,14 +644,14 @@ Two approaches were considered:
 
 > Insert a `/` dashboard as the default landing page. The current nav goes straight to `/feed`, but the app would benefit from a home screen that gives you a quick read on everything at once.
 
-- [ ] Add `/` route and redirect sidebar default to `/` instead of `/feed`
-- [ ] Dashboard layout: 2-column grid on desktop, stacked on mobile
-- [ ] **Top stats strip**: open applications count, interviews in progress, offers pending, total jobs in feed today
-- [ ] **Newest jobs mini-feed**: top 5 most recently fetched jobs with "View all" link to `/feed`
-- [ ] **Application pipeline summary**: small kanban-style count per stage (Saved / Applied / Phone / Technical / Final / Offer / Rejected) — no drag/drop, just counts + "Open tracker" link
-- [ ] **Analytics sparkline**: 30-day application activity bar chart (Recharts, compact)
-- [ ] **Upcoming prep nudges**: applications with interviews soon (by `updated_at`) — links to `/prep`
-- [ ] Animate widgets in on load (staggered Framer Motion entrance)
+- [x] Add `/` route and redirect sidebar default to `/dashboard` instead of `/feed`
+- [x] Dashboard layout: 2-column grid on desktop, stacked on mobile
+- [x] **Top stats strip**: open applications count, interviews in progress, offers pending, total jobs in feed today
+- [x] **Newest jobs mini-feed**: top 5 most recently fetched jobs with "View all" link to `/feed`
+- [x] **Application pipeline summary**: small kanban-style count per stage (Saved / Applied / Phone / Technical / Final / Offer / Rejected) — no drag/drop, just counts + "Open tracker" link
+- [x] **Analytics sparkline**: 30-day application activity bar chart (Recharts, compact)
+- [x] **Active interviews nudge**: applications in phone screen / technical / final with links to `/prep`
+- [x] Animate widgets in on load (staggered Framer Motion entrance)
 
 ### Phase 11 — Intelligence Lift (inspired by career-ops)
 
@@ -713,6 +713,9 @@ GPT-5 nano is 3x cheaper on input ($0.05 vs $0.15/1M), 1.5x cheaper on output ($
 - [x] `worker/src/llm/normalizer.ts` — change `gpt-4o-mini` → `gpt-5-nano`
 - [x] `worker/src/jobs/enricher.ts` — change `gpt-4o-mini` → `gpt-5-nano`
 - [x] `src/lib/llm/matcher.ts` — change `gpt-4o-mini` → `gpt-5-nano`
+- [x] `src/lib/llm/resume-analyzer.ts` — missed in initial pass; fixed in Phase 18 audit
+- [x] `src/lib/llm/company-enricher.ts` — missed in initial pass; fixed in Phase 18 audit
+- [x] `src/lib/jobs/url-extractor.ts` — missed in initial pass; fixed in Phase 18 audit
 - [x] Update `PHASES.md` LLM strategy table to reflect new model
 
 #### 14b — Drop Internship Source
@@ -1013,6 +1016,69 @@ Fast sanity checks run after every deploy. No mocking — hit the real deployed 
 - [ ] Worker test script in `worker/package.json`: `"test": "vitest run"`, `"test:watch": "vitest"`
 - [ ] Playwright config: `webServer` block spins up `next dev` before E2E run in CI; reuses existing server in local dev
 - [ ] Coverage report: `vitest run --coverage` uploads to CI artifacts; enforce 80% threshold on `worker/src/` and `src/lib/`
+
+---
+
+### Phase 18 — Gap Fixes & Reliability
+
+> Gaps identified during codebase audit. Mix of UX problems, silent data issues, and reliability holes. Nothing here is a blocker, but several will cause confusion or wasted spend if left unaddressed.
+
+---
+
+#### 18a — Resume Extraction Review Step *(UX — high priority)*
+
+**The problem:** After uploading a resume, the AI silently writes work history, education, skills, and Q&A answers straight to the DB with no review step. If it misreads a job title, invents a bullet, or parses dates wrong, you won't know until you notice something off in the extension auto-fill or a tailored resume. GPT-5 nano is accurate but not perfect — LLM extraction should never be fully trusted without a review gate.
+
+**The fix:** After upload, instead of committing immediately, return the extracted data to the client and show a review modal. The user confirms, unchecks, or edits individual entries before they're written.
+
+- [ ] `src/app/api/profile/resume/route.ts` — add a `?dry_run=true` mode: run extraction, return the full `ResumeAnalysis` payload but do NOT write to DB
+- [ ] `src/components/profile/ResumeReviewModal.tsx` — modal shown after upload; displays extracted skills (checkboxes), work history entries (toggle each), education entries (toggle each), and Q&A pairs (toggle each); "Confirm & Save" button posts to a new `POST /api/profile/resume/commit` endpoint with the approved subset
+- [ ] `src/app/api/profile/resume/commit/route.ts` — accepts the reviewed/trimmed payload; writes only approved entries to DB; marks match scores stale
+- [ ] `src/components/profile/ResumeUpload.tsx` — wire in the review modal flow: upload → dry_run extract → show modal → on confirm → commit; keep current instant-commit as a fallback if modal is dismissed
+- [ ] If extraction produces zero entries (image PDF), skip the modal and show the existing warning
+
+#### 18b — Skills Change Should Invalidate Match Scores
+
+**The problem:** `match_scores` are invalidated when the resume is re-uploaded, but not when skills are manually added or removed on the profile page. If you add "Rust" to your skills, existing cached scores still don't reflect it until the resume is re-uploaded.
+
+- [ ] `src/app/api/profile/route.ts` — when a `PATCH` includes a `skills` field that differs from the current value, run `UPDATE match_scores SET is_stale = true WHERE user_id = ?`
+- [ ] Same invalidation on `POST /api/profile/work-history` and `DELETE /api/profile/work-history/[id]` — work history changes affect resume quality signals
+
+#### 18c — Resume Analyzer Missing Fields
+
+**The problem:** The analyzer extracts name, phone, address, skills, work history, education, and Q&A — but misses LinkedIn URL, GitHub URL, and portfolio URL, which are almost always on a CS resume. It also doesn't extract GPA, which is on the education table but never populated by upload.
+
+- [ ] `src/lib/llm/resume-analyzer.ts` — add to the extraction prompt and `ResumePersonalInfo` type: `linkedin_url`, `github_url`, `portfolio_url` (all string | null)
+- [ ] Add `gpa: number | null` to `ResumeEducationEntry` and extract it from the resume
+- [ ] `src/app/api/profile/resume/route.ts` — populate these fields during the commit step (same null-check logic as name/phone/address)
+
+#### 18d — Discord Ignores Match Threshold
+
+**The problem:** `dispatchNotifications` sends every new job to Discord regardless of the user's `alert_match_threshold` setting. If your threshold is 70% but a batch of 25 jobs all score 30%, Discord still fires for all of them. Match scores aren't available at notification time (they're lazy), but we can use the same Jaccard proxy from Phase 15b as a pre-send filter.
+
+- [ ] `worker/src/notifications/dispatcher.ts` — after computing Jaccard scores for sort order (Phase 15b), also filter out jobs below a configurable `DISCORD_MIN_RELEVANCE` threshold (env var, default `0` = no filter); this prevents completely unrelated jobs from cluttering the Discord feed
+- [ ] Long-term (post Phase 15b): once skills-based Jaccard is in place, surface only jobs with score ≥ threshold in Discord
+
+#### 18e — No Error Recovery on Anthropic API Failures
+
+**The problem:** Cover letter generation, resume tailoring, STAR response drafting, and interview guide generation all call Claude with no retry, no timeout guard, and no user-facing fallback beyond a generic error. If Anthropic has a brief outage, the user gets a failed state with no way to recover other than clicking again (and there's no retry button on most of these surfaces).
+
+- [ ] `src/lib/llm/cover-letter.ts`, `resume-tailor.ts`, `star-builder.ts`, `question-generator.ts` — wrap Anthropic calls in a shared `withRetry(fn, maxAttempts = 2)` utility that retries once on 529/overloaded errors with a 2s delay; does not retry on 400/auth errors
+- [ ] `src/lib/llm/retry.ts` — implement the `withRetry` utility (10 lines, reused across all LLM callers)
+- [ ] Each LLM-backed UI surface (cover letter editor, STAR builder, tailored resume generator) should show a "Retry" button in the error state rather than requiring a full page action
+
+#### 18f — Work History Description Quality
+
+**The problem:** The resume analyzer writes a "2–3 sentence summary of responsibilities and impact" as the work history description. But the extension uses this description to fill open-ended experience questions, and a dense summary paragraph is worse than bullet points for that purpose. The tailored resume generator also works better with bullet-formatted input.
+
+- [ ] `src/lib/llm/resume-analyzer.ts` — change the `description` field prompt to output 3–5 bullet points ("•  ...") instead of prose; this format is more useful for both extension auto-fill and resume tailoring context
+
+#### 18g — Portal Companies Coverage Check
+
+**The problem:** The 30+ portal companies list in `worker/src/portals/companies.ts` was seeded once and hasn't been audited. Some slugs may be stale (companies switch from Greenhouse to Lever or to Workday), and there are likely major new-grad-hiring companies missing.
+
+- [ ] Audit `worker/src/portals/companies.ts` — verify slugs still resolve (404s already handled gracefully, but dead entries waste a fetch); add any notable missing companies (Stripe, Figma, Notion, Linear, Vercel, etc.)
+- [ ] Add a `worker/src/portals/validate-slugs.ts` script (run manually) that hits each slug's API endpoint and logs which ones 404 — makes future audits easy
 
 ---
 

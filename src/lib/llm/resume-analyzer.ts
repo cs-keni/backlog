@@ -47,7 +47,7 @@ export async function analyzeResume(resumeText: string): Promise<ResumeAnalysis>
   const truncated = resumeText.slice(0, 8000)
 
   const response = await openai.chat.completions.create({
-    model: 'gpt-4o-mini',
+    model: 'gpt-5-nano',
     temperature: 0.2,
     max_tokens: 4000,
     response_format: { type: 'json_object' },

@@ -109,7 +109,7 @@ Respond with a JSON object only, no markdown:
 If a field is genuinely unknowable, use "" for strings, [] for arrays, and "Unknown" for funding_stage.`
 
   const response = await openai.chat.completions.create({
-    model: 'gpt-4o-mini',
+    model: 'gpt-5-nano',
     messages: [{ role: 'user', content: prompt }],
     temperature: 0.2,
     max_tokens: 600,

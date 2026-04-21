@@ -143,7 +143,7 @@ async function fetchFromHtml(url: string): Promise<ExtractedJob | null> {
   const openai = new OpenAI({ apiKey })
 
   const completion = await openai.chat.completions.create({
-    model: 'gpt-4o-mini',
+    model: 'gpt-5-nano',
     temperature: 0,
     response_format: { type: 'json_object' },
     messages: [
