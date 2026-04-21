@@ -42,12 +42,19 @@ const BLOCKED_TITLE_PATTERNS: RegExp[] = [
   /\boperations\s+analyst\b/,
   /\bbusiness\s+analyst\b/,   // not a CS role; distinct from "data analyst" or "software engineer"
 
-  // Management / seniority ceiling
+  // Seniority ceiling — entry-level only (≤3 years experience)
+  /\bsenior\b/,
+  /\bsr\.\s*(software|engineer|swe|developer|ml)\b/,
+  /\blead\s+(software|engineer|swe|developer|ml|data|platform|security|mobile)\b/,
+  /\b(software|engineer|swe|developer|ml|data|platform)\s+lead\b/,
+  /\btech(nical)?\s+lead\b/,
+  /\bstaff\b/,
+  /\bprincipal\b/,
   /\bengineering\s+manager\b/,
   /\bvp\s+of\b/,
   /\bvice\s+president\b/,
   /\bdirector\s+of\b/,
-  /\bhead\s+of\s+(?!machine|ml|ai|data|platform|infrastructure|security|engineering)/,
+  /\bhead\s+of\b/,
   /\bchief\s+(technology|product|operating|executive|financial)\b/,
   /\bcto\b/,
   /\bcoo\b/,
@@ -62,12 +69,8 @@ const BLOCKED_TITLE_PATTERNS: RegExp[] = [
 
 // These patterns in the title are always allowed, even if a broader pattern above
 // would match. Checked first — if a title matches an allowlist entry it is kept.
-// Example: "Head of Machine Learning" would match BLOCKED head-of but is a legit role.
 const ALWAYS_ALLOW_TITLE_PATTERNS: RegExp[] = [
-  /\bstaff\s+(software|engineer|swe|developer|ml|machine\s+learning)\b/,
-  /\bprincipal\s+(software|engineer|swe|developer|ml|machine\s+learning|scientist)\b/,
-  /\bhead\s+of\s+(machine\s+learning|ml|ai|data|platform|infrastructure|security|engineering)\b/,
-  /\bproduct\s+manager\b/,   // CS grads do apply to PM roles
+  /\bproduct\s+manager\b/,   // CS grads do apply to APM / associate PM programs
   /\bprogram\s+manager\b/,
   /\btechnical\s+program\s+manager\b/,
   /\btpm\b/,

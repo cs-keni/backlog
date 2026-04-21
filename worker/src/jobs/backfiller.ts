@@ -2,16 +2,20 @@ import { supabase } from '../db/client'
 import { enrichJobs } from './enricher'
 import type { NormalizedJob } from '../llm/normalizer'
 
-// Pulls jobs with null salary from the DB, enriches them via URL fetch,
-// and writes the results back. Runs at the end of every aggregation cycle
-// so already-stored jobs eventually get salary populated.
-export async function backfillMissingSalaries(limit = 50): Promise<void> {
+const MAX_ATTEMPTS = 3  // stop retrying a URL after this many failed enrichments
+
+// Pulls jobs with null salary/description from the DB, enriches them via URL fetch,
+// and writes results back. Skips jobs that have already failed MAX_ATTEMPTS times
+// so dead URLs (JS-rendered, paywalled, gone) don't burn tokens on every cycle.
+export async function backfillMissingSalaries(limit = 10): Promise<void> {
   const { data, error } = await supabase
     .from('jobs')
-    .select('url, title, company, location, is_remote, experience_level, tags, posted_at')
+    .select('url, title, company, location, is_remote, experience_level, tags, posted_at, enrichment_attempts')
     .is('salary_min', null)
     .is('salary_max', null)
     .is('description', null)
+    .lt('enrichment_attempts', MAX_ATTEMPTS)
+    .order('enrichment_attempts', { ascending: true }) // cheapest jobs first (fewest retries)
     .limit(limit)
 
   if (error) {
@@ -20,14 +24,13 @@ export async function backfillMissingSalaries(limit = 50): Promise<void> {
   }
 
   if (!data || data.length === 0) {
-    console.log('[backfiller] No jobs with missing salary/description — skipping')
+    console.log('[backfiller] No backfill candidates — skipping')
     return
   }
 
-  console.log(`[backfiller] Found ${data.length} jobs to enrich`)
+  console.log(`[backfiller] Attempting to enrich ${data.length} jobs (limit ${limit}, max attempts ${MAX_ATTEMPTS})`)
 
-  // Shape them into the minimal NormalizedJob needed by enrichJobs
-  const stubs: NormalizedJob[] = (data as Array<{
+  type JobRow = {
     url: string
     title: string
     company: string
@@ -36,7 +39,23 @@ export async function backfillMissingSalaries(limit = 50): Promise<void> {
     experience_level: string | null
     tags: string[]
     posted_at: string | null
-  }>).map((row) => ({
+    enrichment_attempts: number
+  }
+
+  const rows = data as JobRow[]
+
+  // Always increment enrichment_attempts, whether or not enrichment succeeds.
+  // This ensures a job that consistently fails eventually stops being retried.
+  await Promise.all(
+    rows.map(row =>
+      supabase
+        .from('jobs')
+        .update({ enrichment_attempts: row.enrichment_attempts + 1 })
+        .eq('url', row.url)
+    )
+  )
+
+  const stubs: NormalizedJob[] = rows.map((row) => ({
     url: row.url,
     title: row.title,
     company: row.company,

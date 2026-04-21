@@ -737,14 +737,282 @@ Add a deterministic (no LLM, zero cost) filter that runs immediately after parsi
 - [x] `worker/src/jobs/relevance-filter.ts` — `filterRelevantJobs(jobs: NormalizedJob[]): NormalizedJob[]` and `filterRelevantEntries(entries: RawJobEntry[]): RawJobEntry[]` (pre-normalization variant for GitHub sources)
 - [x] `worker/src/aggregator.ts` — call `filterRelevantEntries(rawEntries)` after `parseJobsTable` and before `normalizeEntries` (saves tokens on filtered entries)
 - [x] `worker/src/aggregator.ts` — call `filterRelevantJobs(newJobs)` after portal dedup and before `enrichJobs` (saves enrichment calls on filtered jobs)
-- [ ] Unit tests: title blocklist matches, country filter, PhD detection, edge cases (keep "Staff Engineer", "Principal SWE", block "Engineering Manager")
+- [ ] Unit tests: title blocklist matches, country filter, PhD detection, seniority ceiling (block "Senior SWE", "Staff Engineer", "Principal SWE", "Tech Lead"; keep "Software Engineer", "Product Manager", "TPM")
 
 #### 14d — Backfiller Rate Cap (QoL)
 
 The backfiller runs every 15-minute cron cycle and calls GPT on up to 50 jobs per run. With a large DB of jobs with missing descriptions this is a hidden cost driver.
 
-- [ ] `worker/src/jobs/backfiller.ts` — add a `last_enrichment_attempt` column check or reduce default `limit` from 50 → 10 until DB is caught up; add a cap so the same job is not retried more than 3 times (track attempt count or use a `enrichment_failed` flag)
-- [ ] `supabase/migrations/` — migration to add `enrichment_attempts` int column to `jobs` table; backfiller increments on each try, skips rows where `enrichment_attempts >= 3`
+- [x] `worker/src/jobs/backfiller.ts` — reduced default `limit` from 50 → 10; skips rows where `enrichment_attempts >= 3`; always increments attempt count whether enrichment succeeds or fails; orders by `enrichment_attempts asc` (cheapest first)
+- [x] `supabase/migrations/014_add_enrichment_attempts.sql` — adds `enrichment_attempts int NOT NULL DEFAULT 0` to `jobs`; partial index on backfill candidates for query performance
+
+---
+
+### Phase 15 — Discord Notification Redesign
+
+> Make the Discord feed the primary at-a-glance job scanner. Jobs ranked by relevance, each one a clickable embed that deep-links directly to the job in Backlog. Log into Backlog and the drawer opens automatically.
+
+#### 15a — Deep Links
+
+Each Discord job embed needs a URL that routes the user to the right place in Backlog. The feed page needs to handle the `?job=<id>` param by auto-opening that job's detail drawer.
+
+- [ ] `worker/src/notifications/discord.ts` — update `sendJobsNotification` signature to accept `{ job: NormalizedJob, id: string }[]` instead of just `NormalizedJob[]`; add `BACKLOG_APP_URL` env var (e.g. `https://backlog.vercel.app`); set `url: \`${BACKLOG_APP_URL}/feed?job=${id}\`` on each embed
+- [ ] `worker/src/notifications/dispatcher.ts` — zip `newJobs` + `writtenJobIds` into `{ job, id }[]` pairs before calling `sendDiscord`; ids and jobs come from the same aggregation run so they are already positionally aligned
+- [ ] `src/app/(app)/feed/page.tsx` — read `searchParams.job`; if present, pass as `initialJobId` prop to `JobFeed`
+- [ ] `src/components/feed/JobFeed.tsx` — accept `initialJobId?: string`; on mount, fetch that job and auto-open the detail drawer; clear the param from the URL via `router.replace` after opening so it doesn't re-trigger on navigation
+- [ ] `src/lib/supabase/middleware.ts` — preserve `?job=<id>` through the auth redirect: when bouncing an unauthenticated user to `/login`, include `callbackUrl=/feed?job=<id>` so they land on the right job after login
+- [ ] `src/app/(auth)/login/page.tsx` — after successful login, read `callbackUrl` from query params and redirect there instead of default `/feed`
+
+#### 15b — Relevance Sorting
+
+Match scores are user-specific and computed lazily — they aren't available at notification time without a costly LLM call. Instead, use a fast proxy sort: Jaccard similarity against the user's stored skills (free, sub-millisecond), then salary descending as a tiebreaker.
+
+- [ ] `worker/src/notifications/discord.ts` — add `sortByRelevance(jobs, userSkills)` helper: compute Jaccard score between each job's `tags` and `userSkills`; sort descending; jobs with no tags sort below scored jobs; salary desc as secondary sort
+- [ ] `worker/src/notifications/dispatcher.ts` — fetch user skills from DB before calling `sendDiscord`; pass them so Discord list is sorted
+
+#### 15c — Embed Redesign
+
+Current format is a single wall-of-text embed. Replace with one compact embed per job (up to 10 jobs; overflow becomes a "+N more on Backlog" footer link). Each embed should be scannable in 2 seconds.
+
+- [ ] `worker/src/notifications/discord.ts` — replace single embed with array of per-job embeds (Discord allows up to 10 per message); each embed:
+  - **Title**: `{job title}` (linked to deep-link URL)
+  - **Description**: `{company} · {location or Remote}`
+  - **Fields** (inline): Salary (or "Not listed"), Tags (up to 4 chips as inline code), Experience level
+  - **Color**: 🟢 green for high Jaccard match, 🟡 yellow for mid, ⚪ grey for no signal
+  - **Footer**: `Posted {X days ago}`
+- [ ] If `jobs.length > 10`: send first 10 as embeds + a trailing text message `"+{n} more new jobs — [View all on Backlog]({BACKLOG_APP_URL}/feed)"`
+- [ ] Add `BACKLOG_APP_URL` to Render env vars (documented in worker README)
+
+---
+
+### Phase 16 — Projects Section
+
+> Add a structured projects section to the user profile. Projects are the primary signal for new grads with limited work history — they belong in match scoring, resume tailoring, and cover letter context. Token cost at GPT-5 nano rates is negligible (~200 tokens per scoring call = ~$0.00001).
+
+#### 16a — Data Layer
+
+- [ ] `supabase/migrations/add_projects.sql` — new `projects` table:
+  - `id uuid`, `user_id uuid`, `name text`, `description text`, `role text` (what you built / your contribution), `tech_stack text[]`, `url text` (nullable — GitHub, live demo), `highlights text[]` (bullet points, up to 5), `start_date date` (nullable), `end_date date` (nullable), `is_current bool`, `created_at`
+  - RLS: own rows only
+
+#### 16b — Profile UI
+
+- [ ] `src/app/api/profile/projects/route.ts` — GET (list by user), POST (create)
+- [ ] `src/app/api/profile/projects/[id]/route.ts` — PATCH, DELETE
+- [ ] `src/components/profile/ProjectsSection.tsx` — add/edit/delete cards; fields: name, role, description, tech stack tags, URL, highlights, dates; same card pattern as WorkHistorySection
+- [ ] `src/components/profile/ProfileClient.tsx` — add Projects section between Work History and Education (chronologically correct: projects usually alongside education for new grads)
+
+#### 16c — LLM Integration
+
+- [ ] `src/lib/llm/matcher.ts` — include projects in the resume match scoring prompt context: serialize as `Project: {name} ({tech_stack}) — {description}` lines; append after resume text, capped at 800 tokens total for projects
+- [ ] `src/lib/llm/resume-tailor.ts` — include projects in tailoring context; Claude can strengthen project bullet points to align with JD
+- [ ] `src/lib/llm/cover-letter.ts` — include projects in cover letter context when work history is sparse; Claude picks the most relevant project to reference
+- [ ] `src/app/api/extension/profile/route.ts` — include `projects` in the profile payload returned to the extension
+
+---
+
+### Phase 17 — Testing Suite
+
+> Comprehensive reliability layer across every tier of the stack: worker pipeline, API routes, UI flows, and browser extension. Infrastructure is already in place (Vitest + MSW + Playwright from Phase 1, Vitest in extension from Phase 10A) — this phase fills in the actual test coverage.
+
+**Coverage target:** 80%+ on all worker business logic and API route handlers; 100% on critical auth paths and data-mutation routes.
+
+---
+
+#### 17a — Test Fixtures & Factories
+
+Shared test data factories used by all test layers. Define once, import everywhere — prevents fixture drift across suites.
+
+- [ ] `worker/tests/fixtures/jobs.ts` — `makeRawEntry(overrides?)`, `makeNormalizedJob(overrides?)`, factory functions for generating consistent test data
+- [ ] `src/tests/fixtures/jobs.ts` — `makeJob(overrides?)`, `makeApplication(overrides?)`, `makeUser(overrides?)`
+- [ ] `src/tests/fixtures/profile.ts` — `makeUserProfile(overrides?)`, `makeWorkHistory(overrides?)`, `makeEducation(overrides?)`, `makeProject(overrides?)`
+- [ ] `src/tests/helpers/supabase-mock.ts` — typed Supabase mock builder; wraps MSW handlers so route tests don't need raw fetch mocks
+
+---
+
+#### 17b — Worker Unit Tests
+
+Pure logic tests — no network, no DB. Fast, run on every commit.
+
+**Parser (`worker/tests/unit/parser.test.ts`):**
+- [ ] HTML table with ↳ sub-rows inherits company name correctly
+- [ ] Row with 🔒 in link cell is skipped
+- [ ] Row with no parseable URL is skipped
+- [ ] Multi-location `<br>` cells are normalized to `, `-separated string
+- [ ] Leading emoji stripped from company names
+- [ ] Orphaned ↳ row (no prior company) is skipped
+
+**Date parser (`worker/tests/unit/normalizer.test.ts`):**
+- [ ] `"0d"` → today's date ISO string
+- [ ] `"7d"` → 7 days ago
+- [ ] `"30d"` → 30 days ago
+- [ ] Legacy `"Sep 5"` → correct year inference (past month = last year)
+- [ ] Empty string → `null`
+- [ ] Garbage input → `null`
+
+**Relevance filter (`worker/tests/unit/relevance-filter.test.ts`):**
+- [ ] "Senior Software Engineer" → blocked
+- [ ] "Staff Engineer" → blocked
+- [ ] "Principal SWE" → blocked
+- [ ] "Tech Lead" → blocked
+- [ ] "Engineering Manager" → blocked
+- [ ] "PhD Machine Learning Researcher" → blocked
+- [ ] "Account Executive" → blocked
+- [ ] "Product Marketing Manager" → blocked
+- [ ] "Software Engineer" → allowed
+- [ ] "Product Manager" → allowed
+- [ ] "Technical Program Manager" → allowed
+- [ ] "New Grad Software Engineer" → allowed
+- [ ] Location "London, UK" → blocked
+- [ ] Location "Toronto, Canada" → blocked
+- [ ] Location "Remote" → allowed
+- [ ] Location "San Francisco, CA" → allowed
+- [ ] Location "" (blank) → allowed (defaults to US)
+- [ ] `filterRelevantEntries` log message shows correct drop count
+
+**Salary extractor (`worker/tests/unit/enricher.test.ts`):**
+- [ ] `"$120,000 – $150,000"` → `{ min: 120000, max: 150000 }`
+- [ ] `"$120k–$150k"` → `{ min: 120000, max: 150000 }`
+- [ ] `"salary: $80k to $100k"` → `{ min: 80000, max: 100000 }`
+- [ ] `"$50/hr"` (hourly × 2080) → annual equivalent
+- [ ] No salary text → `{ min: null, max: null }`
+
+**Deduplicator (`worker/tests/unit/deduplicator.test.ts`):**
+- [ ] Entries already in DB (by URL) are filtered out
+- [ ] New entries pass through
+- [ ] Mixed batch: only new entries returned
+
+---
+
+#### 17c — App Unit Tests
+
+**Match scorer (`src/tests/unit/matcher.test.ts`):**
+- [ ] Jaccard score: perfect overlap → 100, no overlap → 0, partial → correct ratio
+- [ ] `clamp` handles NaN, negative, over-100
+- [ ] Skills-only mode when no resume text
+- [ ] `mode: 'none'` returned when both skills and resume are absent
+
+**URL extractor (`src/tests/unit/url-extractor.test.ts`):**
+- [ ] Greenhouse URL detected and routed to Greenhouse API handler
+- [ ] Lever URL detected and routed to Lever API handler
+- [ ] Generic URL falls through to HTML fetch + LLM path
+- [ ] Invalid / non-job URL returns appropriate error shape
+
+**API key auth (`src/tests/unit/api-key.test.ts`):**
+- [ ] `hashApiKey` produces consistent output for same input
+- [ ] Two different keys produce different hashes
+- [ ] Raw key is never returned after hashing (no reverse path)
+
+**Quiet hours (`src/tests/unit/dispatcher.test.ts`):**
+- [ ] `isInQuietHours` returns `true` when now is within window
+- [ ] Returns `false` outside window
+- [ ] Overnight range (22:00–08:00) handled correctly
+- [ ] `null` start or end → always returns `false`
+
+---
+
+#### 17d — API Route Integration Tests
+
+Uses Vitest + MSW. Supabase calls are intercepted — no real DB. Tests verify handler logic, not Supabase internals.
+
+**Feed (`src/tests/integration/jobs-feed.test.ts`):**
+- [ ] `GET /api/jobs` returns paginated results with correct cursor structure
+- [ ] `role_type` filter applied correctly
+- [ ] `is_remote` filter applied correctly
+- [ ] `date_range` filter: `24h` restricts `posted_at` correctly
+- [ ] `GET /api/jobs/[id]` returns 404 for unknown id
+- [ ] `GET /api/jobs/[id]/match-score` computes score on first call, returns cached on second
+
+**Applications (`src/tests/integration/applications.test.ts`):**
+- [ ] `POST /api/applications` creates row and first timeline entry
+- [ ] `PATCH /api/applications/[id]` with new status writes timeline row + updates `last_updated`
+- [ ] `PATCH /api/applications/[id]` with same status does not write duplicate timeline row
+- [ ] `DELETE /api/applications/[id]` removes row and cascades timeline
+
+**Profile (`src/tests/integration/profile.test.ts`):**
+- [ ] `POST /api/profile/resume` extracts text, updates `users.resume_text`, invalidates `match_scores`
+- [ ] `POST /api/profile/work-history` creates row, returns id
+- [ ] `DELETE /api/profile/work-history/[id]` rejects if row belongs to different user (RLS simulation)
+
+**URL extractor (`src/tests/integration/from-url.test.ts`):**
+- [ ] Greenhouse URL → calls Greenhouse API mock → returns normalized job
+- [ ] Lever URL → calls Lever API mock → returns normalized job
+- [ ] Unknown static URL → calls HTML fetch mock → GPT extraction path
+
+**Extension (`src/tests/integration/extension.test.ts`):**
+- [ ] `GET /api/extension/profile` returns full profile + saved_answers + STAR responses
+- [ ] `POST /api/extension/answer-question` returns saved answer when match found (no LLM call)
+- [ ] `POST /api/extension/answer-question` calls Claude when no saved answer matches
+- [ ] Invalid API key → 401
+- [ ] Revoked API key → 401
+
+**Worker integration (`worker/tests/integration/aggregator.test.ts`):**
+- [ ] Mock GitHub API response → aggregator writes correct normalized rows to test Supabase
+- [ ] Duplicate URL → second run writes 0 new rows
+- [ ] Relevance filter blocks non-qualifying titles before normalization call is made (verify GPT mock not called)
+
+---
+
+#### 17e — E2E Tests (Playwright)
+
+Full browser tests against a running dev server. Auth state managed via Playwright `storageState` fixture (logged-in session saved once, reused across tests).
+
+**Auth (`src/tests/e2e/auth.spec.ts`) — already partially written:**
+- [x] Unauthenticated user redirected to `/login`
+- [ ] Login with valid credentials → lands on `/feed`
+- [ ] Login with invalid credentials → error message shown, no redirect
+- [ ] `callbackUrl=/feed?job=abc` preserved through login → drawer opens after auth
+- [ ] Idle 10 min → auto-logout (fast-forward with fake timers)
+
+**Feed (`src/tests/e2e/feed.spec.ts`):**
+- [ ] Feed loads → job cards visible
+- [ ] "Remote only" toggle → all visible cards show remote location
+- [ ] Date range filter "24h" → cards update
+- [ ] Scroll to bottom → next page loads (cursor pagination)
+- [ ] `?job=<id>` in URL → job detail drawer opens automatically
+- [ ] Paste Greenhouse URL → job appears in feed
+- [ ] "Just posted" badge on jobs under 3 hours old
+
+**Tracker (`src/tests/e2e/tracker.spec.ts`):**
+- [ ] Drag card from "Applied" → "Phone Screen" → card appears in new column
+- [ ] Timeline in detail panel shows the status change
+- [ ] Add rich-text note → persists on page refresh
+
+**Profile (`src/tests/e2e/profile.spec.ts`):**
+- [ ] Upload PDF resume → success toast → `resume_text` shown in field
+- [ ] Add work history entry → appears in list
+- [ ] Delete work history entry → removed from list
+
+**Cover letter (`src/tests/e2e/cover-letter.spec.ts`):**
+- [ ] Generate cover letter → content appears in editor
+- [ ] Edit content → copy to clipboard button works
+- [ ] Download PDF → file download triggered
+
+**Prep (`src/tests/e2e/prep.spec.ts`):**
+- [ ] Open Prep tab → question bank renders
+- [ ] Generate STAR response → S/T/A/R sections populated
+- [ ] Save STAR response → persists on refresh
+
+---
+
+#### 17f — Smoke Tests
+
+Fast sanity checks run after every deploy. No mocking — hit the real deployed environment.
+
+- [ ] `src/tests/smoke/health.spec.ts` — `GET /health` on worker returns `{ ok: true }` (200)
+- [ ] `src/tests/smoke/app.spec.ts` — login page renders without JS errors; feed page renders for authenticated session; no 500 responses on any main route (`/feed`, `/tracker`, `/analytics`, `/prep`, `/profile`, `/settings`)
+- [ ] Add smoke test script to `package.json`: `"test:smoke": "playwright test src/tests/smoke --reporter=line"`
+- [ ] Wire smoke tests into Vercel post-deploy hook (run after successful deployment)
+
+---
+
+#### 17g — CI Configuration
+
+- [ ] `.github/workflows/test.yml` — run on every PR: `vitest run` (unit + integration) + `playwright test` (E2E against dev server spun up in CI); fail PR if any test fails
+- [ ] Separate `test:unit` and `test:integration` scripts in `package.json` so unit tests can run without network (faster local feedback loop)
+- [ ] Worker test script in `worker/package.json`: `"test": "vitest run"`, `"test:watch": "vitest"`
+- [ ] Playwright config: `webServer` block spins up `next dev` before E2E run in CI; reuses existing server in local dev
+- [ ] Coverage report: `vitest run --coverage` uploads to CI artifacts; enforce 80% threshold on `worker/src/` and `src/lib/`
 
 ---
 
