@@ -2,6 +2,7 @@ import { fetchLatestCommitSha, fetchReadmeContent } from './github/fetcher'
 import { parseJobsTable } from './github/parser'
 import { normalizeEntries, type NormalizedJob } from './llm/normalizer'
 import { filterNewEntries, filterNewJobs } from './jobs/deduplicator'
+import { filterRelevantEntries, filterRelevantJobs } from './jobs/relevance-filter'
 import { enrichJobs } from './jobs/enricher'
 import { backfillMissingSalaries } from './jobs/backfiller'
 import { writeJobs } from './db/writer'
@@ -83,8 +84,11 @@ async function runPortalAggregation(): Promise<AggregationResult> {
     return { written: 0, newJobs: [], writtenJobIds: [], skipped: false }
   }
 
+  // Drop non-qualifying roles before dedup + enrichment (saves enrichment calls)
+  const relevantJobs = filterRelevantJobs(allJobs)
+
   // Deduplicate against what's already in the DB
-  const newJobs = await filterNewJobs(allJobs)
+  const newJobs = await filterNewJobs(relevantJobs)
   if (newJobs.length === 0) {
     console.log('[aggregator] Portals: all jobs already stored')
     return { written: 0, newJobs: [], writtenJobIds: [], skipped: false }
@@ -139,27 +143,30 @@ async function runSourceAggregation(
     return { written: 0, newJobs: [], writtenJobIds: [], skipped: false }
   }
 
-  // 4. Filter already-stored jobs
-  const newEntries = await filterNewEntries(rawEntries)
+  // 4. Drop non-qualifying roles before dedup + normalization (saves tokens)
+  const relevantEntries = filterRelevantEntries(rawEntries)
+
+  // 5. Filter already-stored jobs
+  const newEntries = await filterNewEntries(relevantEntries)
   if (newEntries.length === 0) {
     console.log(`[aggregator] ${config.name}: All entries already stored. Updating SHA.`)
     await updateSourceSha(source.id, latestSha)
     return { written: 0, newJobs: [], writtenJobIds: [], skipped: false }
   }
 
-  // 5. Normalize via GPT-4o-mini
+  // 6. Normalize via GPT-5 nano
   console.log(`[aggregator] ${config.name}: Normalizing ${newEntries.length} new entries...`)
   const normalizedJobs = await normalizeEntries(newEntries)
 
-  // 5b. Enrich with salary + description by fetching each job URL
+  // 7. Enrich with salary + description by fetching each job URL
   console.log(`[aggregator] ${config.name}: Enriching ${normalizedJobs.length} jobs...`)
   const enrichedJobs = await enrichJobs(normalizedJobs)
 
-  // 6. Write to Supabase (role_type comes from source config, not LLM)
+  // 8. Write to Supabase (role_type comes from source config, not LLM)
   const { written, jobIds } = await writeJobs(enrichedJobs, config.roleType)
   console.log(`[aggregator] ${config.name}: Wrote ${written}/${enrichedJobs.length} jobs`)
 
-  // 7. Update SHA
+  // 9. Update SHA
   await updateSourceSha(source.id, latestSha)
 
   return { written, newJobs: enrichedJobs, writtenJobIds: jobIds, skipped: false }

@@ -734,9 +734,9 @@ Add a deterministic (no LLM, zero cost) filter that runs immediately after parsi
 - **Internship titles:** now that we're dropping the internship source, also block stray internship titles from portal scan that slip through (e.g. "Intern", "Co-op", "Cooperative Education")
 
 **Implementation:**
-- [ ] `worker/src/jobs/relevance-filter.ts` — `filterRelevantJobs(jobs: NormalizedJob[]): NormalizedJob[]` and `filterRelevantEntries(entries: RawJobEntry[]): RawJobEntry[]` (pre-normalization variant for GitHub sources)
-- [ ] `worker/src/aggregator.ts` — call `filterRelevantEntries(rawEntries)` after `parseJobsTable` and before `normalizeEntries` (saves tokens on filtered entries)
-- [ ] `worker/src/aggregator.ts` — call `filterRelevantJobs(newJobs)` after portal dedup and before `enrichJobs` (saves enrichment calls on filtered jobs)
+- [x] `worker/src/jobs/relevance-filter.ts` — `filterRelevantJobs(jobs: NormalizedJob[]): NormalizedJob[]` and `filterRelevantEntries(entries: RawJobEntry[]): RawJobEntry[]` (pre-normalization variant for GitHub sources)
+- [x] `worker/src/aggregator.ts` — call `filterRelevantEntries(rawEntries)` after `parseJobsTable` and before `normalizeEntries` (saves tokens on filtered entries)
+- [x] `worker/src/aggregator.ts` — call `filterRelevantJobs(newJobs)` after portal dedup and before `enrichJobs` (saves enrichment calls on filtered jobs)
 - [ ] Unit tests: title blocklist matches, country filter, PhD detection, edge cases (keep "Staff Engineer", "Principal SWE", block "Engineering Manager")
 
 #### 14d — Backfiller Rate Cap (QoL)
