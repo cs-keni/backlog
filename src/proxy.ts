@@ -17,16 +17,16 @@ export async function proxy(request: NextRequest) {
   if (!user && !isPublicRoute) {
     const loginUrl = request.nextUrl.clone()
     loginUrl.pathname = '/login'
-    loginUrl.searchParams.set('redirectedFrom', pathname)
+    loginUrl.searchParams.set('redirectedFrom', pathname + request.nextUrl.search)
     return NextResponse.redirect(loginUrl)
   }
 
-  // If logged in and hitting login page, redirect to feed
+  // If logged in and hitting login page, redirect to dashboard
   if (user && pathname === '/login') {
-    const feedUrl = request.nextUrl.clone()
-    feedUrl.pathname = '/feed'
-    feedUrl.searchParams.delete('redirectedFrom')
-    return NextResponse.redirect(feedUrl)
+    const dashboardUrl = request.nextUrl.clone()
+    dashboardUrl.pathname = '/dashboard'
+    dashboardUrl.searchParams.delete('redirectedFrom')
+    return NextResponse.redirect(dashboardUrl)
   }
 
   return supabaseResponse
