@@ -6,6 +6,8 @@ import { extractTextFromPdf } from '@/lib/pdf/parser'
 import { analyzeResume } from '@/lib/llm/resume-analyzer'
 
 export async function POST(request: Request) {
+  const url = new URL(request.url)
+  const dryRun = url.searchParams.get('dry_run') === 'true'
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 })
@@ -68,7 +70,7 @@ export async function POST(request: Request) {
     console.warn('[POST /api/profile/resume] extraction returned empty/short text:', resumeText.length, 'chars. Error:', extractionError)
   }
 
-  // Update users row with file URL and raw text
+  // Always persist the file and raw text — dry_run only skips the structured data writes
   const { error: updateError } = await supabase
     .from('users')
     .update({ resume_url: publicUrl, resume_text: resumeText || null })
@@ -79,138 +81,151 @@ export async function POST(request: Request) {
     return Response.json({ error: 'Failed to save resume info' }, { status: 500 })
   }
 
-  // Mark match scores stale
+  // Mark match scores stale (even in dry_run — the resume text has changed)
   await supabase
     .from('match_scores')
     .update({ is_stale: true })
     .eq('user_id', user.id)
 
+  // Image-based PDF — skip analysis, return early
+  if (!resumeText || resumeText.length <= 100) {
+    return Response.json({
+      resume_url: publicUrl,
+      resume_text_length: resumeText.length,
+      extraction_error: extractionError ?? 'Text could not be extracted (image-based PDF)',
+      analysis: null,
+    })
+  }
+
   // AI analysis
+  let analysis = null
+  try {
+    analysis = await analyzeResume(resumeText)
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
+    console.error('[POST /api/profile/resume] analysis error', msg)
+    extractionError = extractionError ?? `AI analysis failed: ${msg}`
+  }
+
+  // dry_run: return the analysis for review without writing structured data
+  if (dryRun) {
+    return Response.json({
+      resume_url: publicUrl,
+      resume_text_length: resumeText.length,
+      extraction_error: extractionError,
+      analysis,
+    })
+  }
+
+  // ── Commit structured data ─────────────────────────────────────────────────
   let skillsExtracted: string[] = []
   let answersGenerated = 0
   let workHistoryAdded = 0
   let educationAdded = 0
   const profileFieldsFilled: string[] = []
 
-  if (resumeText.length > 100) {
-    try {
-      const analysis = await analyzeResume(resumeText)
+  if (analysis) {
+    const { data: currentProfile } = await supabase
+      .from('users')
+      .select('full_name, phone, address, linkedin_url, github_url, portfolio_url, skills')
+      .eq('id', user.id)
+      .single()
 
-      // ── Personal info ──────────────────────────────────────────────────────
-      // Only fill fields that are currently null/empty in the DB
-      const { data: currentProfile } = await supabase
-        .from('users')
-        .select('full_name, phone, address, skills')
-        .eq('id', user.id)
-        .single()
+    const personalUpdates: Record<string, unknown> = {}
+    if (!currentProfile?.full_name && analysis.personal_info.full_name) {
+      personalUpdates.full_name = analysis.personal_info.full_name
+      profileFieldsFilled.push('full_name')
+    }
+    if (!currentProfile?.phone && analysis.personal_info.phone) {
+      personalUpdates.phone = analysis.personal_info.phone
+      profileFieldsFilled.push('phone')
+    }
+    if (!currentProfile?.address && analysis.personal_info.address) {
+      personalUpdates.address = analysis.personal_info.address
+      profileFieldsFilled.push('address')
+    }
+    if (!currentProfile?.linkedin_url && analysis.personal_info.linkedin_url) {
+      personalUpdates.linkedin_url = analysis.personal_info.linkedin_url
+      profileFieldsFilled.push('linkedin_url')
+    }
+    if (!currentProfile?.github_url && analysis.personal_info.github_url) {
+      personalUpdates.github_url = analysis.personal_info.github_url
+      profileFieldsFilled.push('github_url')
+    }
+    if (!currentProfile?.portfolio_url && analysis.personal_info.portfolio_url) {
+      personalUpdates.portfolio_url = analysis.personal_info.portfolio_url
+      profileFieldsFilled.push('portfolio_url')
+    }
 
-      const personalUpdates: Record<string, unknown> = {}
-      if (!currentProfile?.full_name && analysis.personal_info.full_name) {
-        personalUpdates.full_name = analysis.personal_info.full_name
-        profileFieldsFilled.push('full_name')
+    if (analysis.skills.length > 0) {
+      const existing: string[] = currentProfile?.skills ?? []
+      const existingLower = new Set(existing.map(s => s.toLowerCase()))
+      const newSkills = analysis.skills.filter(s => !existingLower.has(s.toLowerCase()))
+      const merged = [...existing, ...newSkills]
+      personalUpdates.skills = merged
+      skillsExtracted = newSkills.length > 0 ? newSkills : analysis.skills
+    }
+
+    if (Object.keys(personalUpdates).length > 0) {
+      await supabase.from('users').update(personalUpdates).eq('id', user.id)
+    }
+
+    if (analysis.work_history.length > 0) {
+      const { data: existingWork } = await supabase
+        .from('work_history').select('company, title').eq('user_id', user.id)
+      const existingKeys = new Set(
+        (existingWork ?? []).map(e => `${e.company.toLowerCase()}|${e.title.toLowerCase()}`)
+      )
+      const toInsert = analysis.work_history
+        .filter(e => !existingKeys.has(`${e.company.toLowerCase()}|${e.title.toLowerCase()}`))
+        .map((e, i) => ({
+          user_id: user.id,
+          company: e.company,
+          title: e.title,
+          start_date: e.start_date,
+          end_date: e.end_date,
+          is_current: e.is_current,
+          description: e.description,
+          display_order: i,
+        }))
+      if (toInsert.length > 0) {
+        const { error: whErr } = await supabase.from('work_history').insert(toInsert)
+        if (!whErr) workHistoryAdded = toInsert.length
       }
-      if (!currentProfile?.phone && analysis.personal_info.phone) {
-        personalUpdates.phone = analysis.personal_info.phone
-        profileFieldsFilled.push('phone')
+    }
+
+    if (analysis.education.length > 0) {
+      const { data: existingEdu } = await supabase
+        .from('education').select('school').eq('user_id', user.id)
+      const existingSchools = new Set((existingEdu ?? []).map(e => e.school.toLowerCase()))
+      const toInsert = analysis.education
+        .filter(e => !existingSchools.has(e.school.toLowerCase()))
+        .map((e, i) => ({
+          user_id: user.id,
+          school: e.school,
+          degree: e.degree,
+          field_of_study: e.field_of_study,
+          graduation_year: e.graduation_year,
+          gpa: e.gpa,
+          display_order: i,
+        }))
+      if (toInsert.length > 0) {
+        const { error: eduErr } = await supabase.from('education').insert(toInsert)
+        if (!eduErr) educationAdded = toInsert.length
       }
-      if (!currentProfile?.address && analysis.personal_info.address) {
-        personalUpdates.address = analysis.personal_info.address
-        profileFieldsFilled.push('address')
+    }
+
+    if (analysis.qa_pairs.length > 0) {
+      const { data: existingAnswers } = await supabase
+        .from('saved_answers').select('question').eq('user_id', user.id)
+      const existingQs = new Set((existingAnswers ?? []).map(r => r.question.toLowerCase()))
+      const toInsert = analysis.qa_pairs
+        .filter(p => !existingQs.has(p.question.toLowerCase()))
+        .map(p => ({ user_id: user.id, question: p.question, answer: p.answer }))
+      if (toInsert.length > 0) {
+        await supabase.from('saved_answers').insert(toInsert)
+        answersGenerated = toInsert.length
       }
-
-      // ── Skills ────────────────────────────────────────────────────────────
-      if (analysis.skills.length > 0) {
-        const existing: string[] = currentProfile?.skills ?? []
-        const existingLower = new Set(existing.map(s => s.toLowerCase()))
-        const newSkills = analysis.skills.filter(s => !existingLower.has(s.toLowerCase()))
-        const merged = [...existing, ...newSkills]
-        personalUpdates.skills = merged
-        skillsExtracted = newSkills.length > 0 ? newSkills : analysis.skills
-      }
-
-      if (Object.keys(personalUpdates).length > 0) {
-        await supabase.from('users').update(personalUpdates).eq('id', user.id)
-      }
-
-      // ── Work history ──────────────────────────────────────────────────────
-      if (analysis.work_history.length > 0) {
-        const { data: existingWork } = await supabase
-          .from('work_history')
-          .select('company, title')
-          .eq('user_id', user.id)
-
-        const existingKeys = new Set(
-          (existingWork ?? []).map(e => `${e.company.toLowerCase()}|${e.title.toLowerCase()}`)
-        )
-
-        const toInsert = analysis.work_history
-          .filter(e => !existingKeys.has(`${e.company.toLowerCase()}|${e.title.toLowerCase()}`))
-          .map((e, i) => ({
-            user_id: user.id,
-            company: e.company,
-            title: e.title,
-            start_date: e.start_date,
-            end_date: e.end_date,
-            is_current: e.is_current,
-            description: e.description,
-            display_order: i,
-          }))
-
-        if (toInsert.length > 0) {
-          const { error: whErr } = await supabase.from('work_history').insert(toInsert)
-          if (!whErr) workHistoryAdded = toInsert.length
-        }
-      }
-
-      // ── Education ─────────────────────────────────────────────────────────
-      if (analysis.education.length > 0) {
-        const { data: existingEdu } = await supabase
-          .from('education')
-          .select('school')
-          .eq('user_id', user.id)
-
-        const existingSchools = new Set(
-          (existingEdu ?? []).map(e => e.school.toLowerCase())
-        )
-
-        const toInsert = analysis.education
-          .filter(e => !existingSchools.has(e.school.toLowerCase()))
-          .map((e, i) => ({
-            user_id: user.id,
-            school: e.school,
-            degree: e.degree,
-            field_of_study: e.field_of_study,
-            graduation_year: e.graduation_year,
-            display_order: i,
-          }))
-
-        if (toInsert.length > 0) {
-          const { error: eduErr } = await supabase.from('education').insert(toInsert)
-          if (!eduErr) educationAdded = toInsert.length
-        }
-      }
-
-      // ── Q&A pairs ─────────────────────────────────────────────────────────
-      if (analysis.qa_pairs.length > 0) {
-        const { data: existingAnswers } = await supabase
-          .from('saved_answers')
-          .select('question')
-          .eq('user_id', user.id)
-
-        const existingQs = new Set((existingAnswers ?? []).map(r => r.question.toLowerCase()))
-        const toInsert = analysis.qa_pairs
-          .filter(p => !existingQs.has(p.question.toLowerCase()))
-          .map(p => ({ user_id: user.id, question: p.question, answer: p.answer }))
-
-        if (toInsert.length > 0) {
-          await supabase.from('saved_answers').insert(toInsert)
-          answersGenerated = toInsert.length
-        }
-      }
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err)
-      console.error('[POST /api/profile/resume] analysis error', msg)
-      extractionError = extractionError ?? `AI analysis failed: ${msg}`
     }
   }
 

@@ -1,4 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk'
+import { withRetry } from './retry'
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
@@ -58,7 +59,7 @@ export async function tailorResume(
       ].filter(Boolean).join('\n')).join('\n\n')
     : ''
 
-  const message = await anthropic.messages.create({
+  const message = await withRetry(() => anthropic.messages.create({
     model: 'claude-sonnet-4-6',
     max_tokens: 2000,
     messages: [
@@ -106,7 +107,7 @@ Return a JSON object with exactly this shape:
 Include ALL jobs from the structured work history, ordered most-recent first. Output only valid JSON.`,
       },
     ],
-  })
+  }))
 
   const raw = message.content[0].type === 'text' ? message.content[0].text.trim() : '{}'
 

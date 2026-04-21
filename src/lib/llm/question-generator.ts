@@ -1,4 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk'
+import { withRetry } from './retry'
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
@@ -88,11 +89,11 @@ Rules:
 - All hints must be specific — avoid generic advice like "show your work"
 - questions_to_ask must be genuinely differentiated — questions that signal deep research, not generic curiosity`
 
-  const message = await anthropic.messages.create({
+  const message = await withRetry(() => anthropic.messages.create({
     model: 'claude-haiku-4-5-20251001',
     max_tokens: 1200,
     messages: [{ role: 'user', content: prompt }],
-  })
+  }))
 
   const raw = message.content[0]?.type === 'text' ? message.content[0].text : '{}'
   const cleaned = raw.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '').trim()

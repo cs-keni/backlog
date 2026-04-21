@@ -1,4 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk'
+import { withRetry } from './retry'
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
@@ -55,11 +56,11 @@ Respond with JSON only, no markdown:
 
 Write in first person. Keep each section tight — interviewers lose attention quickly.`
 
-  const message = await anthropic.messages.create({
+  const message = await withRetry(() => anthropic.messages.create({
     model: 'claude-sonnet-4-6',
     max_tokens: 800,
     messages: [{ role: 'user', content: prompt }],
-  })
+  }))
 
   const raw = message.content[0]?.type === 'text' ? message.content[0].text : '{}'
   const cleaned = raw.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '').trim()

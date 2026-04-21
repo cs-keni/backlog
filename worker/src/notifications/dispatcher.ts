@@ -54,8 +54,21 @@ export async function dispatchNotifications(
     new Set((users ?? []).flatMap((u: UserRow) => u.skills ?? []))
   )
 
-  // 1. Discord — sorted by relevance, one message with per-job embeds
-  await sendJobsNotification(jobsWithIds, newJobs.length, allSkills)
+  // 1. Discord — filter by minimum relevance threshold, then sort and send
+  const discordMinRelevance = parseFloat(process.env.DISCORD_MIN_RELEVANCE ?? '0')
+  const discordJobs = discordMinRelevance > 0 && allSkills.length > 0
+    ? jobsWithIds.filter(({ job }) => {
+        const tags = job.tags ?? []
+        if (tags.length === 0 || allSkills.length === 0) return true
+        const a = new Set(tags.map(t => t.toLowerCase()))
+        const b = new Set(allSkills.map(s => s.toLowerCase()))
+        let intersection = 0
+        for (const t of a) if (b.has(t)) intersection++
+        const union = a.size + b.size - intersection
+        return union === 0 ? true : intersection / union >= discordMinRelevance
+      })
+    : jobsWithIds
+  await sendJobsNotification(discordJobs, newJobs.length, allSkills)
 
   // 2. Per-user email and push notifications
   const notifyUsers = (users ?? []).filter(

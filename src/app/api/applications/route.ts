@@ -52,6 +52,16 @@ export async function POST(request: Request) {
     return Response.json({ error: 'Invalid status' }, { status: 400 })
   }
 
+  // Check if this application already exists (to avoid duplicate timeline rows on re-POST)
+  const { data: existing } = await supabase
+    .from('applications')
+    .select('id, status')
+    .eq('user_id', user.id)
+    .eq('job_id', body.job_id)
+    .maybeSingle()
+
+  const isNew = !existing
+
   // Upsert — one application row per user+job
   const { data, error } = await supabase
     .from('applications')
@@ -73,13 +83,15 @@ export async function POST(request: Request) {
     return Response.json({ error: 'Failed to save application' }, { status: 500 })
   }
 
-  // Write timeline row
-  await supabase.from('application_timeline').insert({
-    application_id: data.id,
-    from_status: null,
-    to_status: body.status,
-    changed_at: new Date().toISOString(),
-  })
+  // Only write the initial timeline row for genuinely new applications
+  if (isNew) {
+    await supabase.from('application_timeline').insert({
+      application_id: data.id,
+      from_status: null,
+      to_status: body.status,
+      changed_at: new Date().toISOString(),
+    })
+  }
 
   return Response.json(data, { status: 201 })
 }

@@ -51,5 +51,7 @@ export async function POST(request: Request) {
     return Response.json({ error: 'Failed to create entry' }, { status: 500 })
   }
 
+  await supabase.from('match_scores').update({ is_stale: true }).eq('user_id', user.id)
+
   return Response.json(data, { status: 201 })
 }

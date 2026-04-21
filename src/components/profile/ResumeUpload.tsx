@@ -2,6 +2,8 @@
 
 import { useState, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { ResumeReviewModal } from './ResumeReviewModal'
+import type { ResumeAnalysis } from '@/lib/llm/resume-analyzer'
 
 interface UploadResult {
   resume_url: string
@@ -23,6 +25,21 @@ interface AnalyzeResult {
   profile_fields_filled: string[]
 }
 
+interface DryRunResult {
+  resume_url: string
+  resume_text_length: number
+  extraction_error: string | null
+  analysis: ResumeAnalysis | null
+}
+
+interface CommitResult {
+  skills_extracted: string[]
+  answers_generated: number
+  work_history_added: number
+  education_added: number
+  profile_fields_filled: string[]
+}
+
 interface ResumeUploadProps {
   resumeUrl: string | null
   hasResumeText: boolean
@@ -37,6 +54,7 @@ export function ResumeUpload({ resumeUrl, hasResumeText, onUpload, onAnalyze }: 
   const [lastResult, setLastResult] = useState<UploadResult | null>(null)
   const [analyzeResult, setAnalyzeResult] = useState<AnalyzeResult | null>(null)
   const [dragging, setDragging] = useState(false)
+  const [pendingDryRun, setPendingDryRun] = useState<DryRunResult | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
   async function handleAnalyze() {
@@ -71,24 +89,66 @@ export function ResumeUpload({ resumeUrl, hasResumeText, onUpload, onAnalyze }: 
     }
     setError(null)
     setLastResult(null)
+    setPendingDryRun(null)
     setUploading(true)
     try {
       const formData = new FormData()
       formData.append('resume', file)
-      const res = await fetch('/api/profile/resume', { method: 'POST', body: formData })
-      if (res.ok) {
-        const data = await res.json() as UploadResult
-        setLastResult(data)
-        onUpload(data)
-      } else {
+      const res = await fetch('/api/profile/resume?dry_run=true', { method: 'POST', body: formData })
+      if (!res.ok) {
         const err = await res.json() as { error: string }
         setError(err.error ?? 'Upload failed')
+        return
+      }
+      const data = await res.json() as DryRunResult
+      // Notify parent that the file is saved (resume_url + text are already persisted)
+      onUpload({
+        resume_url: data.resume_url,
+        resume_text_length: data.resume_text_length,
+        extraction_error: data.extraction_error,
+        skills_extracted: [],
+        answers_generated: 0,
+        work_history_added: 0,
+        education_added: 0,
+        profile_fields_filled: [],
+      })
+      if (!data.analysis) {
+        // Image-based PDF — nothing to review
+        setLastResult({
+          resume_url: data.resume_url,
+          resume_text_length: data.resume_text_length,
+          extraction_error: data.extraction_error,
+          skills_extracted: [],
+          answers_generated: 0,
+          work_history_added: 0,
+          education_added: 0,
+          profile_fields_filled: [],
+        })
+      } else {
+        setPendingDryRun(data)
       }
     } catch {
       setError('Upload failed — please try again')
     } finally {
       setUploading(false)
     }
+  }
+
+  function handleModalConfirm(result: CommitResult) {
+    setPendingDryRun(null)
+    const uploadResult: UploadResult = {
+      resume_url: pendingDryRun?.resume_url ?? '',
+      resume_text_length: pendingDryRun?.resume_text_length ?? 0,
+      extraction_error: pendingDryRun?.extraction_error ?? null,
+      ...result,
+    }
+    setLastResult(uploadResult)
+    onUpload(uploadResult)
+  }
+
+  function handleModalDismiss() {
+    // User skipped review — file is already saved, just close the modal
+    setPendingDryRun(null)
   }
 
   const uploadLabel = (() => {
@@ -285,6 +345,17 @@ export function ResumeUpload({ resumeUrl, hasResumeText, onUpload, onAnalyze }: 
               )}
             </div>
           </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Review modal — shown after dry_run upload when analysis is available */}
+      <AnimatePresence>
+        {pendingDryRun?.analysis && (
+          <ResumeReviewModal
+            analysis={pendingDryRun.analysis}
+            onConfirm={handleModalConfirm}
+            onDismiss={handleModalDismiss}
+          />
         )}
       </AnimatePresence>
     </div>

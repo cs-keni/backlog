@@ -1035,72 +1035,72 @@ Fast sanity checks run after every deploy. No mocking — hit the real deployed 
 
 **The fix:** After upload, instead of committing immediately, return the extracted data to the client and show a review modal. The user confirms, unchecks, or edits individual entries before they're written.
 
-- [ ] `src/app/api/profile/resume/route.ts` — add a `?dry_run=true` mode: run extraction, return the full `ResumeAnalysis` payload but do NOT write to DB
-- [ ] `src/components/profile/ResumeReviewModal.tsx` — modal shown after upload; displays extracted skills (checkboxes), work history entries (toggle each), education entries (toggle each), and Q&A pairs (toggle each); "Confirm & Save" button posts to a new `POST /api/profile/resume/commit` endpoint with the approved subset
-- [ ] `src/app/api/profile/resume/commit/route.ts` — accepts the reviewed/trimmed payload; writes only approved entries to DB; marks match scores stale
-- [ ] `src/components/profile/ResumeUpload.tsx` — wire in the review modal flow: upload → dry_run extract → show modal → on confirm → commit; keep current instant-commit as a fallback if modal is dismissed
-- [ ] If extraction produces zero entries (image PDF), skip the modal and show the existing warning
+- [x] `src/app/api/profile/resume/route.ts` — add a `?dry_run=true` mode: run extraction, return the full `ResumeAnalysis` payload but do NOT write to DB
+- [x] `src/components/profile/ResumeReviewModal.tsx` — modal shown after upload; displays extracted skills (checkboxes), work history entries (toggle each), education entries (toggle each), and Q&A pairs (toggle each); "Confirm & Save" button posts to a new `POST /api/profile/resume/commit` endpoint with the approved subset
+- [x] `src/app/api/profile/resume/commit/route.ts` — accepts the reviewed/trimmed payload; writes only approved entries to DB; marks match scores stale
+- [x] `src/components/profile/ResumeUpload.tsx` — wire in the review modal flow: upload → dry_run extract → show modal → on confirm → commit; keep current instant-commit as a fallback if modal is dismissed
+- [x] If extraction produces zero entries (image PDF), skip the modal and show the existing warning
 
 #### 18b — Skills Change Should Invalidate Match Scores
 
 **The problem:** `match_scores` are invalidated when the resume is re-uploaded, but not when skills are manually added or removed on the profile page. If you add "Rust" to your skills, existing cached scores still don't reflect it until the resume is re-uploaded.
 
-- [ ] `src/app/api/profile/route.ts` — when a `PATCH` includes a `skills` field that differs from the current value, run `UPDATE match_scores SET is_stale = true WHERE user_id = ?`
-- [ ] Same invalidation on `POST /api/profile/work-history` and `DELETE /api/profile/work-history/[id]` — work history changes affect resume quality signals
+- [x] `src/app/api/profile/route.ts` — when a `PATCH` includes a `skills` field that differs from the current value, run `UPDATE match_scores SET is_stale = true WHERE user_id = ?`
+- [x] Same invalidation on `POST /api/profile/work-history` and `DELETE /api/profile/work-history/[id]` — work history changes affect resume quality signals
 
 #### 18c — Resume Analyzer Missing Fields
 
 **The problem:** The analyzer extracts name, phone, address, skills, work history, education, and Q&A — but misses LinkedIn URL, GitHub URL, and portfolio URL, which are almost always on a CS resume. It also doesn't extract GPA, which is on the education table but never populated by upload.
 
-- [ ] `src/lib/llm/resume-analyzer.ts` — add to the extraction prompt and `ResumePersonalInfo` type: `linkedin_url`, `github_url`, `portfolio_url` (all string | null)
-- [ ] Add `gpa: number | null` to `ResumeEducationEntry` and extract it from the resume
-- [ ] `src/app/api/profile/resume/route.ts` — populate these fields during the commit step (same null-check logic as name/phone/address)
+- [x] `src/lib/llm/resume-analyzer.ts` — add to the extraction prompt and `ResumePersonalInfo` type: `linkedin_url`, `github_url`, `portfolio_url` (all string | null)
+- [x] Add `gpa: number | null` to `ResumeEducationEntry` and extract it from the resume
+- [x] `src/app/api/profile/resume/route.ts` — populate these fields during the commit step (same null-check logic as name/phone/address)
 
 #### 18d — Discord Ignores Match Threshold
 
 **The problem:** `dispatchNotifications` sends every new job to Discord regardless of the user's `alert_match_threshold` setting. If your threshold is 70% but a batch of 25 jobs all score 30%, Discord still fires for all of them. Match scores aren't available at notification time (they're lazy), but we can use the same Jaccard proxy from Phase 15b as a pre-send filter.
 
-- [ ] `worker/src/notifications/dispatcher.ts` — after computing Jaccard scores for sort order (Phase 15b), also filter out jobs below a configurable `DISCORD_MIN_RELEVANCE` threshold (env var, default `0` = no filter); this prevents completely unrelated jobs from cluttering the Discord feed
-- [ ] Long-term (post Phase 15b): once skills-based Jaccard is in place, surface only jobs with score ≥ threshold in Discord
+- [x] `worker/src/notifications/dispatcher.ts` — after computing Jaccard scores for sort order (Phase 15b), also filter out jobs below a configurable `DISCORD_MIN_RELEVANCE` threshold (env var, default `0` = no filter); this prevents completely unrelated jobs from cluttering the Discord feed
+- [x] Long-term (post Phase 15b): once skills-based Jaccard is in place, surface only jobs with score ≥ threshold in Discord
 
 #### 18e — No Error Recovery on Anthropic API Failures
 
 **The problem:** Cover letter generation, resume tailoring, STAR response drafting, and interview guide generation all call Claude with no retry, no timeout guard, and no user-facing fallback beyond a generic error. If Anthropic has a brief outage, the user gets a failed state with no way to recover other than clicking again (and there's no retry button on most of these surfaces).
 
-- [ ] `src/lib/llm/cover-letter.ts`, `resume-tailor.ts`, `star-builder.ts`, `question-generator.ts` — wrap Anthropic calls in a shared `withRetry(fn, maxAttempts = 2)` utility that retries once on 529/overloaded errors with a 2s delay; does not retry on 400/auth errors
-- [ ] `src/lib/llm/retry.ts` — implement the `withRetry` utility (10 lines, reused across all LLM callers)
+- [x] `src/lib/llm/cover-letter.ts`, `resume-tailor.ts`, `star-builder.ts`, `question-generator.ts` — wrap Anthropic calls in a shared `withRetry(fn, maxAttempts = 2)` utility that retries once on 529/overloaded errors with a 2s delay; does not retry on 400/auth errors
+- [x] `src/lib/llm/retry.ts` — implement the `withRetry` utility (10 lines, reused across all LLM callers)
 - [ ] Each LLM-backed UI surface (cover letter editor, STAR builder, tailored resume generator) should show a "Retry" button in the error state rather than requiring a full page action
 
 #### 18f — Work History Description Quality
 
 **The problem:** The resume analyzer writes a "2–3 sentence summary of responsibilities and impact" as the work history description. But the extension uses this description to fill open-ended experience questions, and a dense summary paragraph is worse than bullet points for that purpose. The tailored resume generator also works better with bullet-formatted input.
 
-- [ ] `src/lib/llm/resume-analyzer.ts` — change the `description` field prompt to output 3–5 bullet points ("•  ...") instead of prose; this format is more useful for both extension auto-fill and resume tailoring context
+- [x] `src/lib/llm/resume-analyzer.ts` — change the `description` field prompt to output 3–5 bullet points ("•  ...") instead of prose; this format is more useful for both extension auto-fill and resume tailoring context
 
 #### 18g — Portal Companies Coverage Check
 
 **The problem:** The 30+ portal companies list in `worker/src/portals/companies.ts` was seeded once and hasn't been audited. Some slugs may be stale (companies switch from Greenhouse to Lever or to Workday), and there are likely major new-grad-hiring companies missing.
 
-- [ ] Audit `worker/src/portals/companies.ts` — verify slugs still resolve (404s already handled gracefully, but dead entries waste a fetch); add any notable missing companies (Stripe, Figma, Notion, Linear, Vercel, etc.)
-- [ ] Add a `worker/src/portals/validate-slugs.ts` script (run manually) that hits each slug's API endpoint and logs which ones 404 — makes future audits easy
+- [x] Audit `worker/src/portals/companies.ts` — verify slugs still resolve (404s already handled gracefully, but dead entries waste a fetch); add any notable missing companies (Stripe, Figma, Notion, Linear, Vercel, etc.)
+- [x] Add a `worker/src/portals/validate-slugs.ts` script (run manually) that hits each slug's API endpoint and logs which ones 404 — makes future audits easy
 
 #### 18h — IdleLogout Event Listener Leak
 
 **The problem:** `IdleLogout.tsx` registers a `focus` listener with an inline arrow function `() => void checkIdle()`, but the cleanup tries to remove a *different* arrow function with the same shape — `removeEventListener` requires the exact same function reference to succeed. The focus listener is therefore never removed. On pages that remount the component (e.g. soft navigation), listeners accumulate, causing multiple parallel idle checks that can fire logout prematurely.
 
-- [ ] `src/components/auth/IdleLogout.tsx` — extract the focus handler to a stable reference (e.g. `useCallback` or a ref) before passing to both `addEventListener` and `removeEventListener`
+- [x] `src/components/auth/IdleLogout.tsx` — extract the focus handler to a stable reference (e.g. `useCallback` or a ref) before passing to both `addEventListener` and `removeEventListener`
 
 #### 18i — Open Redirect in Login Page
 
 **The problem:** `login/page.tsx` reads the `redirectedFrom` search param and passes it directly to `router.push()`. The middleware only ever sets this param to `pathname + search` (always a same-origin path), but the param itself is unguarded. A crafted link like `/login?redirectedFrom=//evil.com` would redirect the user off-site after a successful login.
 
-- [ ] `src/app/(auth)/login/page.tsx` — validate `redirectedFrom` before use: accept only values that start with `/` and not `//`; fall back to `/dashboard` on anything else
+- [x] `src/app/(auth)/login/page.tsx` — validate `redirectedFrom` before use: accept only values that start with `/` and not `//`; fall back to `/dashboard` on anything else
 
 #### 18j — Upsert Writes Duplicate Timeline Entry
 
 **The problem:** `POST /api/applications` does an upsert on `(user_id, job_id)` and then *always* inserts a timeline row with `from_status: null, to_status: <status>`. If the same user POSTs the same job twice (e.g. double-clicking "Save", or clicking "Save" on a job that was already saved), the upsert silently updates the row but a second `from_status: null` timeline row is written, corrupting the status history.
 
-- [ ] `src/app/api/applications/route.ts` — check whether the upsert actually inserted a new row (Supabase returns `count` on upsert when `returning: 'minimal'` is not set, or compare before/after status); only write the initial timeline row if the row is newly created, not on update
+- [x] `src/app/api/applications/route.ts` — check whether the upsert actually inserted a new row (Supabase returns `count` on upsert when `returning: 'minimal'` is not set, or compare before/after status); only write the initial timeline row if the row is newly created, not on update
 
 ---
 

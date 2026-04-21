@@ -17,6 +17,9 @@ export interface ResumePersonalInfo {
   full_name: string | null
   phone: string | null
   address: string | null
+  linkedin_url: string | null
+  github_url: string | null
+  portfolio_url: string | null
 }
 
 export interface ResumeWorkEntry {
@@ -33,6 +36,7 @@ export interface ResumeEducationEntry {
   degree: string | null
   field_of_study: string | null
   graduation_year: number | null
+  gpa: number | null
 }
 
 export interface ResumeAnalysis {
@@ -60,6 +64,9 @@ export async function analyzeResume(resumeText: string): Promise<ResumeAnalysis>
   - "full_name": string or null
   - "phone": string or null — digits only, no formatting (e.g. "5035551234")
   - "address": string or null — city and state (e.g. "Portland, OR")
+  - "linkedin_url": string or null — full URL (e.g. "https://linkedin.com/in/janedoe")
+  - "github_url": string or null — full URL (e.g. "https://github.com/janedoe")
+  - "portfolio_url": string or null — personal website or portfolio URL, not LinkedIn/GitHub
 
 "skills": array of technical skills, tools, languages, and frameworks. Properly capitalized (e.g. "TypeScript", "React", "PostgreSQL"). Max 30. No soft skills.
 
@@ -69,13 +76,14 @@ export async function analyzeResume(resumeText: string): Promise<ResumeAnalysis>
   - "start_date": "YYYY-MM-01" or null
   - "end_date": "YYYY-MM-01" or null (null if current)
   - "is_current": boolean
-  - "description": string or null — 2–3 sentence summary of responsibilities and impact
+  - "description": string or null — 3–5 bullet points starting with "• " describing responsibilities and impact. Each bullet on its own line. Format: "• Did X using Y, resulting in Z\\n• ..."
 
 "education": array. Each entry:
   - "school": string
   - "degree": string or null (e.g. "Bachelor of Science")
   - "field_of_study": string or null (e.g. "Computer Science")
   - "graduation_year": number or null
+  - "gpa": number or null (e.g. 3.85)
 
 "qa_pairs": array with "question" and "answer" fields. Write a first-person answer for each question listed, grounded in the resume. Answers should be 2–4 sentences, specific, ready to paste into a job application. Questions: ${JSON.stringify(COMMON_QUESTIONS)}
 
@@ -97,6 +105,9 @@ Only include data you can extract from the resume. Use null for anything not pre
     full_name: typeof pi.full_name === 'string' ? pi.full_name : null,
     phone: typeof pi.phone === 'string' ? pi.phone.replace(/\D/g, '') : null,
     address: typeof pi.address === 'string' ? pi.address : null,
+    linkedin_url: typeof pi.linkedin_url === 'string' ? pi.linkedin_url : null,
+    github_url: typeof pi.github_url === 'string' ? pi.github_url : null,
+    portfolio_url: typeof pi.portfolio_url === 'string' ? pi.portfolio_url : null,
   }
 
   // skills
@@ -129,6 +140,7 @@ Only include data you can extract from the resume. Use null for anything not pre
           degree: typeof e.degree === 'string' ? e.degree : null,
           field_of_study: typeof e.field_of_study === 'string' ? e.field_of_study : null,
           graduation_year: typeof e.graduation_year === 'number' ? e.graduation_year : null,
+          gpa: typeof e.gpa === 'number' ? e.gpa : null,
         }))
     : []
 

@@ -50,5 +50,8 @@ export async function DELETE(
     .eq('user_id', user.id)
 
   if (error) return Response.json({ error: 'Delete failed' }, { status: 500 })
+
+  await supabase.from('match_scores').update({ is_stale: true }).eq('user_id', user.id)
+
   return new Response(null, { status: 204 })
 }
