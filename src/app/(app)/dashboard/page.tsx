@@ -54,7 +54,7 @@ export default async function DashboardPage() {
       .single(),
   ])
 
-  const allApps = (appsResult.data ?? []) as Array<{
+  const allApps = (appsResult.data ?? []) as unknown as Array<{
     id: string
     status: string
     is_archived: boolean
