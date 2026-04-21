@@ -127,7 +127,7 @@ const containerVariants = {
 
 const itemVariants = {
   hidden: { opacity: 0, y: 14 },
-  show: { opacity: 1, y: 0, transition: { duration: 0.3, ease: [0.25, 0.1, 0.25, 1] } },
+  show: { opacity: 1, y: 0, transition: { duration: 0.3, ease: 'easeOut' } },
 }
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
