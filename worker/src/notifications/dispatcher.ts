@@ -1,12 +1,13 @@
 import { supabase } from '../db/client'
 import type { NormalizedJob } from '../llm/normalizer'
-import { sendJobsNotification as sendDiscord } from './discord'
+import { sendJobsNotification } from './discord'
 import { sendEmailNotification } from './email'
 import { sendPushNotification, type PushSubscription } from './push'
 
 interface UserRow {
   id: string
   email: string | null
+  skills: string[] | null
   notification_email: boolean
   notification_push: boolean
   notification_quiet_hours_start: string | null
@@ -28,51 +29,60 @@ interface PushSubscriptionRow {
  */
 export async function dispatchNotifications(
   newJobs: NormalizedJob[],
-  writtenJobIds: string[]
+  writtenJobPairs: { id: string; url: string }[]
 ): Promise<void> {
-  if (newJobs.length === 0 || writtenJobIds.length === 0) return
+  if (newJobs.length === 0 || writtenJobPairs.length === 0) return
 
-  // 1. Always send Discord (existing behavior, no per-user prefs)
-  await sendDiscord(newJobs, newJobs.length)
+  const writtenJobIds = writtenJobPairs.map((p) => p.id)
 
-  // 2. Fetch all users who have at least one notification channel enabled
+  // Build URL → ID map for matching NormalizedJob objects to their DB IDs
+  const urlToId = new Map(writtenJobPairs.map((p) => [p.url, p.id]))
+  const jobsWithIds = newJobs.flatMap((job) => {
+    const id = urlToId.get(job.url)
+    return id ? [{ job, id }] : []
+  })
+
+  // Fetch users for email/push dispatch + grab skills for Discord relevance sorting
   const { data: users, error: usersError } = await supabase
     .from('users')
-    .select('id, email, notification_email, notification_push, notification_quiet_hours_start, notification_quiet_hours_end')
-    .or('notification_email.eq.true,notification_push.eq.true')
+    .select('id, email, skills, notification_email, notification_push, notification_quiet_hours_start, notification_quiet_hours_end')
 
-  if (usersError || !users?.length) {
-    if (usersError) console.error('[dispatcher] Failed to fetch users:', usersError)
-    return
-  }
+  if (usersError) console.error('[dispatcher] Failed to fetch users:', usersError)
+
+  // Aggregate all user skills for Discord sorting (personal app, single user set)
+  const allSkills = Array.from(
+    new Set((users ?? []).flatMap((u: UserRow) => u.skills ?? []))
+  )
+
+  // 1. Discord — sorted by relevance, one message with per-job embeds
+  await sendJobsNotification(jobsWithIds, newJobs.length, allSkills)
+
+  // 2. Per-user email and push notifications
+  const notifyUsers = (users ?? []).filter(
+    (u: UserRow) => u.notification_email || u.notification_push
+  )
+  if (!notifyUsers.length) return
 
   const nowUtc = new Date()
 
-  for (const user of users as UserRow[]) {
+  for (const user of notifyUsers as UserRow[]) {
     if (isInQuietHours(nowUtc, user.notification_quiet_hours_start, user.notification_quiet_hours_end)) {
       console.log(`[dispatcher] User ${user.id} is in quiet hours — skipping`)
       continue
     }
 
-    // Find which jobs haven't been notified to this user yet (per channel)
     const channels: Array<'email' | 'push'> = []
     if (user.notification_email) channels.push('email')
     if (user.notification_push) channels.push('push')
 
     for (const channel of channels) {
-      const unnotifiedJobs = await getUnnotifiedJobs(user.id, writtenJobIds, channel)
-      if (unnotifiedJobs.length === 0) continue
+      const unnotifiedJobIds = await getUnnotifiedJobs(user.id, writtenJobIds, channel)
+      if (unnotifiedJobIds.length === 0) continue
 
-      // Filter NormalizedJob objects to just the unnotified ones
-      const unnotifiedSet = new Set(unnotifiedJobs)
-      const jobsToSend = newJobs.filter(j => {
-        // Match by URL since we don't have IDs on NormalizedJob
-        // We pass writtenJobIds separately for dedup; here we check position
-        return true // send all — dedup already handled above
-      })
-      // Re-filter: only send for jobs whose IDs are in unnotifiedJobs
-      // Since NormalizedJob doesn't have DB id, we send the full batch and log all
-      // (notification_log dedup prevents re-sends on next run)
+      const unnotifiedSet = new Set(unnotifiedJobIds)
+      const jobsToSend = jobsWithIds
+        .filter(({ id }) => unnotifiedSet.has(id))
+        .map(({ job }) => job)
 
       try {
         if (channel === 'email' && user.email) {
@@ -81,8 +91,7 @@ export async function dispatchNotifications(
           await sendPushToUser(user.id, jobsToSend)
         }
 
-        // Log all sent job ids for this user+channel
-        await logNotifications(user.id, unnotifiedJobs, channel)
+        await logNotifications(user.id, unnotifiedJobIds, channel)
       } catch (err) {
         console.error(`[dispatcher] Failed to send ${channel} to user ${user.id}:`, err)
       }
@@ -141,7 +150,6 @@ async function sendPushToUser(userId: string, jobs: NormalizedJob[]): Promise<vo
       )
     } catch (err) {
       if (err instanceof Error && err.message === 'SUBSCRIPTION_EXPIRED') {
-        // Remove stale subscription
         await supabase.from('push_subscriptions').delete().eq('id', sub.id)
         console.log(`[dispatcher] Removed expired push subscription ${sub.id}`)
       }

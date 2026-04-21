@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import { createClient } from '@/lib/supabase/client'
 import { Job, FeedFilters, SortOption } from '@/lib/jobs/types'
@@ -47,12 +48,17 @@ function buildParams(
   return params
 }
 
-export function JobFeed() {
+interface JobFeedProps {
+  initialJobId?: string
+}
+
+export function JobFeed({ initialJobId }: JobFeedProps) {
+  const router = useRouter()
   const [jobs, setJobs] = useState<Job[]>([])
   const [loading, setLoading] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
   const [nextCursor, setNextCursor] = useState<Cursor | null>(null)
-  const [selectedJobId, setSelectedJobId] = useState<string | null>(null)
+  const [selectedJobId, setSelectedJobId] = useState<string | null>(initialJobId ?? null)
   const [filters, setFilters] = useState<FeedFilters>(DEFAULT_FILTERS)
   const [sort, setSort] = useState<SortOption>('newest')
   const [newJobCount, setNewJobCount] = useState(0)
@@ -60,9 +66,12 @@ export function JobFeed() {
 
   const observerRef = useRef<IntersectionObserver | null>(null)
   const sentinelRef = useRef<HTMLDivElement | null>(null)
-  // Debounce filters to avoid firing on every keystroke
   const filterDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const pendingFilters = useRef<FeedFilters>(filters)
+  // When a deep-linked job is selected on load, preserve that selection through the first fetch
+  const preserveSelectionRef = useRef(!!initialJobId)
+  // Stash the deep-linked job so it stays in the list even if it's not on the first feed page
+  const deepLinkedJobRef = useRef<Job | null>(null)
 
   const selectedJob = jobs.find((j) => j.id === selectedJobId) ?? null
 
@@ -76,14 +85,43 @@ export function JobFeed() {
       const res = await fetch(`/api/jobs?${buildParams(f, s)}`)
       if (!res.ok) throw new Error('Failed to fetch jobs')
       const data = await res.json() as { jobs: Job[]; nextCursor: Cursor | null }
-      setJobs(data.jobs)
+      setJobs((prev) => {
+        // Keep the deep-linked job pinned at top if it's not in this page of results
+        const stashed = deepLinkedJobRef.current
+        if (stashed && !data.jobs.some((j) => j.id === stashed.id)) {
+          return [stashed, ...data.jobs]
+        }
+        return data.jobs
+      })
       setNextCursor(data.nextCursor)
-      setSelectedJobId(null)
+      // Don't clear selection on the first fetch if we came from a deep link
+      if (!preserveSelectionRef.current) {
+        setSelectedJobId(null)
+      }
+      preserveSelectionRef.current = false
     } catch {
       setError('Could not load jobs. Check your connection and try again.')
     } finally {
       setLoading(false)
     }
+  }, [])
+
+  // ─── Deep-link job fetch (runs once on mount) ────────────────────────────────
+
+  useEffect(() => {
+    if (!initialJobId) return
+
+    fetch(`/api/jobs/${initialJobId}`)
+      .then((r) => (r.ok ? (r.json() as Promise<Job>) : null))
+      .then((job) => {
+        if (!job) return
+        deepLinkedJobRef.current = job
+        setJobs((prev) => (prev.some((j) => j.id === job.id) ? prev : [job, ...prev]))
+        setSelectedJobId(initialJobId)
+        router.replace('/feed', { scroll: false })
+      })
+      .catch(() => {})
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // ─── Load more (infinite scroll) ────────────────────────────────────────────
@@ -163,7 +201,6 @@ export function JobFeed() {
   }
 
   function handleJobAdded(jobId: string) {
-    // Refresh to surface the manually-added job at top
     void fetchJobs(filters, sort).then(() => {
       setSelectedJobId(jobId)
     })
@@ -185,7 +222,6 @@ export function JobFeed() {
   }
 
   // ─── Render ──────────────────────────────────────────────────────────────────
-  // Layout: filter sidebar | scrollable feed | job detail panel (desktop only)
   return (
     <div className="flex h-full overflow-hidden">
       {/* Left: filter sidebar */}

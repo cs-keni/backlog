@@ -759,31 +759,31 @@ The backfiller runs every 15-minute cron cycle and calls GPT on up to 50 jobs pe
 
 Each Discord job embed needs a URL that routes the user to the right place in Backlog. The feed page needs to handle the `?job=<id>` param by auto-opening that job's detail drawer.
 
-- [ ] `worker/src/notifications/discord.ts` — update `sendJobsNotification` signature to accept `{ job: NormalizedJob, id: string }[]` instead of just `NormalizedJob[]`; add `BACKLOG_APP_URL` env var (e.g. `https://backlog.vercel.app`); set `url: \`${BACKLOG_APP_URL}/feed?job=${id}\`` on each embed
-- [ ] `worker/src/notifications/dispatcher.ts` — zip `newJobs` + `writtenJobIds` into `{ job, id }[]` pairs before calling `sendDiscord`; ids and jobs come from the same aggregation run so they are already positionally aligned
-- [ ] `src/app/(app)/feed/page.tsx` — read `searchParams.job`; if present, pass as `initialJobId` prop to `JobFeed`
-- [ ] `src/components/feed/JobFeed.tsx` — accept `initialJobId?: string`; on mount, fetch that job and auto-open the detail drawer; clear the param from the URL via `router.replace` after opening so it doesn't re-trigger on navigation
-- [ ] `src/lib/supabase/middleware.ts` — preserve `?job=<id>` through the auth redirect: when bouncing an unauthenticated user to `/login`, include `callbackUrl=/feed?job=<id>` so they land on the right job after login
-- [ ] `src/app/(auth)/login/page.tsx` — after successful login, read `callbackUrl` from query params and redirect there instead of default `/feed`
+- [x] `worker/src/notifications/discord.ts` — update `sendJobsNotification` signature to accept `{ job: NormalizedJob, id: string }[]` instead of just `NormalizedJob[]`; add `BACKLOG_APP_URL` env var (e.g. `https://backlog.vercel.app`); set `url: \`${BACKLOG_APP_URL}/feed?job=${id}\`` on each embed
+- [x] `worker/src/notifications/dispatcher.ts` — zip `newJobs` + `writtenJobPairs` into `{ job, id }[]` pairs before calling `sendDiscord`; matched by URL via `WriteResult.writtenJobPairs`
+- [x] `src/app/(app)/feed/page.tsx` — read `searchParams.job`; if present, pass as `initialJobId` prop to `JobFeed`
+- [x] `src/components/feed/JobFeed.tsx` — accept `initialJobId?: string`; on mount, fetch that job and auto-open the detail drawer; clear the param from the URL via `router.replace` after opening so it doesn't re-trigger on navigation
+- [x] `src/middleware.ts` — preserve `?job=<id>` through the auth redirect: when bouncing an unauthenticated user to `/login`, include `redirectedFrom=/feed?job=<id>` so they land on the right job after login
+- [x] `src/app/(auth)/login/page.tsx` — default redirect changed from `/feed` to `/dashboard`; reads `redirectedFrom` to land on the correct URL after login
 
 #### 15b — Relevance Sorting
 
 Match scores are user-specific and computed lazily — they aren't available at notification time without a costly LLM call. Instead, use a fast proxy sort: Jaccard similarity against the user's stored skills (free, sub-millisecond), then salary descending as a tiebreaker.
 
-- [ ] `worker/src/notifications/discord.ts` — add `sortByRelevance(jobs, userSkills)` helper: compute Jaccard score between each job's `tags` and `userSkills`; sort descending; jobs with no tags sort below scored jobs; salary desc as secondary sort
-- [ ] `worker/src/notifications/dispatcher.ts` — fetch user skills from DB before calling `sendDiscord`; pass them so Discord list is sorted
+- [x] `worker/src/notifications/discord.ts` — added `sortByRelevance(jobsWithIds, userSkills)` helper: Jaccard score between job `tags` and `userSkills`; sort descending; salary desc as secondary sort
+- [x] `worker/src/notifications/dispatcher.ts` — fetches all user skills from DB; aggregates into a union set; passes to `sendJobsNotification` for Discord sorting
 
 #### 15c — Embed Redesign
 
 Current format is a single wall-of-text embed. Replace with one compact embed per job (up to 10 jobs; overflow becomes a "+N more on Backlog" footer link). Each embed should be scannable in 2 seconds.
 
-- [ ] `worker/src/notifications/discord.ts` — replace single embed with array of per-job embeds (Discord allows up to 10 per message); each embed:
+- [x] `worker/src/notifications/discord.ts` — replaced single embed with array of per-job embeds (up to 10); each embed:
   - **Title**: `{job title}` (linked to deep-link URL)
   - **Description**: `{company} · {location or Remote}`
-  - **Fields** (inline): Salary (or "Not listed"), Tags (up to 4 chips as inline code), Experience level
-  - **Color**: 🟢 green for high Jaccard match, 🟡 yellow for mid, ⚪ grey for no signal
+  - **Fields** (inline): Salary (or "Not listed"), Level, Tags (up to 4 chips as inline code)
+  - **Color**: 🟢 green for high Jaccard match (>0.4), 🟡 yellow for mid (0.1–0.4), ⚪ grey for no signal
   - **Footer**: `Posted {X days ago}`
-- [ ] If `jobs.length > 10`: send first 10 as embeds + a trailing text message `"+{n} more new jobs — [View all on Backlog]({BACKLOG_APP_URL}/feed)"`
+- [x] If `jobs.length > 10`: content text shows `+{n} more not shown` with link to Backlog feed
 - [ ] Add `BACKLOG_APP_URL` to Render env vars (documented in worker README)
 
 ---

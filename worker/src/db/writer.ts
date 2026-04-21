@@ -4,6 +4,7 @@ import type { NormalizedJob } from '../llm/normalizer'
 export interface WriteResult {
   written: number
   jobIds: string[]
+  writtenJobPairs: { id: string; url: string }[]
 }
 
 export async function writeJobs(
@@ -11,7 +12,7 @@ export async function writeJobs(
   roleType: 'full_time' | 'internship',
   source: 'github' | 'portal' = 'github',
 ): Promise<WriteResult> {
-  if (jobs.length === 0) return { written: 0, jobIds: [] }
+  if (jobs.length === 0) return { written: 0, jobIds: [], writtenJobPairs: [] }
 
   let written = 0
   const writtenUrls: string[] = []
@@ -50,15 +51,17 @@ export async function writeJobs(
 
   // Fetch IDs for the written jobs by URL
   let jobIds: string[] = []
+  let writtenJobPairs: { id: string; url: string }[] = []
   if (writtenUrls.length > 0) {
     const { data } = await supabase
       .from('jobs')
-      .select('id')
+      .select('id, url')
       .in('url', writtenUrls)
-    jobIds = (data ?? []).map((r: { id: string }) => r.id)
+    writtenJobPairs = (data ?? []).map((r: { id: string; url: string }) => ({ id: r.id, url: r.url }))
+    jobIds = writtenJobPairs.map((p) => p.id)
   }
 
-  return { written, jobIds }
+  return { written, jobIds, writtenJobPairs }
 }
 
 // Upsert a minimal company_profiles stub — name only.
