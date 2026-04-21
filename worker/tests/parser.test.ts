@@ -1,31 +1,67 @@
 import { describe, it, expect } from 'vitest'
 import { parseJobsTable, extractText, extractUrl, cleanLocation } from '../src/github/parser'
 
+// HTML table format — the current SimplifyJobs README structure
 const SAMPLE_TABLE = `
-# New Grad Positions
-
-Some intro text here.
-
-| Company | Role | Location | Application/Link | Date Posted |
-| ------- | ---- | -------- | ---------------- | ----------- |
-| [Acme Corp](https://acme.com) | Software Engineer | San Francisco, CA | [Apply](https://boards.greenhouse.io/acme/jobs/123) | Sep 5 |
-| ↳ | Backend Engineer | Remote | [Apply](https://boards.greenhouse.io/acme/jobs/456) | Sep 5 |
-| ↳ | Frontend Engineer | New York, NY | [Apply](https://boards.greenhouse.io/acme/jobs/789) 🔒 | Aug 2 |
-| [Beta Inc](https://beta.com) | Data Engineer | Austin, TX | [Apply](https://jobs.lever.co/beta/abc) | Oct 1 |
-| Gamma LLC | ML Engineer | Seattle, WA</br>Remote | <a href="https://gamma.com/jobs/1">Apply</a> | Nov 3 |
-| [No Link Corp](https://nolink.com) | SWE | NYC | Not posted yet | Dec 5 |
-
-Some text after the table.
+<table>
+  <thead>
+    <tr><th>Company</th><th>Role</th><th>Location</th><th>Application</th><th>Age</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong><a href="https://acme.com">Acme Corp</a></strong></td>
+      <td>Software Engineer</td>
+      <td>San Francisco, CA</td>
+      <td><div align="center"><a href="https://boards.greenhouse.io/acme/jobs/123"><img alt="Apply"></a></div></td>
+      <td>0d</td>
+    </tr>
+    <tr>
+      <td>↳</td>
+      <td>Backend Engineer</td>
+      <td>Remote</td>
+      <td><div align="center"><a href="https://boards.greenhouse.io/acme/jobs/456"><img alt="Apply"></a></div></td>
+      <td>1d</td>
+    </tr>
+    <tr>
+      <td>↳</td>
+      <td>Frontend Engineer</td>
+      <td>New York, NY</td>
+      <td><div align="center"><a href="https://boards.greenhouse.io/acme/jobs/789"><img alt="Apply"></a></div> 🔒</td>
+      <td>2d</td>
+    </tr>
+    <tr>
+      <td><strong><a href="https://beta.com">Beta Inc</a></strong></td>
+      <td>Data Engineer</td>
+      <td>Austin, TX</td>
+      <td><div align="center"><a href="https://jobs.lever.co/beta/abc"><img alt="Apply"></a></div></td>
+      <td>3d</td>
+    </tr>
+    <tr>
+      <td>Gamma LLC</td>
+      <td>ML Engineer</td>
+      <td>Seattle, WA<br/>Remote</td>
+      <td><div align="center"><a href="https://gamma.com/jobs/1"><img alt="Apply"></a></div></td>
+      <td>4d</td>
+    </tr>
+    <tr>
+      <td>No Link Corp</td>
+      <td>SWE</td>
+      <td>NYC</td>
+      <td>Not posted yet</td>
+      <td>5d</td>
+    </tr>
+  </tbody>
+</table>
 `
 
 describe('parseJobsTable', () => {
-  it('parses standard markdown link rows', () => {
+  it('parses standard HTML rows', () => {
     const jobs = parseJobsTable(SAMPLE_TABLE)
     const acme = jobs.find((j) => j.title === 'Software Engineer')
     expect(acme).toBeDefined()
     expect(acme!.company).toBe('Acme Corp')
     expect(acme!.url).toBe('https://boards.greenhouse.io/acme/jobs/123')
-    expect(acme!.rawDate).toBe('Sep 5')
+    expect(acme!.rawDate).toBe('0d')
   })
 
   it('inherits company name for ↳ rows', () => {
@@ -41,17 +77,16 @@ describe('parseJobsTable', () => {
     expect(frontend).toBeUndefined()
   })
 
-  it('parses rows with plain company name (no markdown link)', () => {
+  it('parses rows with plain company name (no anchor tag)', () => {
     const jobs = parseJobsTable(SAMPLE_TABLE)
     const ml = jobs.find((j) => j.title === 'ML Engineer')
     expect(ml).toBeDefined()
     expect(ml!.company).toBe('Gamma LLC')
   })
 
-  it('parses rows with HTML <a> links', () => {
+  it('extracts href from application link cell', () => {
     const jobs = parseJobsTable(SAMPLE_TABLE)
     const ml = jobs.find((j) => j.title === 'ML Engineer')
-    expect(ml).toBeDefined()
     expect(ml!.url).toBe('https://gamma.com/jobs/1')
   })
 
@@ -61,7 +96,7 @@ describe('parseJobsTable', () => {
     expect(noLink).toBeUndefined()
   })
 
-  it('cleans <br> tags from location', () => {
+  it('cleans <br/> tags from location', () => {
     const jobs = parseJobsTable(SAMPLE_TABLE)
     const ml = jobs.find((j) => j.title === 'ML Engineer')
     expect(ml!.location).toBe('Seattle, WA, Remote')
@@ -71,6 +106,18 @@ describe('parseJobsTable', () => {
     const jobs = parseJobsTable(SAMPLE_TABLE)
     const dataEngineer = jobs.find((j) => j.title === 'Data Engineer')
     expect(dataEngineer!.company).toBe('Beta Inc')
+  })
+
+  it('skips orphaned ↳ row with no prior parent row', () => {
+    const orphan = `
+      <table>
+        <tbody>
+          <tr><td>↳</td><td>Orphan Role</td><td>Remote</td><td><a href="https://example.com">Apply</a></td><td>0d</td></tr>
+        </tbody>
+      </table>
+    `
+    const jobs = parseJobsTable(orphan)
+    expect(jobs).toHaveLength(0)
   })
 })
 
@@ -86,23 +133,28 @@ describe('extractText', () => {
   it('returns raw string if no link', () => {
     expect(extractText('Plain Text')).toBe('Plain Text')
   })
+
+  it('strips HTML tags when no anchor present', () => {
+    expect(extractText('<strong>Company Name</strong>')).toBe('Company Name')
+  })
 })
 
 describe('extractUrl', () => {
-  it('extracts URL from markdown link', () => {
-    expect(extractUrl('[Apply](https://example.com/job/1)')).toBe('https://example.com/job/1')
+  it('extracts URL from HTML href', () => {
+    expect(extractUrl('<a href="https://example.com/job/1">Apply</a>')).toBe('https://example.com/job/1')
   })
 
-  it('extracts URL from HTML anchor', () => {
-    expect(extractUrl('<a href="https://example.com">Apply</a>')).toBe('https://example.com')
+  it('extracts URL from markdown link', () => {
+    expect(extractUrl('[Apply](https://example.com/job/1)')).toBe('https://example.com/job/1')
   })
 
   it('returns null if no URL found', () => {
     expect(extractUrl('Not posted yet')).toBeNull()
   })
 
-  it('handles 🔒 after markdown link', () => {
-    expect(extractUrl('[Apply](https://example.com/job/2) 🔒')).toBe('https://example.com/job/2')
+  it('prefers href over markdown when both present', () => {
+    const cell = '<a href="https://direct.com/job">Apply</a> [also](https://md.com/job)'
+    expect(extractUrl(cell)).toBe('https://direct.com/job')
   })
 })
 

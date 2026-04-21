@@ -777,13 +777,10 @@ Match scores are user-specific and computed lazily — they aren't available at 
 
 Current format is a single wall-of-text embed. Replace with one compact embed per job (up to 10 jobs; overflow becomes a "+N more on Backlog" footer link). Each embed should be scannable in 2 seconds.
 
-- [x] `worker/src/notifications/discord.ts` — replaced single embed with array of per-job embeds (up to 10); each embed:
-  - **Title**: `{job title}` (linked to deep-link URL)
-  - **Description**: `{company} · {location or Remote}`
-  - **Fields** (inline): Salary (or "Not listed"), Level, Tags (up to 4 chips as inline code)
-  - **Color**: 🟢 green for high Jaccard match (>0.4), 🟡 yellow for mid (0.1–0.4), ⚪ grey for no signal
-  - **Footer**: `Posted {X days ago}`
-- [x] If `jobs.length > 10`: content text shows `+{n} more not shown` with link to Backlog feed
+- [x] `worker/src/notifications/discord.ts` — single embed, description is a linked list of up to 10 jobs (one job per entry: match dot + linked title + company · location · salary · tags); overflow shown as italic "+N more" line at the bottom; single embed avoids Discord's 6000-char total limit that was silently truncating multi-embed messages
+  - **Color**: single embed color based on best Jaccard score across listed jobs (green >0.4, yellow >0.1, blurple otherwise)
+  - **Format per job**: `🟢 [**Title**](deeplink)\n↳ Company · Location · Salary · \`tag\``
+- [x] If `jobs.length > 10`: italic overflow line appended to description with link to Backlog feed
 - [ ] Add `BACKLOG_APP_URL` to Render env vars (documented in worker README)
 
 ---

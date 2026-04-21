@@ -7,8 +7,13 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "vitest",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:unit": "vitest run src/tests/unit worker/tests/unit",
+    "test:integration": "vitest run src/tests/integration worker/tests/integration",
     "test:e2e": "playwright test",
+    "test:smoke": "playwright test src/tests/smoke --reporter=line",
+    "test:coverage": "vitest run --coverage",
     "test:ui": "vitest --ui"
   },
   "dependencies": {

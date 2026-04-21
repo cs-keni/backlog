@@ -57,8 +57,8 @@ export async function GET(
     .from('company_profiles')
     .update({
       interview_guide: guide,
-      behavioral_questions: guide.behavioral_questions.map(q => q.question),
-      technical_questions: guide.technical_questions.map(q => q.question),
+      behavioral_questions: guide.behavioral_questions?.map(q => q.question) ?? [],
+      technical_questions: guide.technical_questions?.map(q => q.question) ?? [],
     })
     .eq('id', id)
 

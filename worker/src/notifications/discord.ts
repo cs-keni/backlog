@@ -1,6 +1,6 @@
 import type { NormalizedJob } from '../llm/normalizer'
 
-const MAX_EMBEDS = 10
+const MAX_LISTED = 10
 const BACKLOG_APP_URL = process.env.BACKLOG_APP_URL ?? 'https://backlog.vercel.app'
 
 interface JobWithId {
@@ -31,25 +31,25 @@ export function sortByRelevance(jobsWithIds: JobWithId[], userSkills: string[]):
   })
 }
 
-function embedColor(score: number): number {
-  if (score > 0.4) return 0x57f287  // Discord green — strong match
-  if (score > 0.1) return 0xfee75c  // Discord yellow — moderate match
-  return 0x99aab5                   // Discord grey — no signal
+function topEmbedColor(jobsWithIds: JobWithId[], userSkills: string[]): number {
+  if (jobsWithIds.length === 0 || userSkills.length === 0) return 0x5865f2 // Discord blurple
+  const best = Math.max(...jobsWithIds.slice(0, MAX_LISTED).map(({ job }) => jaccardScore(job.tags ?? [], userSkills)))
+  if (best > 0.4) return 0x57f287  // green — strong match
+  if (best > 0.1) return 0xfee75c  // yellow — moderate match
+  return 0x5865f2                  // blurple — no signal
 }
 
 function formatSalary(min: number | null, max: number | null): string {
-  if (min && max) return `$${Math.round(min / 1000)}k – $${Math.round(max / 1000)}k`
+  if (min && max) return `$${Math.round(min / 1000)}k–$${Math.round(max / 1000)}k`
   if (min) return `~$${Math.round(min / 1000)}k`
   if (max) return `~$${Math.round(max / 1000)}k`
-  return 'Not listed'
+  return ''
 }
 
-function daysAgo(postedAt: string | null): string {
-  if (!postedAt) return 'Unknown date'
-  const days = Math.floor((Date.now() - new Date(postedAt).getTime()) / 86_400_000)
-  if (days === 0) return 'Today'
-  if (days === 1) return '1 day ago'
-  return `${days} days ago`
+function matchDot(score: number): string {
+  if (score > 0.4) return '🟢'
+  if (score > 0.1) return '🟡'
+  return '⚪'
 }
 
 export async function sendJobsNotification(
@@ -66,39 +66,41 @@ export async function sendJobsNotification(
   if (jobsWithIds.length === 0) return
 
   const sorted = userSkills.length > 0 ? sortByRelevance(jobsWithIds, userSkills) : jobsWithIds
-  const listed = sorted.slice(0, MAX_EMBEDS)
-  const overflow = sorted.length - MAX_EMBEDS
+  const listed = sorted.slice(0, MAX_LISTED)
+  const overflow = sorted.length - MAX_LISTED
 
-  const embeds = listed.map(({ job, id }) => {
+  // Build a compact linked-list description — one job per line
+  // Format: 🟢 [**Title**](link) · Company · Location · Salary · `tag1` `tag2`
+  const lines = listed.map(({ job, id }) => {
     const deepLink = `${BACKLOG_APP_URL}/feed?job=${id}`
-    const location = job.is_remote ? 'Remote' : (job.location ?? 'Location unknown')
     const score = jaccardScore(job.tags ?? [], userSkills)
-    const tagChips = (job.tags ?? [])
-      .slice(0, 4)
-      .map((t) => `\`${t}\``)
-      .join(' ')
+    const dot = userSkills.length > 0 ? matchDot(score) + ' ' : ''
+    const location = job.is_remote ? 'Remote' : (job.location ?? '')
+    const salary = formatSalary(job.salary_min, job.salary_max)
+    const tags = (job.tags ?? []).slice(0, 3).map(t => `\`${t}\``).join(' ')
 
-    return {
-      title: job.title,
-      url: deepLink,
-      description: `**${job.company}** · ${location}`,
-      color: embedColor(score),
-      fields: [
-        { name: 'Salary', value: formatSalary(job.salary_min, job.salary_max), inline: true },
-        { name: 'Level', value: job.experience_level ?? 'Not specified', inline: true },
-        ...(tagChips ? [{ name: 'Tags', value: tagChips, inline: false }] : []),
-      ],
-      footer: { text: `Posted ${daysAgo(job.posted_at)}` },
-    }
+    const meta = [job.company, location, salary, tags].filter(Boolean).join(' · ')
+    return `${dot}[**${job.title}**](${deepLink})\n↳ ${meta}`
   })
 
-  const payload: Record<string, unknown> = {
-    content: `**${written} new job${written === 1 ? '' : 's'}** — [View all on Backlog](${BACKLOG_APP_URL}/feed)`,
-    embeds,
+  if (overflow > 0) {
+    lines.push(`\n*+${overflow} more — [view all on Backlog](${BACKLOG_APP_URL}/feed)*`)
   }
 
-  if (overflow > 0) {
-    payload.content = `**${written} new job${written === 1 ? '' : 's'}** (+${overflow} more not shown) — [View all on Backlog](${BACKLOG_APP_URL}/feed)`
+  const description = lines.join('\n\n')
+
+  const embed = {
+    color: topEmbedColor(listed, userSkills),
+    description,
+    footer: {
+      text: `${written} new job${written === 1 ? '' : 's'} · Backlog`,
+    },
+    timestamp: new Date().toISOString(),
+  }
+
+  const payload = {
+    content: '',
+    embeds: [embed],
   }
 
   try {
@@ -111,7 +113,7 @@ export async function sendJobsNotification(
     if (!res.ok) {
       console.error(`[discord] Webhook POST failed: ${res.status} ${res.statusText}`)
     } else {
-      console.log(`[discord] Notified — ${written} job${written === 1 ? '' : 's'} (${listed.length} embeds)`)
+      console.log(`[discord] Notified — ${written} job${written === 1 ? '' : 's'} (${listed.length} listed)`)
     }
   } catch (err) {
     console.error('[discord] Webhook request threw:', err)

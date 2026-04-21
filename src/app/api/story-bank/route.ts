@@ -45,7 +45,7 @@ export async function POST(request: Request) {
       action: body.action?.trim() ?? null,
       result: body.result?.trim() ?? null,
       reflection: body.reflection?.trim() ?? null,
-      tags: body.tags ?? [],
+      tags: Array.isArray(body.tags) ? body.tags.filter((t): t is string => typeof t === 'string') : [],
     })
     .select()
     .single()

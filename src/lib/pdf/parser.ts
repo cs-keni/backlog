@@ -49,11 +49,11 @@ export async function extractTextFromPdf(buffer: Buffer): Promise<string> {
     console.error('[pdf] pdfjs-dist direct threw:', err)
   }
 
-  // ── Attempt 3: pdf-parse v2 ───────────────────────────────────────────────
+  // ── Attempt 3: pdf-parse ──────────────────────────────────────────────────
   try {
-    const { PDFParse } = await import('pdf-parse')
-    const parser = new PDFParse({ data: new Uint8Array(buffer) })
-    const result = await parser.getText()
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const pdfParse = require('pdf-parse') as (buf: Buffer) => Promise<{ text: string }>
+    const result = await pdfParse(buffer)
     const text = result.text.trim()
     console.log(`[pdf] pdf-parse: ${text.length} chars`)
     if (text.length > 0) return text

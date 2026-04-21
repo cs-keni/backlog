@@ -60,8 +60,8 @@ export async function GET(
     return Response.json({ score: null, rationale: null, dimensions: null, mode: 'none' })
   }
 
-  // Upsert into cache
-  await supabase.from('match_scores').upsert(
+  // Upsert into cache — log on failure but don't fail the request
+  const { error: cacheError } = await supabase.from('match_scores').upsert(
     {
       user_id: user.id,
       job_id: jobId,
@@ -73,6 +73,7 @@ export async function GET(
     },
     { onConflict: 'user_id,job_id' }
   )
+  if (cacheError) console.warn('[match-score] cache write failed:', cacheError.message)
 
   return Response.json({
     score: result.score,

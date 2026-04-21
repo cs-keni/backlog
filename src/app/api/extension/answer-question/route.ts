@@ -80,16 +80,20 @@ export async function POST(request: Request) {
     .eq('user_id', auth.userId)
 
   if (savedAnswers) {
-    const qLower = question.toLowerCase()
+    const qWords = new Set(
+      question.toLowerCase().split(/\W+/).filter(w => w.length > 3)
+    )
     for (const saved of savedAnswers) {
-      const savedLower = (saved.question as string).toLowerCase()
-      // Match if at least 60% of saved question words appear in the new question
-      const savedWords = savedLower.split(/\s+/).filter(w => w.length > 3)
-      if (savedWords.length > 0) {
-        const matchCount = savedWords.filter(w => qLower.includes(w)).length
-        if (matchCount / savedWords.length >= 0.6) {
-          return Response.json({ answer: saved.answer, source: 'saved' })
-        }
+      const savedWords = (saved.question as string)
+        .toLowerCase()
+        .split(/\W+/)
+        .filter(w => w.length > 3)
+      if (savedWords.length === 0 || qWords.size === 0) continue
+      const intersection = savedWords.filter(w => qWords.has(w)).length
+      // Jaccard-style: intersection / union — requires 0.5 overlap
+      const union = new Set([...savedWords, ...qWords]).size
+      if (intersection / union >= 0.5) {
+        return Response.json({ answer: saved.answer, source: 'saved' })
       }
     }
   }

@@ -92,6 +92,14 @@ export async function POST(request: Request) {
       return Response.json({ error: 'Failed to create application' }, { status: 500 })
     }
     applicationId = newApp.id
+
+    // Write initial timeline entry for the auto-created application
+    await supabase.from('application_timeline').insert({
+      application_id: applicationId,
+      from_status: null,
+      to_status: 'saved',
+      changed_at: new Date().toISOString(),
+    })
   }
 
   // ── Check for existing cover letter ───────────────────────────────────────

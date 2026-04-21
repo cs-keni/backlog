@@ -125,7 +125,6 @@ export async function POST(request: Request) {
       .update({
         content_text: JSON.stringify(tailored),
         pdf_url: publicUrl,
-        created_at: new Date().toISOString(),
       })
       .eq('id', existing.id)
       .select('id')
