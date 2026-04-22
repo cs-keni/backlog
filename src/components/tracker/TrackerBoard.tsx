@@ -16,6 +16,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { ApplicationCard } from './ApplicationCard'
 import { ApplicationDetail } from './ApplicationDetail'
 import { ApplicationList } from './ApplicationList'
+import { LogApplicationModal } from '@/components/shared/LogApplicationModal'
 import type { ApplicationWithJob, ApplicationStatus } from '@/lib/jobs/types'
 
 interface TrackerBoardProps {
@@ -38,6 +39,7 @@ export function TrackerBoard({ initialApplications }: TrackerBoardProps) {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [view, setView] = useState<'kanban' | 'list'>('kanban')
   const [showArchived, setShowArchived] = useState(false)
+  const [showLogModal, setShowLogModal] = useState(false)
 
   const archivedCount = applications.filter(a => a.is_archived).length
   const visibleApps = showArchived ? applications : applications.filter(a => !a.is_archived)
@@ -128,13 +130,20 @@ export function TrackerBoard({ initialApplications }: TrackerBoardProps) {
     if (archived && !showArchived) setSelectedId(null)
   }, [showArchived])
 
+  const handleApplicationLogged = useCallback((application: ApplicationWithJob) => {
+    setApplications((prev) => [application, ...prev])
+    setShowLogModal(false)
+    setSelectedId(application.id)
+  }, [])
+
   const appsByStatus = COLUMNS.reduce<Record<string, ApplicationWithJob[]>>((acc, col) => {
     acc[col.id] = visibleApps.filter((a) => a.status === col.id)
     return acc
   }, {})
 
   return (
-    <div className="flex flex-col h-full overflow-hidden">
+    <>
+    <div className="relative flex flex-col h-full overflow-hidden">
       {/* Toolbar */}
       <div className="shrink-0 flex items-center gap-2 px-4 py-2 border-b border-zinc-800">
         {/* View toggle */}
@@ -175,6 +184,21 @@ export function TrackerBoard({ initialApplications }: TrackerBoardProps) {
             {showArchived ? 'Hide archived' : `Show archived (${archivedCount})`}
           </button>
         )}
+
+        <div className="ml-auto flex items-center gap-2">
+          <span className="text-xs text-zinc-600 tabular-nums">
+            {applications.length} application{applications.length !== 1 ? 's' : ''}
+          </span>
+          <button
+            onClick={() => setShowLogModal(true)}
+            className="flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-1 rounded-md bg-zinc-800 border border-zinc-700 text-zinc-300 hover:text-zinc-100 hover:border-zinc-600 transition-colors"
+          >
+            <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+            </svg>
+            Log Application
+          </button>
+        </div>
       </div>
 
       <div className="flex flex-1 overflow-hidden">
@@ -254,7 +278,39 @@ export function TrackerBoard({ initialApplications }: TrackerBoardProps) {
           />
         </div>
       </div>
+
+      {/* Empty state */}
+      {applications.length === 0 && (
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+          <div className="text-center space-y-3">
+            <p className="text-sm font-medium text-zinc-300">No applications yet</p>
+            <p className="text-xs text-zinc-600 max-w-[260px] leading-relaxed">
+              Save or apply to jobs from the feed, or log an application you already sent.
+            </p>
+            <button
+              onClick={() => setShowLogModal(true)}
+              className="pointer-events-auto inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg bg-zinc-800 border border-zinc-700 text-zinc-300 hover:text-zinc-100 hover:border-zinc-600 transition-colors"
+            >
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+              </svg>
+              Log your first application
+            </button>
+          </div>
+        </div>
+      )}
     </div>
+
+    {/* Log Application modal */}
+    <AnimatePresence>
+      {showLogModal && (
+        <LogApplicationModal
+          onSuccess={handleApplicationLogged}
+          onClose={() => setShowLogModal(false)}
+        />
+      )}
+    </AnimatePresence>
+    </>
   )
 }
 

@@ -54,7 +54,8 @@ const AVATAR_COLORS = [
   'bg-yellow-500/20 text-yellow-300', 'bg-rose-500/20 text-rose-300',
 ]
 
-function getDomain(company: string, jobUrl: string): string {
+function getDomain(company: string, jobUrl: string | null): string {
+  if (!jobUrl) return `${company.toLowerCase().replace(/[^a-z0-9]/g, '')}.com`
   try {
     const u = new URL(jobUrl)
     const hostname = u.hostname

@@ -3,6 +3,7 @@
 import { useState, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { SortOption } from '@/lib/jobs/types'
+import { LogApplicationModal } from '@/components/shared/LogApplicationModal'
 
 interface FeedHeaderProps {
   sort: SortOption
@@ -15,6 +16,7 @@ export function FeedHeader({ sort, onSortChange, onJobAdded }: FeedHeaderProps) 
   const [urlState, setUrlState] = useState<'idle' | 'loading' | 'success' | 'error' | 'js-rendered'>('idle')
   const [errorMsg, setErrorMsg] = useState('')
   const [refreshState, setRefreshState] = useState<'idle' | 'loading' | 'checking' | 'error'>('idle')
+  const [showLogModal, setShowLogModal] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
 
   async function handleAddFromUrl(e: React.FormEvent) {
@@ -196,6 +198,28 @@ export function FeedHeader({ sort, onSortChange, onJobAdded }: FeedHeaderProps) 
           >
             {errorMsg}
           </motion.p>
+        )}
+      </AnimatePresence>
+
+      {/* Log manually */}
+      <button
+        onClick={() => setShowLogModal(true)}
+        className="text-[11px] text-zinc-600 hover:text-zinc-400 transition-colors self-start"
+      >
+        Applied somewhere not in the feed?{' '}
+        <span className="underline underline-offset-2">Log it manually →</span>
+      </button>
+
+      {/* Log Application modal */}
+      <AnimatePresence>
+        {showLogModal && (
+          <LogApplicationModal
+            onSuccess={(application) => {
+              onJobAdded(application.jobs.id)
+              setShowLogModal(false)
+            }}
+            onClose={() => setShowLogModal(false)}
+          />
         )}
       </AnimatePresence>
     </div>

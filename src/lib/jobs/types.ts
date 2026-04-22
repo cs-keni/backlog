@@ -84,7 +84,7 @@ export interface ApplicationJob {
   location: string | null
   salary_min: number | null
   salary_max: number | null
-  url: string
+  url: string | null
   is_remote: boolean
   tags: string[] | null
 }

@@ -35,7 +35,8 @@ const AVATAR_COLORS = [
   'bg-yellow-500/20 text-yellow-300', 'bg-rose-500/20 text-rose-300',
 ]
 
-function getDomain(company: string, jobUrl: string): string {
+function getDomain(company: string, jobUrl: string | null): string {
+  if (!jobUrl) return `${company.toLowerCase().replace(/[^a-z0-9]/g, '')}.com`
   try {
     const u = new URL(jobUrl)
     const hostname = u.hostname
@@ -90,7 +91,7 @@ interface ApplicationListProps {
   onSelect: (id: string) => void
 }
 
-function LogoCell({ company, url }: { company: string; url: string }) {
+function LogoCell({ company, url }: { company: string; url: string | null }) {
   const domain = getDomain(company, url)
   const logoUrls = [
     `https://logo.clearbit.com/${domain}`,

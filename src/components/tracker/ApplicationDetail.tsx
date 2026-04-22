@@ -246,14 +246,16 @@ export function ApplicationDetail({ app, onClose, onStatusChange, onUpdate, onDe
                   <span>💰 {formatSalary(app.jobs.salary_min, app.jobs.salary_max)}</span>
                 )}
                 {app.applied_at && <span>📅 Applied {formatDate(app.applied_at)}</span>}
-                <a
-                  href={app.jobs.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-zinc-400 hover:text-zinc-200 underline underline-offset-2 transition-colors"
-                >
-                  View listing ↗
-                </a>
+                {app.jobs.url && (
+                  <a
+                    href={app.jobs.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-zinc-400 hover:text-zinc-200 underline underline-offset-2 transition-colors"
+                  >
+                    View listing ↗
+                  </a>
+                )}
               </div>
 
               {/* Status buttons */}

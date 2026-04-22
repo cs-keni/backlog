@@ -25,25 +25,11 @@ export default async function TrackerPage() {
 
   const applications = (data ?? []) as unknown as ApplicationWithJob[]
 
-  if (applications.length === 0) {
-    return (
-      <div className="flex h-full items-center justify-center">
-        <div className="text-center space-y-2">
-          <p className="text-sm font-medium text-zinc-300">No applications yet</p>
-          <p className="text-xs text-zinc-600 max-w-[260px] leading-relaxed">
-            Save or apply to jobs from the feed — they&apos;ll appear here as cards you can drag through your pipeline.
-          </p>
-        </div>
-      </div>
-    )
-  }
-
   return (
     <div className="h-full flex flex-col overflow-hidden">
       {/* Header */}
-      <div className="shrink-0 px-5 py-4 border-b border-zinc-800 flex items-center justify-between">
+      <div className="shrink-0 px-5 py-4 border-b border-zinc-800">
         <h1 className="text-sm font-semibold text-zinc-100">Tracker</h1>
-        <span className="text-xs text-zinc-500">{applications.length} application{applications.length !== 1 ? 's' : ''}</span>
       </div>
 
       {/* Board */}

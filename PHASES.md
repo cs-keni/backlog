@@ -519,13 +519,42 @@ Additional sources (LinkedIn, Indeed, Glassdoor) are deferred to a future phase 
 - [ ] `/analytics` page
 - [ ] Jobs posted today + 7-day rolling average chart
 - [ ] Application activity chart with weekly / monthly / yearly toggle (Recharts)
-- [ ] Application funnel visualization (stacked bar)
+- [ ] Application funnel visualization (stacked bar or Sankey)
 - [ ] Response rate metric
 - [ ] Most active companies hiring right now
 - [ ] Time-to-first-response distribution (derived from `application_timeline`)
 - [ ] Dashboard mini-stats strip + 30-day sparkline
-- [ ] Breakdown of manually-added jobs (`source = 'manual'`) vs aggregated feed jobs
+- [ ] Breakdown of manually-added jobs (`source = 'manual'`) vs aggregated feed jobs (`github` / `portal`)
 - [ ] Integration tests: analytics API routes return correct aggregations
+
+#### 9b — Company Graph View
+
+A force-directed interactive graph that gives you a spatial "map" of your job search — more expressive than bar charts and genuinely fun to explore.
+
+**Visualization:**
+- **Nodes are companies** — sized proportionally to the number of open roles Backlog has for that company
+- **Node color = your relationship with that company:**
+  - Grey — no interaction
+  - Blue — saved a job there
+  - Yellow — applied
+  - Orange — in active interviews (phone screen / technical / final)
+  - Green — offer
+  - Red — rejected
+- **Edges connect companies that share tech stack tags** — Jaccard similarity on `jobs.tags[]`; only edges above a threshold (e.g. 0.3) are drawn, so the graph doesn't become a hairball
+- **Clusters emerge naturally** from the force simulation — ML/AI companies pull together, fintech groups together, consumer SaaS groups together; no manual categorization needed
+- **Clicking a node** opens that company's panel (same drawer as in the feed)
+- **Hovering** shows a tooltip: application status, number of open roles, top shared tags with your profile
+
+**Implementation:**
+- `react-force-graph-2d` — wraps D3 force simulation, performant in React, supports custom node rendering via Canvas
+- Graph data computed server-side at request time: `GET /api/analytics/company-graph` returns `{ nodes: [{id, name, roleCount, applicationStatus}], edges: [{source, target, weight}] }`; edges built from tag Jaccard across all companies with at least 1 open role
+- Framer Motion handles the entrance — graph fades in as nodes settle into position
+- Toggle between graph view and standard chart view on the analytics page
+
+- [ ] `src/app/api/analytics/company-graph/route.ts` — compute nodes (all companies with open roles + user application status) and edges (tag Jaccard ≥ 0.3); return serialized graph
+- [ ] `src/components/analytics/CompanyGraph.tsx` — `react-force-graph-2d` canvas component; custom node renderer (circle + company letter avatar); color by application status; tooltip on hover; click → open company panel
+- [ ] Add `react-force-graph-2d` to dependencies
+- [ ] Toggle between "Charts" and "Map" view on the analytics page
 
 ### Phase 10 — Browser Extension (Auto-Fill)
 
@@ -827,10 +856,10 @@ Current format is a single wall-of-text embed. Replace with one compact embed pe
 
 Shared test data factories used by all test layers. Define once, import everywhere — prevents fixture drift across suites.
 
-- [ ] `worker/tests/fixtures/jobs.ts` — `makeRawEntry(overrides?)`, `makeNormalizedJob(overrides?)`, factory functions for generating consistent test data
-- [ ] `src/tests/fixtures/jobs.ts` — `makeJob(overrides?)`, `makeApplication(overrides?)`, `makeUser(overrides?)`
-- [ ] `src/tests/fixtures/profile.ts` — `makeUserProfile(overrides?)`, `makeWorkHistory(overrides?)`, `makeEducation(overrides?)`, `makeProject(overrides?)`
-- [ ] `src/tests/helpers/supabase-mock.ts` — typed Supabase mock builder; wraps MSW handlers so route tests don't need raw fetch mocks
+- [x] `worker/tests/fixtures/jobs.ts` — `makeRawEntry(overrides?)`, `makeNormalizedJob(overrides?)`, factory functions for generating consistent test data
+- [x] `src/tests/fixtures/jobs.ts` — `makeJob(overrides?)`, `makeApplication(overrides?)`, `makeUser(overrides?)`
+- [x] `src/tests/fixtures/profile.ts` — `makeUserProfile(overrides?)`, `makeWorkHistory(overrides?)`, `makeEducation(overrides?)`, `makeProject(overrides?)`
+- [x] `src/tests/helpers/supabase-mock.ts` — typed Supabase mock builder; wraps MSW handlers so route tests don't need raw fetch mocks
 
 ---
 
@@ -838,80 +867,92 @@ Shared test data factories used by all test layers. Define once, import everywhe
 
 Pure logic tests — no network, no DB. Fast, run on every commit.
 
-**Parser (`worker/tests/unit/parser.test.ts`):**
-- [ ] HTML table with ↳ sub-rows inherits company name correctly
-- [ ] Row with 🔒 in link cell is skipped
-- [ ] Row with no parseable URL is skipped
-- [ ] Multi-location `<br>` cells are normalized to `, `-separated string
-- [ ] Leading emoji stripped from company names
-- [ ] Orphaned ↳ row (no prior company) is skipped
+**Parser (`worker/tests/parser.test.ts`):**
+- [x] HTML table with ↳ sub-rows inherits company name correctly
+- [x] Row with 🔒 in link cell is skipped
+- [x] Row with no parseable URL is skipped
+- [x] Multi-location `<br>` cells are normalized to `, `-separated string
+- [x] Leading emoji stripped from company names
+- [x] Orphaned ↳ row (no prior company) is skipped
 
-**Date parser (`worker/tests/unit/normalizer.test.ts`):**
-- [ ] `"0d"` → today's date ISO string
-- [ ] `"7d"` → 7 days ago
-- [ ] `"30d"` → 30 days ago
-- [ ] Legacy `"Sep 5"` → correct year inference (past month = last year)
-- [ ] Empty string → `null`
-- [ ] Garbage input → `null`
+**Date parser (`worker/tests/normalizer.test.ts`):**
+- [x] `"0d"` → today's date ISO string
+- [x] `"7d"` → 7 days ago
+- [x] `"30d"` → 30 days ago
+- [x] Legacy `"Sep 5"` → correct year inference (past month = last year)
+- [x] Empty string → `null`
+- [x] Garbage input → `null`
 
 **Relevance filter (`worker/tests/unit/relevance-filter.test.ts`):**
-- [ ] "Senior Software Engineer" → blocked
-- [ ] "Staff Engineer" → blocked
-- [ ] "Principal SWE" → blocked
-- [ ] "Tech Lead" → blocked
-- [ ] "Engineering Manager" → blocked
-- [ ] "PhD Machine Learning Researcher" → blocked
-- [ ] "Account Executive" → blocked
-- [ ] "Product Marketing Manager" → blocked
-- [ ] "Software Engineer" → allowed
-- [ ] "Product Manager" → allowed
-- [ ] "Technical Program Manager" → allowed
-- [ ] "New Grad Software Engineer" → allowed
-- [ ] Location "London, UK" → blocked
-- [ ] Location "Toronto, Canada" → blocked
-- [ ] Location "Remote" → allowed
-- [ ] Location "San Francisco, CA" → allowed
-- [ ] Location "" (blank) → allowed (defaults to US)
-- [ ] `filterRelevantEntries` log message shows correct drop count
+- [x] "Senior Software Engineer" → blocked
+- [x] "Staff Engineer" → blocked
+- [x] "Principal SWE" → blocked
+- [x] "Tech Lead" → blocked
+- [x] "Engineering Manager" → blocked
+- [x] "PhD Machine Learning Researcher" → blocked
+- [x] "Account Executive" → blocked
+- [x] "Product Marketing Manager" → blocked
+- [x] "Software Engineer" → allowed
+- [x] "Product Manager" → allowed
+- [x] "Technical Program Manager" → allowed
+- [x] "New Grad Software Engineer" → allowed
+- [x] Location "London, UK" → blocked
+- [x] Location "Toronto, Canada" → blocked
+- [x] Location "Remote" → allowed
+- [x] Location "San Francisco, CA" → allowed
+- [x] Location "" (blank) → allowed (defaults to US)
+- [x] `filterRelevantEntries` log message shows correct drop count
 
 **Salary extractor (`worker/tests/unit/enricher.test.ts`):**
-- [ ] `"$120,000 – $150,000"` → `{ min: 120000, max: 150000 }`
-- [ ] `"$120k–$150k"` → `{ min: 120000, max: 150000 }`
-- [ ] `"salary: $80k to $100k"` → `{ min: 80000, max: 100000 }`
-- [ ] `"$50/hr"` (hourly × 2080) → annual equivalent
-- [ ] No salary text → `{ min: null, max: null }`
+- [x] `"$120,000 – $150,000"` → `{ min: 120000, max: 150000 }`
+- [x] `"$120k–$150k"` → `{ min: 120000, max: 150000 }`
+- [x] `"salary: $80k to $100k"` → `{ min: 80000, max: 100000 }`
+- [x] `"$50/hr"` (hourly × 2080) → annual equivalent
+- [x] No salary text → `{ min: null, max: null }`
 
-**Deduplicator (`worker/tests/unit/deduplicator.test.ts`):**
-- [ ] Entries already in DB (by URL) are filtered out
-- [ ] New entries pass through
-- [ ] Mixed batch: only new entries returned
+**Deduplicator (`worker/tests/deduplicator.test.ts`):**
+- [x] Entries already in DB (by URL) are filtered out
+- [x] New entries pass through
+- [x] Mixed batch: only new entries returned
 
 ---
 
 #### 17c — App Unit Tests
 
 **Match scorer (`src/tests/unit/matcher.test.ts`):**
-- [ ] Jaccard score: perfect overlap → 100, no overlap → 0, partial → correct ratio
-- [ ] `clamp` handles NaN, negative, over-100
-- [ ] Skills-only mode when no resume text
-- [ ] `mode: 'none'` returned when both skills and resume are absent
+- [x] Jaccard score: perfect overlap → 100, no overlap → 0, partial → correct ratio
+- [x] `clamp` handles NaN, negative, over-100
+- [x] Skills-only mode when no resume text
+- [x] `mode: 'none'` returned when both skills and resume are absent
 
-**URL extractor (`src/tests/unit/url-extractor.test.ts`):**
-- [ ] Greenhouse URL detected and routed to Greenhouse API handler
-- [ ] Lever URL detected and routed to Lever API handler
-- [ ] Generic URL falls through to HTML fetch + LLM path
-- [ ] Invalid / non-job URL returns appropriate error shape
+**Resume analyzer (`src/tests/unit/resume-analyzer.test.ts`):**
+- [x] Extracts personal info fields correctly
+- [x] Handles missing optional fields (LinkedIn, GitHub, portfolio, GPA)
+
+**Retry utility (`src/tests/unit/retry.test.ts`):**
+- [x] Retries on 529/overloaded errors up to maxAttempts
+- [x] Does not retry on 400/auth errors
+- [x] Returns result on first success without retry
+
+**Discord dispatcher (`worker/tests/unit/dispatcher.test.ts`):**
+- [x] `isInQuietHours` returns `true` when now is within window
+- [x] Returns `false` outside window
+- [x] Overnight range (22:00–08:00) handled correctly
+- [x] `null` start or end → always returns `false`
+
+**Discord notification format (`worker/tests/unit/discord.test.ts`):**
+- [x] Relevance sort orders jobs by Jaccard score descending
+- [x] Overflow line appears when jobs > 10
+- [x] Embed color reflects best Jaccard score
+
+**URL extractor (`src/tests/helpers/url-extractor-test-helpers.ts`):**
+- [x] Greenhouse URL detected and routed to Greenhouse API handler
+- [x] Lever URL detected and routed to Lever API handler
 
 **API key auth (`src/tests/unit/api-key.test.ts`):**
 - [ ] `hashApiKey` produces consistent output for same input
 - [ ] Two different keys produce different hashes
 - [ ] Raw key is never returned after hashing (no reverse path)
-
-**Quiet hours (`src/tests/unit/dispatcher.test.ts`):**
-- [ ] `isInQuietHours` returns `true` when now is within window
-- [ ] Returns `false` outside window
-- [ ] Overnight range (22:00–08:00) handled correctly
-- [ ] `null` start or end → always returns `false`
 
 ---
 
@@ -920,18 +961,24 @@ Pure logic tests — no network, no DB. Fast, run on every commit.
 Uses Vitest + MSW. Supabase calls are intercepted — no real DB. Tests verify handler logic, not Supabase internals.
 
 **Feed (`src/tests/integration/jobs-feed.test.ts`):**
-- [ ] `GET /api/jobs` returns paginated results with correct cursor structure
-- [ ] `role_type` filter applied correctly
-- [ ] `is_remote` filter applied correctly
-- [ ] `date_range` filter: `24h` restricts `posted_at` correctly
-- [ ] `GET /api/jobs/[id]` returns 404 for unknown id
+- [x] `GET /api/jobs` returns paginated results with correct cursor structure
+- [x] `role_type` filter applied correctly
+- [x] `is_remote` filter applied correctly
+- [x] `date_range` filter: `24h` restricts `posted_at` correctly
+- [x] `GET /api/jobs/[id]` returns 404 for unknown id
 - [ ] `GET /api/jobs/[id]/match-score` computes score on first call, returns cached on second
 
 **Applications (`src/tests/integration/applications.test.ts`):**
-- [ ] `POST /api/applications` creates row and first timeline entry
-- [ ] `PATCH /api/applications/[id]` with new status writes timeline row + updates `last_updated`
-- [ ] `PATCH /api/applications/[id]` with same status does not write duplicate timeline row
-- [ ] `DELETE /api/applications/[id]` removes row and cascades timeline
+- [x] `POST /api/applications` creates row and first timeline entry
+- [x] `PATCH /api/applications/[id]` with new status writes timeline row + updates `last_updated`
+- [x] `PATCH /api/applications/[id]` with same status does not write duplicate timeline row
+- [x] `DELETE /api/applications/[id]` removes row and cascades timeline
+
+**Story bank (`src/tests/integration/story-bank.test.ts`):**
+- [x] `GET /api/story-bank` returns user's stories
+- [x] `POST /api/story-bank` creates story
+- [x] `PATCH /api/story-bank/[id]` updates story
+- [x] `DELETE /api/story-bank/[id]` removes story
 
 **Profile (`src/tests/integration/profile.test.ts`):**
 - [ ] `POST /api/profile/resume` extracts text, updates `users.resume_text`, invalidates `match_scores`
@@ -1017,6 +1064,62 @@ Fast sanity checks run after every deploy. No mocking — hit the real deployed 
 - [ ] Worker test script in `worker/package.json`: `"test": "vitest run"`, `"test:watch": "vitest"`
 - [ ] Playwright config: `webServer` block spins up `next dev` before E2E run in CI; reuses existing server in local dev
 - [ ] Coverage report: `vitest run --coverage` uploads to CI artifacts; enforce 80% threshold on `worker/src/` and `src/lib/`
+
+---
+
+### Phase 19 — Manual Application Entry
+
+> Sometimes you apply for a job outside of Backlog — via a referral, LinkedIn Easy Apply, a company's direct careers page, or somewhere that Backlog doesn't aggregate. This phase adds a way to log those applications so they count toward your stats, appear in the tracker, and show up in analytics.
+
+The existing "Add Job from URL" flow already handles jobs with a URL (Greenhouse/Lever via public APIs; other URLs via HTML fetch + GPT extraction). This phase extends that into a **two-mode entry modal** — URL-first (auto-extract + confirm) and pure-manual (no URL, just the basics) — and adds a dedicated "Log application" entry point on the tracker.
+
+#### 19a — Two-Mode Entry Modal
+
+**Mode 1: URL provided**
+
+User pastes a job posting URL. The modal calls the existing URL extractor (`lib/jobs/url-extractor.ts`) to auto-fill as many fields as possible:
+- Greenhouse/Lever URLs → full structured data via their public APIs (title, company, description, location, salary, tags, experience level)
+- Other static URLs → HTML fetch + GPT-5 nano extraction (best-effort; fills what it can)
+- JS-rendered pages that fail extraction → fields stay blank; user fills manually
+
+The pre-filled form is shown in a review step. User can edit any field before confirming. This is the same extraction pipeline already used for "Add Job from URL" in the feed — we're just adding an application creation step on top.
+
+**Mode 2: No URL (referral, LinkedIn Easy Apply, posting is gone, etc.)**
+
+User fills in the bare minimum manually:
+- **Company name** *(required)*
+- **Job title** *(required)*
+- **Location** — free text, optional ("Remote", "New York, NY")
+- **Job URL** — optional; if added later, can be used to enrich the job
+- **Applied date** — date picker, defaults to today
+- **Status** — selector defaulting to "Applied"; options: Saved, Applied (don't offer later stages here — those are advanced via the tracker)
+- **Notes** — single plain-text field for a quick note; not Tiptap (this is quick entry, not the full notes panel)
+
+Fields intentionally omitted from manual entry: description, tags, salary, experience level. These can't be reliably entered by hand and require a job posting to be meaningful. Jobs entered without a description will show a prompt in their detail panel: "Add a URL to unlock match scoring and interview prep."
+
+**What gets created:**
+- `jobs` row: `source = 'manual'`; populated fields from extraction or manual input; `description` / `tags` / `salary` only if extracted from a URL
+- `company_profiles` stub upserted (name + id) — same pattern as aggregation worker
+- `applications` row: chosen status, `applied_at` stamped
+- `application_timeline` row: `from_status: null → to_status: <chosen>`
+- Job appears immediately in tracker; visible in feed with a "Manually added" badge
+
+**Entry points:**
+- Tracker: "+ Log application" button in the page header — the most natural home; you're already tracking
+- Feed: "Enter manually" option in the existing "Add job" dropdown alongside "Paste URL"
+- Keyboard shortcut `L` (for "Log") — opens the modal from anywhere in the app
+
+- [x] `src/app/api/jobs/manual/extract/route.ts` — POST with `{ url }`, returns extracted job data without writing to DB, auth-gated
+- [x] `src/app/api/jobs/manual/route.ts` — POST: creates job + company stub + application + timeline in one shot; returns `{ job_id, application_id, application: ApplicationWithJob }`
+- [x] `src/components/shared/LogApplicationModal.tsx` — two-step modal: (1) URL input with "Extract" button or "Enter details manually" link; (2) form pre-filled from extraction or blank; status selector; date picker; "Save Application" submits to `POST /api/jobs/manual`
+- [x] `src/components/tracker/TrackerBoard.tsx` — "+ Log Application" button in toolbar; dynamic application count; empty state with "Log your first application" CTA; on success, optimistically inserts card and opens detail panel
+- [x] `src/components/feed/FeedHeader.tsx` — "Applied somewhere not in the feed? Log it manually →" link below URL input; opens modal; on success calls `onJobAdded` so job appears in feed
+- [ ] Keyboard shortcut `L` — opens modal from anywhere; deferred to Phase 13 (global shortcuts pass)
+- [ ] Jobs with no `description` show "Add URL to unlock prep & match scoring" nudge in detail panel — deferred (minor UX polish)
+
+#### 19b — Analytics Integration
+
+No additional schema work needed. `jobs.source` already distinguishes `github` / `portal` / `manual`. Phase 9 analytics will naturally pick up all manually-entered jobs in every chart, and the source breakdown widget will include them in the "manually logged" slice alongside URL-extracted jobs.
 
 ---
 
