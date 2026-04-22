@@ -675,6 +675,12 @@ Two approaches were considered:
 - Haiku fill call is staged: run Tier 1 immediately (visible fills), then Tier 2 in background (second wave) — avoids "nothing happening for 500ms" UX
 - Vitest added to extension for unit tests
 
+**Bug fixed (2026-04-21) — false application records from non-job pages:**
+Two cooperating bugs caused random pages (streaming sites, gaming client auth flows) to appear as applied jobs in the tracker:
+1. `hasJobForm()` in `detect.ts` only checked for `email input + 3+ text inputs` — too many false positives. Login pages, search forms, and idle-timeout pages all matched. Fixed: now requires at least one strong job-application signal (file upload for resume, LinkedIn/GitHub URL field, or job-specific label text like "resume", "cover letter", "work authorization", "sponsorship").
+2. `watchForSubmission()` attached click listeners to ALL `button[type="submit"]` elements on any detected page — clicking Search on SFlix or "Yes, I'm here" on a Riot idle-timeout page fired `MARK_APPLIED`. Fixed: button click listeners are now ONLY attached on confirmed ATS pages (greenhouse / lever / workday). Generic-detected pages only use form `submit` events, which are far harder to trigger accidentally.
+3. Secondary: `/api/extension/apply` did not set `hide_from_feed = true` on extension-created job stubs. Fixed.
+
 **Tasks:**
 
 - [x] **Remove `fillGreenhouse()`** from `fill.ts` — use generic label-based filler for all ATS platforms; simpler, more maintainable, less brittle

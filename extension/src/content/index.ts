@@ -119,37 +119,32 @@ function watchForSubmission() {
   const info = cachedPageInfo
   let submitted = false
 
+  function send() {
+    if (submitted) return
+    submitted = true
+    chrome.runtime.sendMessage({
+      type: 'MARK_APPLIED',
+      payload: {
+        jobUrl: window.location.href,
+        jobTitle: info.jobTitle,
+        company: info.company,
+      },
+    } as ExtensionMessage)
+  }
+
+  // Form submit events are safe to watch on any detected page
   document.querySelectorAll('form').forEach((form) => {
-    form.addEventListener('submit', () => {
-      if (submitted) return
-      submitted = true
-      chrome.runtime.sendMessage({
-        type: 'MARK_APPLIED',
-        payload: {
-          jobUrl: window.location.href,
-          jobTitle: info.jobTitle,
-          company: info.company,
-        },
-      } as ExtensionMessage)
-    })
+    form.addEventListener('submit', send)
   })
 
-  document.querySelectorAll('button[type="submit"], input[type="submit"]').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      if (submitted) return
-      submitted = true
-      setTimeout(() => {
-        chrome.runtime.sendMessage({
-          type: 'MARK_APPLIED',
-          payload: {
-            jobUrl: window.location.href,
-            jobTitle: info.jobTitle,
-            company: info.company,
-          },
-        } as ExtensionMessage)
-      }, 500)
+  // Button click listeners cause too many false positives on generic-detected pages
+  // (login pages, search forms, auth flows). Only attach them on confirmed ATS pages
+  // where we have high confidence this is actually a job application.
+  if (info.ats !== null && info.ats !== 'generic') {
+    document.querySelectorAll('button[type="submit"], input[type="submit"]').forEach((btn) => {
+      btn.addEventListener('click', () => setTimeout(send, 500))
     })
-  })
+  }
 }
 
 // Initial check (catches pages where the form is already in the DOM)

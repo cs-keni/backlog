@@ -16,9 +16,31 @@ export function detectAts(url: string): AtsType {
 function hasJobForm(): boolean {
   const inputs = document.querySelectorAll('input[type="text"], input[type="email"], textarea')
   if (inputs.length < 3) return false
-  // Look for email input — almost always present on job apps
-  const emailInput = document.querySelector('input[type="email"], input[name*="email"], input[id*="email"]')
-  return emailInput !== null
+
+  const emailInput = document.querySelector(
+    'input[type="email"], input[name*="email" i], input[id*="email" i]'
+  )
+  if (!emailInput) return false
+
+  // Require at least one strong job-application-specific signal beyond email.
+  // This prevents false positives on login pages, search pages, auth flows, etc.
+
+  // Resume file upload — the clearest single signal
+  if (document.querySelector('input[type="file"]')) return true
+
+  // LinkedIn or GitHub URL fields
+  if (document.querySelector(
+    'input[name*="linkedin" i], input[id*="linkedin" i], input[placeholder*="linkedin" i],' +
+    'input[name*="github" i], input[id*="github" i], input[placeholder*="github" i]'
+  )) return true
+
+  // Job-application-specific label text
+  const labelText = Array.from(document.querySelectorAll('label'))
+    .map((l) => l.textContent?.toLowerCase() ?? '')
+    .join(' ')
+  if (/\bresume\b|cover\s+letter|work\s+auth|\bsponsorship\b|\blinkedin\b|\bgithub\b|\bportfolio\b/i.test(labelText)) return true
+
+  return false
 }
 
 export function extractPageInfo(): PageInfo {

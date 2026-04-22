@@ -46,6 +46,7 @@ export async function POST(request: Request) {
         title: body.jobTitle ?? 'Unknown role',
         company: body.company ?? 'Unknown company',
         source: 'manual',
+        hide_from_feed: true,
         posted_at: new Date().toISOString(),
         fetched_at: new Date().toISOString(),
       })
