@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useRef } from 'react'
+import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import { SortOption } from '@/lib/jobs/types'
 import { LogApplicationModal } from '@/components/shared/LogApplicationModal'
@@ -12,6 +13,7 @@ interface FeedHeaderProps {
 }
 
 export function FeedHeader({ sort, onSortChange, onJobAdded }: FeedHeaderProps) {
+  const router = useRouter()
   const [urlInput, setUrlInput] = useState('')
   const [urlState, setUrlState] = useState<'idle' | 'loading' | 'success' | 'error' | 'js-rendered'>('idle')
   const [errorMsg, setErrorMsg] = useState('')
@@ -214,9 +216,9 @@ export function FeedHeader({ sort, onSortChange, onJobAdded }: FeedHeaderProps) 
       <AnimatePresence>
         {showLogModal && (
           <LogApplicationModal
-            onSuccess={(application) => {
-              onJobAdded(application.jobs.id)
+            onSuccess={() => {
               setShowLogModal(false)
+              router.push('/tracker')
             }}
             onClose={() => setShowLogModal(false)}
           />

@@ -63,6 +63,7 @@ export async function POST(request: Request) {
       is_remote: body.is_remote === true,
       experience_level: typeof body.experience_level === 'string' ? body.experience_level || null : null,
       source: 'manual',
+      hide_from_feed: true,
       posted_at: new Date().toISOString(),
       fetched_at: new Date().toISOString(),
     })

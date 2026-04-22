@@ -1,7 +1,8 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { Combobox, type Suggestion } from '@/components/ui/Combobox'
 import type { ApplicationWithJob, ApplicationStatus } from '@/lib/jobs/types'
 
 interface ExtractedJobData {
@@ -57,6 +58,28 @@ export function LogApplicationModal({ onSuccess, onClose }: LogApplicationModalP
 
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState('')
+
+  const fetchCompanySuggestions = useCallback(async (q: string): Promise<Suggestion[]> => {
+    try {
+      const res = await fetch(`/api/autocomplete/companies?q=${encodeURIComponent(q)}`)
+      if (!res.ok) return []
+      const data = await res.json() as { suggestions: Suggestion[] }
+      return data.suggestions ?? []
+    } catch {
+      return []
+    }
+  }, [])
+
+  const fetchLocationSuggestions = useCallback(async (q: string): Promise<Suggestion[]> => {
+    try {
+      const res = await fetch(`/api/autocomplete/locations?q=${encodeURIComponent(q)}`)
+      if (!res.ok) return []
+      const data = await res.json() as { suggestions: Suggestion[] }
+      return data.suggestions ?? []
+    } catch {
+      return []
+    }
+  }, [])
 
   async function handleExtract() {
     const u = urlInput.trim()
@@ -272,13 +295,13 @@ export function LogApplicationModal({ onSuccess, onClose }: LogApplicationModalP
                     <label className={labelClass}>
                       Company <span className="text-red-400 normal-case font-normal">*</span>
                     </label>
-                    <input
-                      type="text"
+                    <Combobox
                       value={company}
-                      onChange={(e) => setCompany(e.target.value)}
+                      onChange={setCompany}
+                      fetchSuggestions={fetchCompanySuggestions}
                       placeholder="Stripe"
+                      inputClassName={inputClass}
                       autoFocus
-                      className={inputClass}
                     />
                   </div>
                   <div>
@@ -298,12 +321,12 @@ export function LogApplicationModal({ onSuccess, onClose }: LogApplicationModalP
                 {/* Location */}
                 <div>
                   <label className={labelClass}>Location</label>
-                  <input
-                    type="text"
+                  <Combobox
                     value={location}
-                    onChange={(e) => setLocation(e.target.value)}
+                    onChange={setLocation}
+                    fetchSuggestions={fetchLocationSuggestions}
                     placeholder="Remote · New York, NY"
-                    className={inputClass}
+                    inputClassName={inputClass}
                   />
                 </div>
 

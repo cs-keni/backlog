@@ -431,6 +431,32 @@ Additional sources (LinkedIn, Indeed, Glassdoor) are deferred to a future phase 
 - [x] Integration tests: URL extractor identifies Greenhouse/Lever URLs correctly; feed query param builder verified
 - [ ] E2E test: login → feed loads → filter by remote → jobs update; paste Greenhouse URL → job appears in feed
 
+### Phase 4A — Manual Log UX
+
+Improvements to the "Log Application" modal — reduced friction for logging jobs you've already applied to outside Backlog.
+
+**`hide_from_feed` flag**
+- [x] Migration `supabase/migrations/017_add_hide_from_feed.sql` — add `hide_from_feed boolean NOT NULL DEFAULT false` to `jobs` table
+- [x] `/api/jobs/manual` sets `hide_from_feed = true` on insert — manually logged applications should never appear in the discovery feed
+- [x] `/api/jobs` GET feed query adds `.eq('hide_from_feed', false)` filter — "Add from URL" jobs (`/api/jobs/from-url`) are unaffected and remain visible in the feed
+
+**Autocomplete endpoints**
+- [x] `GET /api/autocomplete/companies?q=<query>` — ILIKE search on `company_profiles.name`; cross-references user's past `applications → jobs.company` to float previously-applied companies to the top; returns top 8 names; empty query returns user's most-recent companies
+- [x] `GET /api/autocomplete/locations?q=<query>` — queries distinct non-null `jobs.location` (excluding `hide_from_feed = true` rows to avoid a feedback loop from previously-logged manual entries); "Remote" and "Hybrid" always pinned at the top regardless of query; returns top 8
+
+**Reusable `<Combobox>` component** (`src/components/ui/Combobox.tsx`)
+- [x] Keyboard navigable — ↑/↓ moves highlight, Enter selects, Escape closes, Tab dismisses
+- [x] Framer Motion dropdown with staggered item entrance (12ms delay per item)
+- [x] Closes on blur (150ms delay allows click-on-suggestion to fire first); `onMouseDown` prevents default on list to keep input focused
+- [x] 150ms debounce on the fetch — avoids a request per keystroke
+- [x] Highlight matched substring in suggestion text
+- [x] Portal-rendered dropdown (`createPortal` to `document.body`) — escapes modal's `overflow-y: auto` clipping; position tracked with `getBoundingClientRect` on focus/change
+
+**Wire into `LogApplicationModal`**
+- [x] Company field → `<Combobox>` backed by `/api/autocomplete/companies`; previously-applied companies show "applied before" meta label
+- [x] Location field → `<Combobox>` backed by `/api/autocomplete/locations`; "Remote" and "Hybrid" always visible as first two items even before typing
+- [x] `FeedHeader` `onSuccess` handler updated to `router.push('/tracker')` — after logging from the feed, user lands on the tracker where the new card lives
+
 ### Phase 4 — Application Tracker
 
 - [x] Kanban board with drag-and-drop (`@dnd-kit/core` for DnD logic, Framer Motion for animation)

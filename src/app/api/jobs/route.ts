@@ -72,6 +72,7 @@ export async function GET(request: NextRequest) {
     )
     // RLS scopes applications to the current user automatically
     .eq('applications.user_id', user.id)
+    .eq('hide_from_feed', false)
 
   // Cursor-based pagination using fetched_at + id.
   // fetched_at is always non-null so it's safe to paginate on.
