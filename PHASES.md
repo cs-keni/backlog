@@ -1258,6 +1258,97 @@ No additional schema work needed. `jobs.source` already distinguishes `github` /
 
 ---
 
+### Phase 14 — DSA Spaced Repetition Tracker (NeetCode 150)
+
+A lightweight LeetCode study tracker integrated into Backlog. Tracks which NeetCode 150 problems you've solved and automatically schedules review sessions using spaced repetition (same day → +1 → +3 → +7 → +14 days). No built-in editor — you solve on neetcode.io or leetcode.com, then log it here.
+
+**Architecture decisions locked (2026-04-28 eng review):**
+- New `/dsa` route with sidebar nav item (separate from job-specific `/prep`)
+- Problem list is a static JSON file (`src/lib/dsa/neetcode150.ts`) — no DB table
+- Review schedule is fixed from original solve date, not shifted by late completions
+- Re-solving a problem resets the chain (deletes old pending reviews, starts fresh)
+- `solved_at` stored as ISO date string from client to avoid UTC timezone drift
+
+#### DB Migration
+
+- [x] Migration `018_add_dsa_tables.sql`: create `lc_solves` and `lc_reviews` tables
+  - `lc_solves`: `id`, `user_id`, `problem_slug`, `problem_title`, `pattern`, `difficulty`, `solved_at` (date), `created_at`
+  - `lc_reviews`: `id`, `user_id` (denormalized for RLS), `solve_id → lc_solves`, `scheduled_for` (date), `completed_at` (timestamptz)
+  - Indexes: `(user_id, problem_slug)` on `lc_solves`; `(user_id, scheduled_for)` on `lc_reviews`
+  - RLS: own-rows policies on both tables
+  - Trigger: on `lc_reviews` INSERT, verify `lc_solves.user_id = NEW.user_id` (prevent solve_id/user_id mismatch)
+
+#### Problem List
+
+- [x] `src/lib/dsa/neetcode150.ts` — static array of all 150 problems with `slug`, `title`, `pattern`, `difficulty`, `url`
+  - Patterns: Arrays & Hashing, Two Pointers, Sliding Window, Stack, Binary Search, Linked List, Trees, Tries, Heap / Priority Queue, Backtracking, Graphs, Advanced Graphs, 1D DP, 2D DP, Greedy, Intervals, Math & Geometry, Bit Manipulation
+
+#### Scheduling Logic
+
+- [x] `src/lib/dsa/schedule.ts` — pure functions only
+  - `SR_INTERVALS_DAYS = [0, 1, 3, 7, 14]` — named constant
+  - `computeReviewDates(solvedAt: string): string[]` — returns 5 ISO date strings
+
+#### API Routes
+
+- [x] `GET /api/dsa/solves` — returns all `lc_solves` with their associated `lc_reviews` (single JOIN query, no N+1)
+- [x] `POST /api/dsa/solves` — logs a solve:
+  1. Delete all pending (uncompleted) `lc_reviews` for the same `problem_slug` + `user_id`
+  2. Upsert `lc_solves` row (insert or update `solved_at` if already exists)
+  3. Insert 5 new `lc_reviews` rows using `computeReviewDates(solved_at)`
+- [x] `PATCH /api/dsa/reviews/[id]` — sets `completed_at = now()` for a review the user owns
+
+#### UI Components
+
+- [x] `src/app/(app)/dsa/page.tsx` — server component, renders `<DSAClient />`
+- [x] `src/components/dsa/DSAClient.tsx` — main client component, fetches data, renders three panels
+- [x] `src/components/dsa/TodayPanel.tsx`
+  - Lists all reviews where `scheduled_for <= today AND completed_at IS NULL`
+  - Shows overdue badge (orange) vs due-today badge (blue)
+  - Each card: problem title, pattern tag, difficulty badge, "Mark Done" button
+  - "Mark Done" triggers optimistic update + PATCH call
+  - Empty state: "All caught up for today" message
+- [x] `src/components/dsa/CalendarView.tsx`
+  - Month grid (no library — vanilla Tailwind grid)
+  - Each day cell shows review count badge if > 0
+  - Today highlighted
+  - Framer Motion staggered entrance on month change
+- [x] `src/components/dsa/ProblemLogger.tsx`
+  - Search/filter the 150 problems by title or pattern
+  - "Log Solve" button per problem — triggers POST
+  - Shows "Already solved" indicator if solve exists
+  - Re-solve confirmation prompt ("This will reset your review chain")
+- [x] Add "DSA" nav item to `src/components/layout/Sidebar.tsx` (between Prep and Profile)
+
+#### Bulk Backfill
+
+- [x] "Log past solves" mode in `ProblemLogger`
+  - Multi-select problems
+  - Date picker defaulting to today (allows setting a past date)
+  - Reviews computed from selected date, but any review dates in the past are skipped (only future reviews created)
+
+#### Tests
+
+- [x] `src/tests/unit/dsa-schedule.test.ts`
+  - `computeReviewDates` returns 5 correct ISO dates
+  - Month boundary edge case (e.g., Jan 30 → Feb 3, Feb 10, Feb 17)
+- [x] `src/tests/integration/dsa-solves.test.ts`
+  - POST creates `lc_solves` row + 5 `lc_reviews`
+  - POST for already-solved problem deletes old pending reviews and creates fresh chain
+  - Unauthenticated POST returns 401
+- [x] `src/tests/integration/dsa-reviews.test.ts`
+  - PATCH sets `completed_at`
+  - GET returns overdue reviews correctly
+  - RLS: PATCH on another user's review is blocked
+- [ ] `src/tests/e2e/dsa.spec.ts`
+  - Daily workflow: open `/dsa`, see due reviews, mark complete, log new solve, see tomorrow in calendar
+
+#### TODO (deferred, captured)
+
+- Atomic re-solve transaction: the POST currently does DELETE + INSERT in two Supabase calls. A server crash between them leaves the user with a solve but no review chain. Fix: Postgres stored procedure wrapping the whole operation in a transaction.
+
+---
+
 ## Future / Long-Term
 
 - [ ] Additional job sources: LinkedIn, Indeed, Glassdoor (when scraping strategy is solid)
@@ -1274,11 +1365,11 @@ No additional schema work needed. `jobs.source` already distinguishes `github` /
 | Review | Trigger | Why | Runs | Status | Findings |
 |--------|---------|-----|------|--------|----------|
 | CEO Review | `/plan-ceo-review` | Scope & strategy | 0 | — | — |
-| Outside Voice | Claude subagent | Independent 2nd opinion | 1 | issues_found | 10 issues raised, 4 critical incorporated into plan |
-| Eng Review | `/plan-eng-review` | Architecture & tests (required) | 1 | CLEAR (PLAN) | 6 issues found, all resolved |
+| Outside Voice | Claude subagent | Independent 2nd opinion | 2 | issues_found | Phase 14 (DSA): 8 issues raised, 3 incorporated into plan |
+| Eng Review | `/plan-eng-review` | Architecture & tests (required) | 2 | CLEAR (PLAN) | Phase 14 (DSA): 4 issues, all resolved |
 | Design Review | `/plan-design-review` | UI/UX gaps | 0 | — | — |
 
-**OUTSIDE VOICE:** 10 issues raised. 4 incorporated: (1) Tier 2 must not overwrite Tier 1, (2) `chrome.storage.session` is session-scoped not tab-scoped — need tabId key + onRemoved cleanup, (3) `history.pushState` patching requires `world: MAIN` for CSP-strict sites, (4) multi-page review must store filled fields at fill time (DOM is gone post-navigation). Remaining 6 are known risks accepted for personal-tool scope.
+**OUTSIDE VOICE (Phase 14 — DSA Tracker, 2026-04-28):** 8 issues raised. 3 incorporated: (1) backfill story added (bulk-log past solves with past-date support), (2) RLS integrity trigger added (verify solve_id.user_id = review.user_id on INSERT), (3) day-0 review kept per user preference (user chose to keep it). Remaining 5: same-day review efficacy (user's call), timezone drift (non-issue for single-user same-timezone tool), two-table complexity (stored dates needed for calendar queries), strategic fit (intentional bundling for job-search context), skip affordance (overdue reviews cover this).
 
 **UNRESOLVED:** 0 decisions open.
 
