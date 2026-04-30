@@ -19,6 +19,7 @@ import { ApplicationList } from './ApplicationList'
 import { LogApplicationModal } from '@/components/shared/LogApplicationModal'
 import type { ApplicationWithJob, ApplicationStatus } from '@/lib/jobs/types'
 import { useToast } from '@/components/ui/Toaster'
+import { EmptyState } from '@/components/ui/EmptyState'
 
 interface TrackerBoardProps {
   initialApplications: ApplicationWithJob[]
@@ -290,21 +291,21 @@ export function TrackerBoard({ initialApplications }: TrackerBoardProps) {
       {/* Empty state */}
       {applications.length === 0 && (
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-          <div className="text-center space-y-3">
-            <p className="text-sm font-medium text-zinc-300">No applications yet</p>
-            <p className="text-xs text-zinc-600 max-w-[260px] leading-relaxed">
-              Save or apply to jobs from the feed, or log an application you already sent.
-            </p>
-            <button
-              onClick={() => setShowLogModal(true)}
-              className="pointer-events-auto inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg bg-zinc-800 border border-zinc-700 text-zinc-300 hover:text-zinc-100 hover:border-zinc-600 transition-colors"
-            >
-              <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-              </svg>
-              Log your first application
-            </button>
-          </div>
+          <EmptyState
+            variant="kanban"
+            title="No applications yet"
+            description="Save or apply to jobs from the feed, or log an application you already sent."
+            action={{
+              label: 'Log your first application',
+              onClick: () => setShowLogModal(true),
+              icon: (
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                </svg>
+              ),
+            }}
+            className="pointer-events-auto"
+          />
         </div>
       )}
     </div>

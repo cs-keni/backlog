@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { motion } from 'framer-motion'
 import { MaterialsSection } from './MaterialsSection'
+import { EmptyState } from '@/components/ui/EmptyState'
 import { QuestionBank } from './QuestionBank'
 import { StarResponseSection } from './StarResponseSection'
 import { CompanyIntelligence } from './CompanyIntelligence'
@@ -68,12 +69,12 @@ function ApplicationPicker() {
   if (apps.length === 0) {
     return (
       <div className="flex h-full items-center justify-center p-6">
-        <div className="text-center space-y-2">
-          <p className="text-sm text-zinc-400">No active applications to prep for.</p>
-          <Link href="/feed" className="text-xs text-zinc-600 hover:text-zinc-400 transition-colors">
-            Browse jobs →
-          </Link>
-        </div>
+        <EmptyState
+          variant="telescope"
+          title="No active applications"
+          description="Apply to a role from the feed and come back here to generate interview questions, build STAR responses, and tailor your resume."
+          action={{ label: 'Browse jobs', onClick: () => { window.location.href = '/feed' } }}
+        />
       </div>
     )
   }

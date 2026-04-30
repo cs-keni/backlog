@@ -542,15 +542,15 @@ Improvements to the "Log Application" modal — reduced friction for logging job
 
 ### Phase 9 — Analytics
 
-- [ ] `/analytics` page
-- [ ] Jobs posted today + 7-day rolling average chart
-- [ ] Application activity chart with weekly / monthly / yearly toggle (Recharts)
-- [ ] Application funnel visualization (stacked bar or Sankey)
-- [ ] Response rate metric
-- [ ] Most active companies hiring right now
-- [ ] Time-to-first-response distribution (derived from `application_timeline`)
-- [ ] Dashboard mini-stats strip + 30-day sparkline
-- [ ] Breakdown of manually-added jobs (`source = 'manual'`) vs aggregated feed jobs (`github` / `portal`)
+- [x] `/analytics` page — `src/app/(app)/analytics/page.tsx`
+- [x] Jobs posted today + 7-day rolling average chart — area chart in analytics page
+- [x] Application activity chart with weekly / monthly / yearly toggle (Recharts) — bar chart with 7d/30d/1y toggle
+- [x] Application funnel visualization (stacked bar or Sankey) — horizontal bar chart per status with color coding
+- [x] Response rate metric — stat card + outcomes breakdown panel
+- [x] Most active companies hiring right now — ranked list with mini bar chart
+- [x] Time-to-first-response distribution (derived from `application_timeline`) — median days to response
+- [x] Dashboard mini-stats strip + 30-day sparkline — `DashboardClient.tsx` with stats strip + Recharts sparkline
+- [x] Breakdown of manually-added jobs (`source = 'manual'`) vs aggregated feed jobs (`github` / `portal`) — source breakdown widget
 - [ ] Integration tests: analytics API routes return correct aggregations
 
 #### 9b — Company Graph View
@@ -568,19 +568,19 @@ A force-directed interactive graph that gives you a spatial "map" of your job se
   - Red — rejected
 - **Edges connect companies that share tech stack tags** — Jaccard similarity on `jobs.tags[]`; only edges above a threshold (e.g. 0.3) are drawn, so the graph doesn't become a hairball
 - **Clusters emerge naturally** from the force simulation — ML/AI companies pull together, fintech groups together, consumer SaaS groups together; no manual categorization needed
-- **Clicking a node** opens that company's panel (same drawer as in the feed)
-- **Hovering** shows a tooltip: application status, number of open roles, top shared tags with your profile
+- **Clicking a node** navigates to feed filtered for that company
+- **Hovering** shows a tooltip: application status, number of open roles
 
 **Implementation:**
 - `react-force-graph-2d` — wraps D3 force simulation, performant in React, supports custom node rendering via Canvas
-- Graph data computed server-side at request time: `GET /api/analytics/company-graph` returns `{ nodes: [{id, name, roleCount, applicationStatus}], edges: [{source, target, weight}] }`; edges built from tag Jaccard across all companies with at least 1 open role
-- Framer Motion handles the entrance — graph fades in as nodes settle into position
-- Toggle between graph view and standard chart view on the analytics page
+- Graph data computed server-side at request time: `GET /api/analytics/company-graph` returns `{ nodes, edges }`; edges built from tag Jaccard across all companies with at least 1 open role; top 60 companies by role count
+- Framer Motion entrance — graph fades in as nodes settle into position
+- Toggle between "Charts" and "Map" view on the analytics page
 
-- [ ] `src/app/api/analytics/company-graph/route.ts` — compute nodes (all companies with open roles + user application status) and edges (tag Jaccard ≥ 0.3); return serialized graph
-- [ ] `src/components/analytics/CompanyGraph.tsx` — `react-force-graph-2d` canvas component; custom node renderer (circle + company letter avatar); color by application status; tooltip on hover; click → open company panel
-- [ ] Add `react-force-graph-2d` to dependencies
-- [ ] Toggle between "Charts" and "Map" view on the analytics page
+- [x] `src/app/api/analytics/company-graph/route.ts` — compute nodes + edges (Jaccard ≥ 0.25); return serialized graph
+- [x] `src/components/analytics/CompanyGraph.tsx` — `react-force-graph-2d` canvas component; custom node renderer (colored circles + initials); glow ring for active applications; tooltip on hover; click → feed search
+- [x] `react-force-graph-2d` added to `package.json` dependencies
+- [x] Toggle between "Charts" and "Map" view on the analytics page; range picker hidden in Map mode
 
 ### Phase 10 — Browser Extension (Auto-Fill)
 
@@ -1251,7 +1251,7 @@ No additional schema work needed. `jobs.source` already distinguishes `github` /
 - [x] Full mobile-responsive layout audit — `AppShell` replaces raw flex layout; desktop sidebar hidden on mobile; bottom tab bar added; slide-in hamburger menu for full nav on mobile; main content padded for top/bottom bars
 - [x] Optimistic UI updates across all mutations with rollback on failure — tracker drag already had rollback; toast feedback added on failure
 - [ ] Onboarding flow for first login (resume upload + profile completion + notification prefs + alert config)
-- [ ] Empty state illustrations
+- [x] Empty state illustrations — `EmptyState` component with 5 SVG variants (telescope, kanban, chart, search, check); wired into feed (no results), tracker kanban + list view, prep (no active applications); Framer Motion staggered entrance
 - [ ] Performance audit: lazy loading, image optimization, query caching
 - [ ] PWA manifest + service worker for offline basic functionality
 - [ ] Full E2E test suite review — cover all critical paths across phases

@@ -11,6 +11,7 @@ import { FeedHeader } from './FeedHeader'
 import { FilterSidebar } from './FilterSidebar'
 import { FeedSkeleton } from './JobSkeleton'
 import { useToast } from '@/components/ui/Toaster'
+import { EmptyState } from '@/components/ui/EmptyState'
 
 interface Cursor {
   cursor: string
@@ -329,15 +330,13 @@ export function JobFeed({ initialJobId }: JobFeedProps) {
                 </button>
               </div>
             ) : jobs.length === 0 ? (
-              <div className="text-center py-16 space-y-2">
-                <p className="text-sm text-zinc-500">No jobs match your filters.</p>
-                <button
-                  onClick={() => setFilters(DEFAULT_FILTERS)}
-                  className="text-xs text-zinc-600 hover:text-zinc-400 underline"
-                >
-                  Clear filters
-                </button>
-              </div>
+              <EmptyState
+                variant="search"
+                title="No jobs match your filters"
+                description="Try widening your search — remove a filter or expand the date range."
+                secondaryAction={{ label: 'Clear filters', onClick: () => setFilters(DEFAULT_FILTERS) }}
+                className="py-16"
+              />
             ) : (
               <>
                 {jobs.map((job, i) => (

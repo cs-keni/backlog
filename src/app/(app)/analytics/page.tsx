@@ -1,10 +1,12 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
 import {
   BarChart, Bar, AreaChart, Area,
   XAxis, YAxis, Tooltip, ResponsiveContainer, Cell,
 } from 'recharts'
+import { CompanyGraph } from '@/components/analytics/CompanyGraph'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -92,7 +94,10 @@ const CHART_TOOLTIP_STYLE = {
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
+type Tab = 'charts' | 'map'
+
 export default function AnalyticsPage() {
+  const [tab, setTab] = useState<Tab>('charts')
   const [range, setRange] = useState<Range>('30d')
   const [data, setData] = useState<AnalyticsData | null>(null)
   const [loading, setLoading] = useState(true)
@@ -112,27 +117,76 @@ export default function AnalyticsPage() {
       <div className="max-w-5xl mx-auto px-5 py-8 space-y-8">
 
         {/* Header */}
-        <div className="flex items-center justify-between">
+        <div className="flex items-start justify-between gap-4 flex-wrap">
           <div>
             <h1 className="text-lg font-semibold text-zinc-100">Analytics</h1>
             <p className="text-sm text-zinc-500 mt-0.5">Your job search at a glance</p>
           </div>
-          <div className="flex gap-1 bg-zinc-900 border border-zinc-800 rounded-lg p-1">
-            {(['7d', '30d', '1y'] as Range[]).map((r) => (
-              <button
-                key={r}
-                onClick={() => setRange(r)}
-                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
-                  range === r ? 'bg-zinc-700 text-zinc-100' : 'text-zinc-500 hover:text-zinc-300'
-                }`}
-              >
-                {r === '7d' ? '7 days' : r === '30d' ? '30 days' : '1 year'}
-              </button>
-            ))}
+          <div className="flex items-center gap-2">
+            {/* Charts / Map tab */}
+            <div className="flex gap-1 bg-zinc-900 border border-zinc-800 rounded-lg p-1">
+              {(['charts', 'map'] as Tab[]).map((t) => (
+                <button
+                  key={t}
+                  onClick={() => setTab(t)}
+                  className={`relative px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                    tab === t ? 'text-zinc-100' : 'text-zinc-500 hover:text-zinc-300'
+                  }`}
+                >
+                  {tab === t && (
+                    <motion.span
+                      layoutId="analytics-tab-pill"
+                      className="absolute inset-0 rounded-md bg-zinc-700"
+                      transition={{ type: 'spring', stiffness: 400, damping: 35 }}
+                    />
+                  )}
+                  <span className="relative capitalize">{t === 'charts' ? '📊 Charts' : '🗺 Map'}</span>
+                </button>
+              ))}
+            </div>
+            {/* Range picker — only shown on charts tab */}
+            <AnimatePresence>
+              {tab === 'charts' && (
+                <motion.div
+                  initial={{ opacity: 0, x: 8 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: 8 }}
+                  transition={{ duration: 0.15 }}
+                  className="flex gap-1 bg-zinc-900 border border-zinc-800 rounded-lg p-1"
+                >
+                  {(['7d', '30d', '1y'] as Range[]).map((r) => (
+                    <button
+                      key={r}
+                      onClick={() => setRange(r)}
+                      className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                        range === r ? 'bg-zinc-700 text-zinc-100' : 'text-zinc-500 hover:text-zinc-300'
+                      }`}
+                    >
+                      {r === '7d' ? '7d' : r === '30d' ? '30d' : '1y'}
+                    </button>
+                  ))}
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
         </div>
 
-        {loading ? (
+        {/* Company map tab */}
+        {tab === 'map' && (
+          <motion.div
+            key="map"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="rounded-xl border border-zinc-800 bg-zinc-900/40 overflow-hidden"
+            style={{ height: 560 }}
+          >
+            <CompanyGraph />
+          </motion.div>
+        )}
+
+        {tab === 'charts' && (loading ? (
           <AnalyticsSkeleton />
         ) : !data ? (
           <p className="text-sm text-zinc-500">Failed to load analytics.</p>
@@ -364,7 +418,7 @@ export default function AnalyticsPage() {
             </div>
 
           </>
-        )}
+        ))}
       </div>
     </div>
   )

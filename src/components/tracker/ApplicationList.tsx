@@ -3,6 +3,7 @@
 import { useState, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import type { ApplicationWithJob, ApplicationStatus } from '@/lib/jobs/types'
+import { EmptyState } from '@/components/ui/EmptyState'
 
 const STATUS_COLORS: Record<ApplicationStatus, string> = {
   saved:        'bg-zinc-700/60 text-zinc-300 border-zinc-600',
@@ -263,9 +264,12 @@ export function ApplicationList({ applications, selectedId, onSelect }: Applicat
         </table>
 
         {sorted.length === 0 && (
-          <div className="flex items-center justify-center py-16 text-zinc-600 text-sm">
-            {search ? 'No matches found' : 'No applications'}
-          </div>
+          <EmptyState
+            variant={search ? 'search' : 'kanban'}
+            title={search ? 'No matches found' : 'No applications yet'}
+            description={search ? `No applications match "${search}"` : 'Applications you log or save will appear here.'}
+            className="py-16"
+          />
         )}
       </div>
     </div>
