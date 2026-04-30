@@ -226,7 +226,7 @@ export function ProfileClient({
 
       {/* Personal Info */}
       <Section title="Personal Info">
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <Field label="Full Name">
             <Input
               value={profile.full_name ?? ''}
@@ -300,7 +300,7 @@ export function ProfileClient({
 
       {/* Experience */}
       <Section title="Experience">
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <Field label="Experience Level">
             <Select
               value={profile.experience_level ?? ''}
@@ -392,7 +392,7 @@ export function ProfileClient({
 
       {/* Job Preferences */}
       <Section title="Job Preferences">
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <Field label="Remote Preference">
             <Select
               value={profile.remote_preference ?? ''}
@@ -468,7 +468,7 @@ export function ProfileClient({
         <p className="text-xs text-zinc-500 -mt-2">
           Used by the browser extension to auto-fill EEO self-identification and salary fields. All fields are optional and stored only in your profile.
         </p>
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <Field label="Gender">
             <Select
               value={profile.gender ?? ''}
@@ -509,7 +509,7 @@ export function ProfileClient({
             <option value="Decline">Decline to self-identify</option>
           </Select>
         </Field>
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <Field label="Veteran Status">
             <Select
               value={profile.veteran_status ?? ''}

@@ -47,6 +47,7 @@ export function NotificationSettings({ initialPrefs, recentLogs, vapidPublicKey 
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved'>('idle')
   const [pushState, setPushState] = useState<'idle' | 'loading' | 'subscribed' | 'unsupported'>('idle')
   const [pushSubscription, setPushSubscription] = useState<PushSubscription | null>(null)
+  const [pushError, setPushError] = useState<string | null>(null)
 
   // Check current push subscription state on mount
   useEffect(() => {
@@ -82,13 +83,19 @@ export function NotificationSettings({ initialPrefs, recentLogs, vapidPublicKey 
   }
 
   async function enablePush() {
+    setPushError(null)
     if (!vapidPublicKey) {
-      alert('Push notifications are not configured yet (missing VAPID keys).')
+      setPushError('Push notifications are not configured on this server yet.')
       return
     }
     setPushState('loading')
     try {
       const permission = await Notification.requestPermission()
+      if (permission === 'denied') {
+        setPushError('Permission denied. Allow notifications in your browser settings.')
+        setPushState('idle')
+        return
+      }
       if (permission !== 'granted') {
         setPushState('idle')
         return
@@ -111,6 +118,7 @@ export function NotificationSettings({ initialPrefs, recentLogs, vapidPublicKey 
       setPrefs(p => ({ ...p, notification_push: true }))
     } catch (err) {
       console.error('Push subscription failed:', err)
+      setPushError('Failed to enable push notifications. Please try again.')
       setPushState('idle')
     }
   }
@@ -203,6 +211,14 @@ export function NotificationSettings({ initialPrefs, recentLogs, vapidPublicKey 
               <p className="text-xs text-zinc-500">Push active on this browser</p>
             </div>
           )}
+          {pushError && (
+            <div className="px-4 py-3 flex items-start gap-2 border-t border-zinc-800">
+              <svg className="h-3.5 w-3.5 shrink-0 text-red-400 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+              </svg>
+              <p className="text-xs text-red-400">{pushError}</p>
+            </div>
+          )}
         </div>
       </section>
 
@@ -281,9 +297,9 @@ export function NotificationSettings({ initialPrefs, recentLogs, vapidPublicKey 
       </section>
 
       {/* Notification log */}
-      {recentLogs.length > 0 && (
-        <section className="space-y-4">
-          <h2 className="text-sm font-semibold text-zinc-200">Recent notifications</h2>
+      <section className="space-y-4">
+        <h2 className="text-sm font-semibold text-zinc-200">Recent notifications</h2>
+        {recentLogs.length > 0 ? (
           <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 divide-y divide-zinc-800 overflow-hidden">
             {recentLogs.map(log => (
               <div key={log.id} className="flex items-center gap-3 px-4 py-3">
@@ -299,8 +315,12 @@ export function NotificationSettings({ initialPrefs, recentLogs, vapidPublicKey 
               </div>
             ))}
           </div>
-        </section>
-      )}
+        ) : (
+          <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 px-4 py-6 text-center">
+            <p className="text-xs text-zinc-600">No notifications sent yet</p>
+          </div>
+        )}
+      </section>
     </div>
   )
 }

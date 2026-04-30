@@ -527,16 +527,18 @@ Improvements to the "Log Application" modal — reduced friction for logging job
 
 ### Phase 8 — Notifications & Alerts
 
-- [ ] Notification preferences UI: match threshold, role types, channels, quiet hours (maps to `users.notification_quiet_hours_start/end`)
-- [ ] Push subscription UI: "Enable browser notifications" button → calls `Notification.requestPermission()` → subscribes with VAPID public key → saves subscription to `push_subscriptions` table
+- [x] Notification preferences UI: match threshold, channels (email/push), quiet hours — full settings page at `/settings` (`src/components/settings/NotificationSettings.tsx`)
+- [x] Push subscription UI: "Enable browser notifications" button → calls `Notification.requestPermission()` → subscribes with VAPID public key → saves subscription to `push_subscriptions` table (`src/app/api/notifications/subscribe/route.ts`)
+- [x] Settings PATCH API (`src/app/api/settings/route.ts`) — saves all preference changes to DB
+- [x] Service worker (`public/sw.js`) — handles incoming push events and notification-click routing
+- [x] Notification log page in settings — renders recent `notification_log` rows with channel icon, job name, and timestamp
 - [ ] Dispatcher (`lib/notifications/dispatcher.ts`):
   - Before sending any alert, check `notification_log` for (user_id, job_id, channel) — skip if already sent
   - Respect quiet hours before sending
   - Send across all configured channels for a matching job
 - [ ] Email alerts via Resend (`lib/notifications/email.ts`)
 - [ ] Browser push notifications via Web Push API (`lib/notifications/push.ts`) — reads `push_subscriptions` table to find user's registered browser endpoints; requires VAPID keys in env
-- [ ] SMS alerts via Twilio (`lib/notifications/sms.ts`)
-- [ ] Notification log page in settings
+- [ ] SMS alerts via Twilio (`lib/notifications/sms.ts`) — deferred; requires Twilio credentials
 - [ ] Unit tests: threshold matching logic, quiet hours check, deduplication
 - [ ] Integration test: new job inserted → dispatcher fires for matching user → notification_log row created → second run for same job does not resend
 
@@ -1248,7 +1250,7 @@ No additional schema work needed. `jobs.source` already distinguishes `github` /
 - [x] Keyboard shortcuts (`F`, `K`/`J`, `A`, `?`, `Cmd+K`) — global handler in AppShell; J/K navigate feed cards, A quick-applies to selected, F focuses filter, ? opens cheatsheet modal
 - [x] Command palette with fuzzy search via `cmdk` (jobs, applications, pages) — `CommandPalette.tsx`; triggered by `Cmd/Ctrl+K` or sidebar search button; searches jobs + applications + page nav
 - [x] Toast notification system — `ToastProvider` + `useToast` hook; wired into quick-apply, drag-to-move, log-application; spring-animated, bottom-right, auto-dismiss 4s
-- [x] Full mobile-responsive layout audit — `AppShell` replaces raw flex layout; desktop sidebar hidden on mobile; bottom tab bar added; slide-in hamburger menu for full nav on mobile; main content padded for top/bottom bars
+- [x] Full mobile-responsive layout audit — `AppShell` replaces raw flex layout; desktop sidebar hidden on mobile; bottom tab bar added; slide-in hamburger menu for full nav on mobile; main content padded for top/bottom bars; profile grids use `sm:grid-cols-2`; DSA page uses tab-based mobile layout (Today / Calendar / Problems) with due-count badge on Today tab
 - [x] Optimistic UI updates across all mutations with rollback on failure — tracker drag already had rollback; toast feedback added on failure
 - [ ] Onboarding flow for first login (resume upload + profile completion + notification prefs + alert config)
 - [x] Empty state illustrations — `EmptyState` component with 5 SVG variants (telescope, kanban, chart, search, check); wired into feed (no results), tracker kanban + list view, prep (no active applications); Framer Motion staggered entrance
