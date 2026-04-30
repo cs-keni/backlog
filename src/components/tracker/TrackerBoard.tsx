@@ -18,6 +18,7 @@ import { ApplicationDetail } from './ApplicationDetail'
 import { ApplicationList } from './ApplicationList'
 import { LogApplicationModal } from '@/components/shared/LogApplicationModal'
 import type { ApplicationWithJob, ApplicationStatus } from '@/lib/jobs/types'
+import { useToast } from '@/components/ui/Toaster'
 
 interface TrackerBoardProps {
   initialApplications: ApplicationWithJob[]
@@ -34,6 +35,7 @@ const COLUMNS: { id: ApplicationStatus; label: string; color: string; dot: strin
 ]
 
 export function TrackerBoard({ initialApplications }: TrackerBoardProps) {
+  const { toast } = useToast()
   const [applications, setApplications] = useState<ApplicationWithJob[]>(initialApplications)
   const [activeId, setActiveId] = useState<string | null>(null)
   const [selectedId, setSelectedId] = useState<string | null>(null)
@@ -73,6 +75,9 @@ export function TrackerBoard({ initialApplications }: TrackerBoardProps) {
       prev.map((a) => a.id === appId ? { ...a, status: newStatus, last_updated: new Date().toISOString() } : a)
     )
 
+    const colLabel = COLUMNS.find((c) => c.id === newStatus)?.label ?? newStatus
+    toast({ type: 'success', title: `Moved to ${colLabel}`, description: app.jobs?.title })
+
     // Persist with rollback on failure
     fetch(`/api/applications/${appId}`, {
       method: 'PATCH',
@@ -82,11 +87,13 @@ export function TrackerBoard({ initialApplications }: TrackerBoardProps) {
       setApplications((prev) =>
         prev.map((a) => a.id === appId ? { ...a, status: oldStatus } : a)
       )
+      toast({ type: 'error', title: 'Failed to save — reverted' })
     }).then((res) => {
       if (res && !res.ok) {
         setApplications((prev) =>
           prev.map((a) => a.id === appId ? { ...a, status: oldStatus } : a)
         )
+        toast({ type: 'error', title: 'Failed to save — reverted' })
       }
     })
   }
@@ -134,7 +141,8 @@ export function TrackerBoard({ initialApplications }: TrackerBoardProps) {
     setApplications((prev) => [application, ...prev])
     setShowLogModal(false)
     setSelectedId(application.id)
-  }, [])
+    toast({ type: 'success', title: 'Application logged', description: `${application.jobs?.title ?? 'Job'} at ${application.jobs?.company ?? ''}` })
+  }, [toast])
 
   const appsByStatus = COLUMNS.reduce<Record<string, ApplicationWithJob[]>>((acc, col) => {
     acc[col.id] = visibleApps.filter((a) => a.status === col.id)

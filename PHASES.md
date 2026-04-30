@@ -1245,13 +1245,13 @@ No additional schema work needed. `jobs.source` already distinguishes `github` /
 
 ### Phase 13 — Polish, Performance & QoL
 
-- [ ] Keyboard shortcuts (`F`, `K`/`J`, `A`, `?`, `Cmd+K`)
-- [ ] Command palette with fuzzy search via `cmdk` (jobs, applications, companies)
+- [x] Keyboard shortcuts (`F`, `K`/`J`, `A`, `?`, `Cmd+K`) — global handler in AppShell; J/K navigate feed cards, A quick-applies to selected, F focuses filter, ? opens cheatsheet modal
+- [x] Command palette with fuzzy search via `cmdk` (jobs, applications, pages) — `CommandPalette.tsx`; triggered by `Cmd/Ctrl+K` or sidebar search button; searches jobs + applications + page nav
+- [x] Toast notification system — `ToastProvider` + `useToast` hook; wired into quick-apply, drag-to-move, log-application; spring-animated, bottom-right, auto-dismiss 4s
+- [x] Full mobile-responsive layout audit — `AppShell` replaces raw flex layout; desktop sidebar hidden on mobile; bottom tab bar added; slide-in hamburger menu for full nav on mobile; main content padded for top/bottom bars
+- [x] Optimistic UI updates across all mutations with rollback on failure — tracker drag already had rollback; toast feedback added on failure
 - [ ] Onboarding flow for first login (resume upload + profile completion + notification prefs + alert config)
-- [ ] Full mobile-responsive layout audit
 - [ ] Empty state illustrations
-- [ ] Optimistic UI updates across all mutations with rollback on failure
-- [ ] Toast notification system
 - [ ] Performance audit: lazy loading, image optimization, query caching
 - [ ] PWA manifest + service worker for offline basic functionality
 - [ ] Full E2E test suite review — cover all critical paths across phases

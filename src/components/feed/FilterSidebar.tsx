@@ -1,12 +1,13 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { DateRange, FeedFilters } from '@/lib/jobs/types'
 
 interface FilterSidebarProps {
   filters: FeedFilters
   onChange: (filters: FeedFilters) => void
+  onFocusRef?: React.MutableRefObject<(() => void) | null>
 }
 
 const EXPERIENCE_LEVELS = [
@@ -31,8 +32,18 @@ const DATE_RANGES: { value: DateRange; label: string }[] = [
   { value: '1y', label: '1 year' },
 ]
 
-export function FilterSidebar({ filters, onChange }: FilterSidebarProps) {
+export function FilterSidebar({ filters, onChange, onFocusRef }: FilterSidebarProps) {
   const [isOpen, setIsOpen] = useState(true)
+  const locationRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    if (onFocusRef) {
+      onFocusRef.current = () => {
+        setIsOpen(true)
+        setTimeout(() => locationRef.current?.focus(), 50)
+      }
+    }
+  }, [onFocusRef])
 
   function update(patch: Partial<FeedFilters>) {
     onChange({ ...filters, ...patch })
@@ -136,6 +147,7 @@ export function FilterSidebar({ filters, onChange }: FilterSidebarProps) {
               <div className="space-y-1.5">
                 <label className="text-[11px] text-zinc-500 font-medium">Location</label>
                 <input
+                  ref={locationRef}
                   type="text"
                   value={filters.location}
                   onChange={(e) => update({ location: e.target.value })}

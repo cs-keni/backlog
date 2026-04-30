@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { Job } from '@/lib/jobs/types'
+import { useToast } from '@/components/ui/Toaster'
 
 interface JobCardProps {
   job: Job
@@ -159,6 +160,7 @@ function companyAvatar(name: string): { initials: string; color: string } {
 }
 
 export function JobCard({ job, isSelected, onClick, onQuickApply, index }: JobCardProps) {
+  const { toast } = useToast()
   const logoUrls = getLogoUrls(job.company, job.url)
   const [logoSourceIndex, setLogoSourceIndex] = useState(0)
   const [quickApplyState, setQuickApplyState] = useState<'idle' | 'loading' | 'done'>('idle')
@@ -185,11 +187,14 @@ export function JobCard({ job, isSelected, onClick, onQuickApply, index }: JobCa
       if (res.ok) {
         setQuickApplyState('done')
         onQuickApply(job.id)
+        toast({ type: 'success', title: 'Marked as applied', description: `${job.title} at ${job.company}` })
       } else {
         setQuickApplyState('idle')
+        toast({ type: 'error', title: 'Could not save application' })
       }
     } catch {
       setQuickApplyState('idle')
+      toast({ type: 'error', title: 'Could not reach server' })
     }
   }
 

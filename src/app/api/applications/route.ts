@@ -1,11 +1,16 @@
 import { createClient } from '@/lib/supabase/server'
 
-export async function GET() {
+export async function GET(request: Request) {
   const supabase = await createClient()
   const {
     data: { user },
   } = await supabase.auth.getUser()
   if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const { searchParams } = new URL(request.url)
+  const search = searchParams.get('search')
+  const limitParam = searchParams.get('limit')
+  const limit = limitParam ? Math.min(parseInt(limitParam, 10), 200) : 200
 
   const { data, error } = await supabase
     .from('applications')
@@ -17,10 +22,24 @@ export async function GET() {
     `)
     .eq('user_id', user.id)
     .order('last_updated', { ascending: false })
+    .limit(limit)
 
   if (error) {
     console.error('[GET /api/applications]', error)
     return Response.json({ error: 'Failed to fetch applications' }, { status: 500 })
+  }
+
+  if (search) {
+    const q = search.toLowerCase()
+    type Row = { id: string; status: string; jobs: { title?: string; company?: string } | null }
+    const filtered = ((data ?? []) as Row[])
+      .filter(
+        (a) =>
+          a.jobs?.title?.toLowerCase().includes(q) ||
+          a.jobs?.company?.toLowerCase().includes(q)
+      )
+      .map((a) => ({ id: a.id, status: a.status, title: a.jobs?.title ?? '', company: a.jobs?.company ?? '' }))
+    return Response.json({ applications: filtered })
   }
 
   return Response.json(data)

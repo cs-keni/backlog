@@ -10,6 +10,7 @@ import { JobDetail } from './JobDetail'
 import { FeedHeader } from './FeedHeader'
 import { FilterSidebar } from './FilterSidebar'
 import { FeedSkeleton } from './JobSkeleton'
+import { useToast } from '@/components/ui/Toaster'
 
 interface Cursor {
   cursor: string
@@ -54,6 +55,7 @@ interface JobFeedProps {
 
 export function JobFeed({ initialJobId }: JobFeedProps) {
   const router = useRouter()
+  const { toast } = useToast()
   const [jobs, setJobs] = useState<Job[]>([])
   const [loading, setLoading] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
@@ -63,11 +65,14 @@ export function JobFeed({ initialJobId }: JobFeedProps) {
   const [sort, setSort] = useState<SortOption>('newest')
   const [newJobCount, setNewJobCount] = useState(0)
   const [error, setError] = useState<string | null>(null)
+  const [focusedIndex, setFocusedIndex] = useState<number>(-1)
 
   const observerRef = useRef<IntersectionObserver | null>(null)
   const sentinelRef = useRef<HTMLDivElement | null>(null)
   const filterDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const pendingFilters = useRef<FeedFilters>(filters)
+  const filterFocusRef = useRef<(() => void) | null>(null)
+  const cardRefs = useRef<Map<string, HTMLDivElement>>(new Map())
   // When a deep-linked job is selected on load, preserve that selection through the first fetch
   const preserveSelectionRef = useRef(!!initialJobId)
   // Stash the deep-linked job so it stays in the list even if it's not on the first feed page
@@ -194,6 +199,66 @@ export function JobFeed({ initialJobId }: JobFeedProps) {
     }
   }, [filters, sort, fetchJobs])
 
+  // ─── Feed keyboard shortcuts (J/K navigate, A quick-apply, F focus filter) ──
+
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      const tag = (e.target as HTMLElement)?.tagName
+      const isEditing =
+        ['INPUT', 'TEXTAREA', 'SELECT'].includes(tag) ||
+        (e.target as HTMLElement)?.isContentEditable
+      if (isEditing) return
+
+      if (e.key === 'j' || e.key === 'J') {
+        e.preventDefault()
+        setFocusedIndex((i) => {
+          const next = Math.min(i + 1, jobs.length - 1)
+          const job = jobs[next]
+          if (job) {
+            setSelectedJobId(job.id)
+            cardRefs.current.get(job.id)?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+          }
+          return next
+        })
+      } else if (e.key === 'k' || e.key === 'K') {
+        e.preventDefault()
+        setFocusedIndex((i) => {
+          const next = Math.max(i - 1, 0)
+          const job = jobs[next]
+          if (job) {
+            setSelectedJobId(job.id)
+            cardRefs.current.get(job.id)?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+          }
+          return next
+        })
+      } else if (e.key === 'f' || e.key === 'F') {
+        e.preventDefault()
+        filterFocusRef.current?.()
+      } else if (e.key === 'a' || e.key === 'A') {
+        e.preventDefault()
+        const job = focusedIndex >= 0 ? jobs[focusedIndex] : selectedJobId ? jobs.find((j) => j.id === selectedJobId) : null
+        if (!job) return
+        const existing = job.applications?.[0]
+        if (existing && existing.status !== 'saved') return
+        fetch('/api/applications', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ job_id: job.id, status: 'applied' }),
+        })
+          .then((r) => {
+            if (r.ok) {
+              handleApplicationChange(job.id, 'applied')
+              toast({ type: 'success', title: 'Marked as applied', description: `${job.title} at ${job.company}` })
+            }
+          })
+          .catch(() => toast({ type: 'error', title: 'Could not reach server' }))
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [jobs, focusedIndex, selectedJobId, toast])
+
   // ─── Handlers ────────────────────────────────────────────────────────────────
 
   function handleRefreshNewJobs() {
@@ -226,7 +291,7 @@ export function JobFeed({ initialJobId }: JobFeedProps) {
     <div className="flex h-full overflow-hidden">
       {/* Left: filter sidebar */}
       <aside className="hidden md:block w-52 shrink-0 border-r border-zinc-800 overflow-y-auto p-4">
-        <FilterSidebar filters={filters} onChange={setFilters} />
+        <FilterSidebar filters={filters} onChange={setFilters} onFocusRef={filterFocusRef} />
       </aside>
 
       {/* Center: feed list */}
@@ -276,16 +341,24 @@ export function JobFeed({ initialJobId }: JobFeedProps) {
             ) : (
               <>
                 {jobs.map((job, i) => (
-                  <JobCard
+                  <div
                     key={job.id}
-                    job={job}
-                    index={i}
-                    isSelected={job.id === selectedJobId}
-                    onClick={() =>
-                      setSelectedJobId((prev) => (prev === job.id ? null : job.id))
-                    }
-                    onQuickApply={(jobId) => handleApplicationChange(jobId, 'applied')}
-                  />
+                    ref={(el) => {
+                      if (el) cardRefs.current.set(job.id, el)
+                      else cardRefs.current.delete(job.id)
+                    }}
+                  >
+                    <JobCard
+                      job={job}
+                      index={i}
+                      isSelected={job.id === selectedJobId}
+                      onClick={() => {
+                        setSelectedJobId((prev) => (prev === job.id ? null : job.id))
+                        setFocusedIndex(i)
+                      }}
+                      onQuickApply={(jobId) => handleApplicationChange(jobId, 'applied')}
+                    />
+                  </div>
                 ))}
 
                 {/* Infinite scroll sentinel */}

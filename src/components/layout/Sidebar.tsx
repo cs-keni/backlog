@@ -89,9 +89,10 @@ const NAV_ITEMS: NavItem[] = [
 
 interface SidebarProps {
   userEmail: string | null | undefined
+  onOpenPalette?: () => void
 }
 
-export default function Sidebar({ userEmail }: SidebarProps) {
+export default function Sidebar({ userEmail, onOpenPalette }: SidebarProps) {
   const pathname = usePathname()
   const router = useRouter()
 
@@ -105,11 +106,29 @@ export default function Sidebar({ userEmail }: SidebarProps) {
   return (
     <aside className="flex h-full w-56 flex-col border-r border-zinc-800 bg-zinc-950">
       {/* Logo */}
-      <div className="px-4 py-5">
+      <div className="flex items-center justify-between px-4 py-5">
         <span className="text-lg font-semibold tracking-tight text-zinc-100">
           Backlog
         </span>
       </div>
+
+      {/* Search / palette trigger */}
+      {onOpenPalette && (
+        <div className="px-3 pb-3">
+          <button
+            onClick={onOpenPalette}
+            className="w-full flex items-center gap-2 rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-1.5 text-xs text-zinc-500 hover:border-zinc-700 hover:text-zinc-400 transition-colors"
+          >
+            <svg className="h-3.5 w-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
+            </svg>
+            <span className="flex-1 text-left">Search…</span>
+            <kbd className="hidden xl:flex items-center gap-0.5 rounded border border-zinc-700 px-1 py-0.5 text-[10px] text-zinc-600">
+              ⌘K
+            </kbd>
+          </button>
+        </div>
+      )}
 
       {/* Navigation */}
       <nav className="flex-1 space-y-0.5 px-2">

@@ -18,7 +18,6 @@ export async function GET(request: NextRequest) {
   // Cursor is fetched_at (ISO timestamp) + id — fetched_at is always non-null, safe for pagination
   const cursor = searchParams.get('cursor')
   const cursorId = searchParams.get('cursorId')
-  const limit = 25
 
   // Filters
   const location = searchParams.get('location')
@@ -29,6 +28,8 @@ export async function GET(request: NextRequest) {
   const roleType = searchParams.get('role_type') // 'full_time' | 'internship' | 'contract'
   const dateRange = searchParams.get('date_range') // '24h' | '7d' | '30d' | '1y' | null
   const sort = searchParams.get('sort') ?? 'newest'
+  const search = searchParams.get('search')
+  const limitParam = searchParams.get('limit')
 
   let query = supabase
     .from('jobs')
@@ -74,6 +75,8 @@ export async function GET(request: NextRequest) {
     .eq('applications.user_id', user.id)
     .eq('hide_from_feed', false)
 
+  const limit = limitParam ? Math.min(parseInt(limitParam, 10), 25) : 25
+
   // Cursor-based pagination using fetched_at + id.
   // fetched_at is always non-null so it's safe to paginate on.
   if (cursor && cursorId) {
@@ -88,6 +91,7 @@ export async function GET(request: NextRequest) {
   // "us" includes jobs with country = 'United States' OR null (unlabeled remote = US default)
   if (country === 'us') query = query.or('country.eq.United States,country.is.null')
   if (country === 'international') query = query.not('country', 'eq', 'United States').not('country', 'is', null)
+  if (search) query = query.or(`title.ilike.%${search}%,company.ilike.%${search}%`)
   if (location) query = query.ilike('location', `%${location}%`)
   if (salaryMin) query = query.gte('salary_min', parseInt(salaryMin, 10))
   if (experienceLevel) query = query.eq('experience_level', experienceLevel)
@@ -108,7 +112,7 @@ export async function GET(request: NextRequest) {
   query = query
     .order('fetched_at', { ascending: false })
     .order('id', { ascending: false })
-    .limit(limit)
+    .limit(limit as number)
 
   const { data, error } = await query
 
