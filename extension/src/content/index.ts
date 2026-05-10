@@ -39,7 +39,7 @@ window.addEventListener('backlog:navigation', (e) => {
   // Small delay to allow the new page DOM to settle
   setTimeout(() => {
     refreshCache()
-    chrome.runtime.sendMessage({ type: 'PAGE_NAVIGATED', payload: { url } } as ExtensionMessage)
+    try { chrome.runtime.sendMessage({ type: 'PAGE_NAVIGATED', payload: { url } } as ExtensionMessage) } catch { /* context invalidated */ }
   }, 300)
 })
 
@@ -122,14 +122,16 @@ function watchForSubmission() {
   function send() {
     if (submitted) return
     submitted = true
-    chrome.runtime.sendMessage({
-      type: 'MARK_APPLIED',
-      payload: {
-        jobUrl: window.location.href,
-        jobTitle: info.jobTitle,
-        company: info.company,
-      },
-    } as ExtensionMessage)
+    try {
+      chrome.runtime.sendMessage({
+        type: 'MARK_APPLIED',
+        payload: {
+          jobUrl: window.location.href,
+          jobTitle: info.jobTitle,
+          company: info.company,
+        },
+      } as ExtensionMessage)
+    } catch { /* context invalidated */ }
   }
 
   // Form submit events are safe to watch on any detected page
