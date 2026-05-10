@@ -4,8 +4,25 @@ import { updateSession } from '@/lib/supabase/middleware'
 // Routes that don't require authentication
 const PUBLIC_ROUTES = ['/login', '/signup']
 
+const CORS_HEADERS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+  'Access-Control-Max-Age': '86400',
+}
+
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
+
+  // Extension API routes use API-key auth — skip session checks, just add CORS
+  if (pathname.startsWith('/api/extension/')) {
+    if (request.method === 'OPTIONS') {
+      return new NextResponse(null, { status: 204, headers: CORS_HEADERS })
+    }
+    const response = NextResponse.next()
+    Object.entries(CORS_HEADERS).forEach(([k, v]) => response.headers.set(k, v))
+    return response
+  }
 
   const { supabaseResponse, user } = await updateSession(request)
 
