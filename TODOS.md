@@ -17,3 +17,16 @@ Deferred tasks and known issues. Each item has enough context to pick up months 
 **Why:** Could silently skip a modal the user needs to interact with (e.g., a terms-of-service acknowledgment or CAPTCHA prompt).
 **How to apply:** In the Next-button detector, check for visible modals before clicking. If a modal is open, surface it in the popup ("Modal detected — review it before continuing") rather than advancing.
 **Depends on:** Next-button detection being implemented first.
+
+### Workday async combobox fill — Phase 2
+**What:** Add async dropdown filling for Workday's custom combobox components: country, state/province, work authorization, phone country code, employment type.
+**Why:** Deferred from the initial Workday autofill implementation (Phase 2 decision in eng review 2026-05-15). After live testing of the text-input fill, confirm which comboboxes block page progression — those are the ones to prioritize.
+**How to apply:** Implement `fillWorkdayDropdown(el: Element, value: string): Promise<void>` that: (1) clicks the combobox trigger element `[data-automation-id="..."] [role="combobox"]`, (2) waits for `[role="option"]` list to appear via MutationObserver or 300ms poll, (3) finds the option matching `value` (case-insensitive), (4) clicks it. Handle cascading: country → state requires a second pass after the country combobox settles. Wire this as a post-pass after `applyFills()` in the Workday path.
+**Trigger condition:** Test the text-only Workday fill on a real application first. If country/state/work-auth block page 1 advancement, this becomes high priority.
+**Depends on:** Workday text-input fill (Phase 1) + live testing to identify gated fields.
+
+### Workday DOM fixture capture for fill.test.ts
+**What:** After live testing on a real Workday application, capture serialized HTML (including shadow DOM) as a test fixture file. Use this in fill.test.ts to test Workday-specific behavior against a real DOM structure rather than synthetic jsdom trees.
+**Why:** Codex flagged during the 2026-05-15 eng review that synthetic tests won't catch real Workday behavior: nested shadow roots, repeated automation IDs across steps, async mount order, React controlled inputs.
+**How to apply:** On a real Workday application page (console), run: `document.documentElement.outerHTML` to capture the serialized DOM. Save to `extension/src/test/fixtures/workday-page1.html`. Then write `fill.test.ts` tests that load this fixture into jsdom and run `computeFills` against it.
+**Depends on:** Workday text-input fill being implemented and tested live first.

@@ -1,4 +1,4 @@
-import type { FullProfile, FilledField, SkippedField, FillResult, AtsType, UnfilledField } from '../shared/types'
+import type { FullProfile, FilledField, SkippedField, FillResult, AtsType, UnfilledField, ScannedField } from '../shared/types'
 
 // ─── Input value setter ───────────────────────────────────────────────────────
 // Works for standard inputs and React/Angular controlled inputs by dispatching
@@ -34,9 +34,29 @@ function setSelectValue(select: HTMLSelectElement, value: string) {
   }
 }
 
+// ─── Visibility check ─────────────────────────────────────────────────────────
+// Skips hidden, disabled, readonly, or zero-size inputs to avoid filling
+// off-step Workday wizard fields that are rendered but not active.
+
+export function isElementFillable(el: HTMLElement): boolean {
+  // Bounding rect check
+  const rect = el.getBoundingClientRect()
+  if (rect.width === 0 && rect.height === 0) return false
+  // Computed style
+  const style = window.getComputedStyle(el)
+  if (style.display === 'none' || style.visibility === 'hidden') return false
+  if (parseFloat(style.opacity) === 0) return false
+  // aria-hidden
+  if (el.getAttribute('aria-hidden') === 'true') return false
+  // Disabled / readonly
+  const inp = el as HTMLInputElement
+  if (inp.disabled || inp.readOnly) return false
+  return true
+}
+
 // ─── Label extraction ─────────────────────────────────────────────────────────
 
-function getLabelForInput(input: Element): string {
+export function getLabelForInput(input: Element): string {
   // 1. <label for="id">
   if (input.id) {
     const label = document.querySelector(`label[for="${input.id}"]`)
@@ -69,10 +89,40 @@ function getLabelForInput(input: Element): string {
     if (ancestor.tagName === 'FORM' || ancestor.tagName === 'FIELDSET') break
     ancestor = ancestor.parentElement
   }
-  // 7. placeholder
+  // 7. Shadow DOM boundary crossing.
+  //    Workday inputs live inside nested shadow roots while their labels are in
+  //    the parent shadow scope. Climb via .getRootNode().host up to 3 levels.
+  let shadowHops = 0
+  let root = input.getRootNode()
+  while (root instanceof ShadowRoot && shadowHops < 3) {
+    shadowHops++
+    const host = root.host
+    // Check for a label in the host's immediate parent scope
+    if (host.id) {
+      const hostRoot = host.getRootNode()
+      if (hostRoot instanceof ShadowRoot || hostRoot instanceof Document) {
+        const labelForHost = (hostRoot as Document | ShadowRoot).querySelector(`label[for="${host.id}"]`)
+        if (labelForHost) return labelForHost.textContent?.trim().toLowerCase() ?? ''
+      }
+    }
+    // Look at siblings of the host or its parent container
+    let hostAncestor = host.parentElement
+    while (hostAncestor && hostAncestor.tagName !== 'FORM' && hostAncestor.tagName !== 'FIELDSET') {
+      const sibLabel = hostAncestor.querySelector(':scope > label, :scope > [class*="label"]')
+      if (sibLabel) {
+        const txt = sibLabel.textContent?.trim().toLowerCase() ?? ''
+        // Guard: only accept if the label text looks like a real field label (has content, not a section heading)
+        if (txt.length > 0 && txt.length < 80 && !txt.includes('\n')) return txt
+      }
+      if (hostAncestor === document.body) break
+      hostAncestor = hostAncestor.parentElement
+    }
+    root = host.getRootNode()
+  }
+  // 8. placeholder
   const placeholder = (input as HTMLInputElement).placeholder
   if (placeholder) return placeholder.toLowerCase()
-  // 8. name attribute
+  // 9. name attribute
   return (input.getAttribute('name') ?? '').toLowerCase().replace(/[_-]/g, ' ')
 }
 
@@ -135,12 +185,209 @@ function resolveField(label: string, profile: FullProfile): string | null {
   return null
 }
 
+// ─── Workday data-automation-id map ──────────────────────────────────────────
+// Workday assigns stable data-automation-id attributes to form inputs across
+// tenants (e.g. acme.myworkdayjobs.com vs stripe.myworkdayjobs.com).
+// This map is the primary field identification strategy for Workday.
+
+const WORKDAY_ID_MAP: Array<{ ids: RegExp; resolve: Resolver }> = [
+  // Name fields — Workday uses both legalName and preferredName prefixes
+  { ids: /^(legalName[_-])?firstName$|^legalNameSection_firstName$/, resolve: (p) => p.user.full_name?.split(' ')[0] ?? null },
+  { ids: /^(legalName[_-])?lastName$|^legalNameSection_lastName$/, resolve: (p) => p.user.full_name?.split(' ').slice(1).join(' ') || null },
+  // Contact
+  { ids: /^email$|^emailAddress$|^workEmail$/, resolve: (p) => p.user.email },
+  { ids: /^phone$|^phoneNumber$|^phonePrimary$|^mobilePhone$/, resolve: (p) => p.user.phone },
+  // Address
+  { ids: /^addressLine1$|^addressSection_addressLine1$/, resolve: (p) => p.user.address?.split(',')[0]?.trim() ?? null },
+  { ids: /^city$|^addressSection_city$/, resolve: (p) => p.user.address?.split(',')[0]?.trim() ?? null },
+  { ids: /^postalCode$|^zipCode$|^addressSection_postalCode$/, resolve: (p) => p.user.address?.split(',').pop()?.trim() ?? null },
+  // Online presence
+  { ids: /^linkedIn(Url)?$|^linkedInProfile$/, resolve: (p) => p.user.linkedin_url },
+  { ids: /^gitHub(Url)?$|^githubProfile$/, resolve: (p) => p.user.github_url },
+  { ids: /^portfolioUrl$|^personalSite$|^websiteUrl$/, resolve: (p) => p.user.portfolio_url },
+  // Experience
+  { ids: /^yearsOfExperience$|^totalExperience$/, resolve: (p) => p.user.years_of_experience?.toString() ?? null },
+  { ids: /^desiredSalary$|^expectedSalary$/, resolve: (p) => p.user.desired_salary ?? null },
+  // Education (first entry)
+  { ids: /^school$|^institution$|^universityName$/, resolve: (p) => p.education[0]?.school ?? null },
+  { ids: /^major$|^fieldOfStudy$|^discipline$/, resolve: (p) => p.education[0]?.field_of_study ?? null },
+  { ids: /^gpa$|^gradePointAverage$/, resolve: (p) => p.education[0]?.gpa?.toString() ?? null },
+]
+
+function resolveWorkdayField(automationId: string, profile: FullProfile): string | null {
+  for (const { ids, resolve } of WORKDAY_ID_MAP) {
+    if (ids.test(automationId)) return resolve(profile)
+  }
+  return null
+}
+
+// ─── Shadow DOM traversal ─────────────────────────────────────────────────────
+// Scoped to form containers first (fast), falls back to full document.
+// Workday renders inputs inside nested shadow roots — must recurse into each.
+
+export function queryShadowAll<T extends Element>(selector: string, root: Document | ShadowRoot | Element = document): T[] {
+  const results: T[] = Array.from((root as Document | ShadowRoot | Element).querySelectorAll<T>(selector))
+  for (const host of (root as Document | ShadowRoot | Element).querySelectorAll('*')) {
+    if ((host as Element & { shadowRoot?: ShadowRoot }).shadowRoot) {
+      results.push(...queryShadowAll<T>(selector, (host as Element & { shadowRoot: ShadowRoot }).shadowRoot))
+    }
+  }
+  return results
+}
+
+function queryShadowScoped<T extends Element>(selector: string): T[] {
+  // Try form containers first (much faster on React-heavy Workday pages)
+  const containers = Array.from(document.querySelectorAll<Element>(
+    'form, main, [role="main"], [data-automation-id]'
+  ))
+  if (containers.length === 0) return queryShadowAll<T>(selector)
+
+  const seen = new Set<T>()
+  const results: T[] = []
+  for (const container of containers) {
+    for (const el of queryShadowAll<T>(selector, container)) {
+      if (!seen.has(el)) { seen.add(el); results.push(el) }
+    }
+  }
+  // Fallback: if scoped traversal found nothing, try full document
+  if (results.length === 0) return queryShadowAll<T>(selector)
+  return results
+}
+
+// ─── Labels to never auto-fill ────────────────────────────────────────────────
+const SKIP_LABEL_PATTERNS = /referr(ed|al)|someone else|employee.*email|recruiter/
+
+// ─── computeFills — read-only scan ───────────────────────────────────────────
+// Returns a list of fields that would be filled, without touching the DOM.
+// The ScannedField holds a WeakRef to the live element for a stable apply pass.
+
+export function computeFills(profile: FullProfile, ats: AtsType): ScannedField[] {
+  const scanned: ScannedField[] = []
+  const seen = new Set<Element>()
+
+  const queryInputs = ats === 'workday'
+    ? () => queryShadowScoped<HTMLInputElement | HTMLTextAreaElement>(
+        'input[type="text"], input[type="email"], input[type="tel"], input[type="url"], input[type="number"], textarea'
+      )
+    : () => Array.from(document.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>(
+        'input[type="text"], input[type="email"], input[type="tel"], input[type="url"], input[type="number"], textarea'
+      ))
+
+  for (const input of queryInputs()) {
+    try {
+      if (seen.has(input)) continue
+      seen.add(input)
+      if (!isElementFillable(input)) continue
+
+      let value: string | null = null
+      let source: ScannedField['source'] = 'label'
+
+      if (ats === 'workday') {
+        // Primary: data-automation-id lookup
+        const automationId = input.getAttribute('data-automation-id')
+        if (automationId) {
+          value = resolveWorkdayField(automationId, profile)
+          if (value) source = 'automation-id'
+        }
+      }
+
+      if (!value) {
+        // Fallback: label text matching (all ATS types)
+        const label = getLabelForInput(input)
+        if (!label) continue
+        if (SKIP_LABEL_PATTERNS.test(label)) continue
+        value = resolveField(label, profile)
+        if (value) source = 'label'
+      }
+
+      if (!value) continue
+
+      const selector = input.id ? `#${CSS.escape(input.id)}` : `[name="${input.getAttribute('name')}"]`
+      const label = getLabelForInput(input) || input.getAttribute('data-automation-id') || selector
+
+      scanned.push({
+        label,
+        value,
+        selector,
+        elRef: new WeakRef(input),
+        source,
+      })
+    } catch { /* skip bad element */ }
+  }
+
+  // <select> dropdowns (standard HTML selects only — not Workday custom comboboxes)
+  if (ats !== 'workday') {
+    const selects = Array.from(document.querySelectorAll<HTMLSelectElement>('select'))
+    for (const select of selects) {
+      try {
+        if (seen.has(select)) continue
+        seen.add(select)
+        if (!isElementFillable(select)) continue
+        const label = getLabelForInput(select)
+        if (!label) continue
+        if (SKIP_LABEL_PATTERNS.test(label)) continue
+        const value = resolveField(label, profile)
+        if (!value) continue
+        // Check if the value actually matches an option
+        const normalized = value.trim().toLowerCase()
+        const matchingOption = Array.from(select.options).find(
+          (o) => o.text.trim().toLowerCase() === normalized ||
+                 o.text.trim().toLowerCase().startsWith(normalized)
+        )
+        if (!matchingOption) continue
+        const selector = select.id ? `#${CSS.escape(select.id)}` : `[name="${select.getAttribute('name')}"]`
+        scanned.push({
+          label,
+          value: matchingOption.text.trim(),
+          selector,
+          elRef: new WeakRef(select),
+          source: 'label',
+        })
+      } catch { /* skip */ }
+    }
+  }
+
+  return scanned
+}
+
+// ─── applyFills — DOM write pass ─────────────────────────────────────────────
+// Takes the output of computeFills and writes to DOM.
+// Uses WeakRef to get the live element — skips gracefully if element was unmounted.
+
+export function applyFills(fields: ScannedField[]): FilledField[] {
+  const filled: FilledField[] = []
+
+  for (const field of fields) {
+    try {
+      const el = field.elRef.deref()
+      if (!el) continue // Element was garbage collected / unmounted
+
+      if (el instanceof HTMLSelectElement) {
+        const before = el.value
+        setSelectValue(el, field.value)
+        if (el.value !== before && el.value !== '') {
+          filled.push({
+            label: field.label,
+            value: el.options[el.selectedIndex]?.text ?? field.value,
+            selector: field.selector,
+          })
+        }
+      } else if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) {
+        if (el.value.trim()) continue // Don't overwrite existing values
+        setNativeValue(el, field.value)
+        filled.push({ label: field.label, value: field.value, selector: field.selector })
+      }
+    } catch { /* skip bad element */ }
+  }
+
+  return filled
+}
+
 // ─── Lever-specific filler ────────────────────────────────────────────────────
 
 function fillLever(profile: FullProfile): FilledField[] {
   const filled: FilledField[] = []
 
-  // Lever uses placeholder text to identify fields
   const inputMap: Array<{ placeholder: RegExp; label: string; value: string | null }> = [
     { placeholder: /full name/i, label: 'Full name', value: profile.user.full_name },
     { placeholder: /email/i, label: 'Email', value: profile.user.email },
@@ -167,85 +414,7 @@ function fillLever(profile: FullProfile): FilledField[] {
   return filled
 }
 
-// Labels to never auto-fill
-const SKIP_LABEL_PATTERNS = /referr(ed|al)|someone else|employee.*email|recruiter/
-
-// ─── Shadow DOM traversal (Workday) ──────────────────────────────────────────
-// Workday renders inputs inside Shadow DOM. We need to traverse shadow roots
-// to find and fill them. Best-effort — some Workday forms require manual correction.
-
-function queryShadowAll<T extends Element>(selector: string, root: Document | ShadowRoot = document): T[] {
-  const results: T[] = Array.from(root.querySelectorAll<T>(selector))
-  // Traverse all shadow hosts
-  for (const host of root.querySelectorAll('*')) {
-    if (host.shadowRoot) {
-      results.push(...queryShadowAll<T>(selector, host.shadowRoot))
-    }
-  }
-  return results
-}
-
-// ─── Generic filler ───────────────────────────────────────────────────────────
-
-function fillGeneric(profile: FullProfile, ats: AtsType): FilledField[] {
-  const filled: FilledField[] = []
-  const seen = new Set<Element>()
-
-  // For Workday, traverse shadow DOM in addition to regular DOM
-  const queryInputs = ats === 'workday'
-    ? () => queryShadowAll<HTMLInputElement | HTMLTextAreaElement>(
-        'input[type="text"], input[type="email"], input[type="tel"], input[type="url"], textarea'
-      )
-    : () => Array.from(document.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>(
-        'input[type="text"], input[type="email"], input[type="tel"], input[type="url"], textarea'
-      ))
-
-  const querySelects = ats === 'workday'
-    ? () => queryShadowAll<HTMLSelectElement>('select')
-    : () => Array.from(document.querySelectorAll<HTMLSelectElement>('select'))
-
-  // Text inputs and textareas
-  for (const input of queryInputs()) {
-    try {
-      if (seen.has(input)) continue
-      seen.add(input)
-      const label = getLabelForInput(input)
-      if (!label) continue
-      if (SKIP_LABEL_PATTERNS.test(label)) continue
-      const value = resolveField(label, profile)
-      if (!value) continue
-      setNativeValue(input, value)
-      const selector = input.id ? `#${input.id}` : `[name="${input.getAttribute('name')}"]`
-      filled.push({ label, value, selector })
-    } catch { /* skip bad element */ }
-  }
-
-  // <select> dropdowns
-  for (const select of querySelects()) {
-    try {
-      if (seen.has(select)) continue
-      seen.add(select)
-      const label = getLabelForInput(select)
-      if (!label) continue
-      if (SKIP_LABEL_PATTERNS.test(label)) continue
-      const value = resolveField(label, profile)
-      if (!value) continue
-      const before = select.value
-      setSelectValue(select, value)
-      if (select.value !== before && select.value !== '') {
-        const selector = select.id ? `#${select.id}` : `[name="${select.getAttribute('name')}"]`
-        filled.push({ label, value: select.options[select.selectedIndex]?.text ?? value, selector })
-      }
-    } catch { /* skip bad element */ }
-  }
-
-  return filled
-}
-
 // ─── Collect unfilled fields for Tier 2 (Haiku) analysis ─────────────────────
-// Returns descriptors for inputs/selects that are currently empty after Tier 1.
-// These are sent to the analyze-page endpoint for Haiku to map to profile values
-// or identify as open-ended questions needing Sonnet.
 
 export function getUnfilledFields(filledSelectors: Set<string>): UnfilledField[] {
   const unfilled: UnfilledField[] = []
@@ -258,10 +427,8 @@ export function getUnfilledFields(filledSelectors: Set<string>): UnfilledField[]
     try {
       if (seen.has(input)) continue
       seen.add(input)
-      // Skip if already filled by Tier 1
-      const selector = input.id ? `#${input.id}` : `[name="${input.getAttribute('name')}"]`
+      const selector = input.id ? `#${CSS.escape(input.id)}` : `[name="${input.getAttribute('name')}"]`
       if (filledSelectors.has(selector)) continue
-      // Skip if already has a value
       if (input.value.trim()) continue
       const label = getLabelForInput(input)
       if (!label) continue
@@ -272,21 +439,19 @@ export function getUnfilledFields(filledSelectors: Set<string>): UnfilledField[]
     } catch { /* skip */ }
   }
 
-  // <select> dropdowns with no selection
   const selects = document.querySelectorAll<HTMLSelectElement>('select')
   for (const select of selects) {
     try {
       if (seen.has(select)) continue
       seen.add(select)
-      const selector = select.id ? `#${select.id}` : `[name="${select.getAttribute('name')}"]`
+      const selector = select.id ? `#${CSS.escape(select.id)}` : `[name="${select.getAttribute('name')}"]`
       if (filledSelectors.has(selector)) continue
-      // Skip if a non-placeholder option is selected
       if (select.value && select.selectedIndex > 0) continue
       const label = getLabelForInput(select)
       if (!label) continue
       if (SKIP_LABEL_PATTERNS.test(label)) continue
       const options = Array.from(select.options)
-        .slice(1) // skip the placeholder option
+        .slice(1)
         .map((o) => o.text.trim())
         .filter(Boolean)
       unfilled.push({ selector, label, type: 'select', options })
@@ -297,8 +462,6 @@ export function getUnfilledFields(filledSelectors: Set<string>): UnfilledField[]
 }
 
 // ─── Apply Tier 2 field values ────────────────────────────────────────────────
-// Applies values returned by the analyze-page or answer-question endpoints.
-// Only fills fields that are currently empty — never overwrites Tier 1 fills.
 
 export function applyFieldValues(fields: Array<{ selector: string; value: string }>): FilledField[] {
   const filled: FilledField[] = []
@@ -306,7 +469,6 @@ export function applyFieldValues(fields: Array<{ selector: string; value: string
   for (const { selector, value } of fields) {
     if (!value.trim()) continue
     try {
-      // Try <input> / <textarea>
       const input = document.querySelector<HTMLInputElement | HTMLTextAreaElement>(selector)
       if (input && !input.value.trim()) {
         setNativeValue(input, value)
@@ -314,7 +476,6 @@ export function applyFieldValues(fields: Array<{ selector: string; value: string
         filled.push({ label: label || selector, value, selector })
         continue
       }
-      // Try <select>
       const select = document.querySelector<HTMLSelectElement>(selector)
       if (select && (!select.value || select.selectedIndex === 0)) {
         const before = select.value
@@ -331,6 +492,8 @@ export function applyFieldValues(fields: Array<{ selector: string; value: string
 }
 
 // ─── Main entry ───────────────────────────────────────────────────────────────
+// fillForm uses computeFills + applyFills internally.
+// This preserves the existing API for background service worker and content script callers.
 
 export function fillForm(profile: FullProfile, ats: AtsType): FillResult {
   const skipped: SkippedField[] = []
@@ -338,21 +501,21 @@ export function fillForm(profile: FullProfile, ats: AtsType): FillResult {
 
   try {
     if (ats === 'lever') {
-      filled = fillLever(profile)
-      const generic = fillGeneric(profile, ats)
-      const filledSelectors = new Set(filled.map((f) => f.selector))
-      filled.push(...generic.filter((f) => !filledSelectors.has(f.selector)))
+      // Lever: start with placeholder-based fills, then generic label fills
+      const leverFilled = fillLever(profile)
+      const leverSelectors = new Set(leverFilled.map((f) => f.selector))
+      const scanned = computeFills(profile, ats)
+      const genericFilled = applyFills(scanned.filter((f) => !leverSelectors.has(f.selector)))
+      filled = [...leverFilled, ...genericFilled]
     } else {
-      // greenhouse, workday, generic, null — all use the generic label-based filler
-      // Workday also traverses Shadow DOM (handled inside fillGeneric)
-      filled = fillGeneric(profile, ats)
+      // greenhouse, workday, generic — all go through computeFills + applyFills
+      const scanned = computeFills(profile, ats)
+      filled = applyFills(scanned)
     }
 
-    // Collect unfilled fields for Tier 2
     const filledSelectors = new Set(filled.map((f) => f.selector))
     const unfilledFields = getUnfilledFields(filledSelectors)
 
-    // Note fields we couldn't fill
     if (!profile.user.full_name) skipped.push({ label: 'Name', reason: 'Not set in profile' })
     if (!profile.user.email) skipped.push({ label: 'Email', reason: 'Not set in profile' })
     if (!profile.user.phone) skipped.push({ label: 'Phone', reason: 'Not set in profile' })

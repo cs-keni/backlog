@@ -97,6 +97,17 @@ export interface FillResult {
   unfilledFields: UnfilledField[]
 }
 
+// A field identified during the scan (pre-fill preview).
+// elRef is a WeakRef to the live DOM element so applyFills can write without re-querying.
+export interface ScannedField {
+  label: string
+  value: string
+  selector: string
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  elRef: WeakRef<any>
+  source: 'automation-id' | 'label' | 'aria'
+}
+
 // Haiku's verdict on each unfilled field
 export type FieldAnalysisResult =
   | { type: 'value'; selector: string; value: string }
@@ -140,3 +151,6 @@ export type ExtensionMessage =
   | { type: 'ADD_TO_BACKLOG'; payload: { url: string; title: string; company: string; description: string | null } }
   | { type: 'MARK_APPLIED'; payload: { jobUrl: string; jobTitle: string | null; company: string | null } }
   | { type: 'PAGE_NAVIGATED'; payload: { url: string } }
+  | { type: 'GET_TAB_ID' }
+  | { type: 'SCAN_FORM'; payload: FullProfile }
+  | { type: 'APPLY_SCANNED'; payload: { fields: Array<{ selector: string; value: string }> } }

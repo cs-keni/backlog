@@ -2,11 +2,11 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import {
   getApiKey, setApiKey, fetchProfile, analyzePage, answerQuestion, improveSkills, addJob,
 } from '../shared/api'
-import { fillForm, applyFieldValues, getLabelForInput } from '../content/fill'
+import { computeFills, applyFills, applyFieldValues, getLabelForInput } from '../content/fill'
 import { detectNextButton, detectPageType } from '../content/detect'
 import type {
   FullProfile, PageInfo, FilledField, SkippedField, FillResult,
-  FieldAnalysisResult, PageFill, TabSessionState,
+  FieldAnalysisResult, PageFill, TabSessionState, ScannedField,
 } from '../shared/types'
 import { BACKLOG_URL } from '../shared/config'
 
@@ -18,6 +18,8 @@ type SidebarState =
   | { status: 'loading' }
   | { status: 'no-key' }
   | { status: 'ready'; profile: FullProfile; page: PageInfo }
+  | { status: 'scanning' }
+  | { status: 'scan-preview'; fields: ScannedField[]; profile: FullProfile; page: PageInfo }
   | { status: 'filling'; stage: FillStage }
   | { status: 'review'; filled: FilledField[]; skipped: SkippedField[]; page: PageInfo; profile: FullProfile; aiUnavailable: boolean }
   | { status: 'added'; duplicate: boolean }
@@ -100,7 +102,6 @@ export function Sidebar({ initialPage }: { initialPage: PageInfo }) {
   const [improvingSkills, setImprovingSkills] = useState(false)
   const [page, setPage] = useState<PageInfo>(initialPage)
   const tabIdRef = useRef<number>(0)
-  const shadowHostRef = useRef<Element | null>(null)
 
   const init = useCallback(async () => {
     try {
@@ -124,7 +125,6 @@ export function Sidebar({ initialPage }: { initialPage: PageInfo }) {
   // Listen for page-update events dispatched by inject.ts (SPA navigation)
   useEffect(() => {
     const host = document.getElementById('backlog-sidebar-host')
-    shadowHostRef.current = host
     const shadow = host?.shadowRoot
     if (!shadow) return
 
@@ -145,7 +145,45 @@ export function Sidebar({ initialPage }: { initialPage: PageInfo }) {
     return () => clearTimeout(t)
   }, [state.status])
 
-  // ── Auto-fill ──────────────────────────────────────────────────────────────
+  // ── Scan — read-only preview ───────────────────────────────────────────────
+
+  async function handleScan() {
+    if (state.status !== 'ready') return
+    const { profile } = state
+
+    setState({ status: 'scanning' })
+    try {
+      // Small tick to let React render the scanning state before potentially
+      // heavy shadow DOM traversal on Workday pages
+      await new Promise<void>((r) => setTimeout(r, 50))
+      const fields = computeFills(profile, page.ats)
+      setState({ status: 'scan-preview', fields, profile, page })
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      setState({ status: 'error', message: msg })
+    }
+  }
+
+  // ── Apply scanned fields + run Tier 2/3 ───────────────────────────────────
+
+  async function handleApplyScanned() {
+    if (state.status !== 'scan-preview') return
+    const { fields, profile } = state
+
+    setState({ status: 'filling', stage: 'tier1' })
+
+    let filled: FilledField[]
+    try {
+      filled = applyFills(fields)
+    } catch {
+      setState({ status: 'error', message: 'Fill failed. Try refreshing the page.' })
+      return
+    }
+
+    await runTier2AndFinish(profile, filled)
+  }
+
+  // ── One-click auto-fill (scan + apply in one) ─────────────────────────────
 
   async function autoFill() {
     if (state.status !== 'ready') return
@@ -153,24 +191,35 @@ export function Sidebar({ initialPage }: { initialPage: PageInfo }) {
 
     setState({ status: 'filling', stage: 'tier1' })
 
-    // Tier 1
-    let result: FillResult
+    let tier1Filled: FilledField[]
     try {
-      result = fillForm(profile, page.ats)
+      const scanned = computeFills(profile, page.ats)
+      tier1Filled = applyFills(scanned)
     } catch {
       setState({ status: 'error', message: 'Fill failed. Try refreshing the page.' })
       return
     }
 
-    let aiUnavailable = false
-    const allFilled = [...result.filled]
+    await runTier2AndFinish(profile, tier1Filled)
+  }
 
-    // Tier 2 — Haiku analysis
-    if (result.unfilledFields.length > 0) {
+  // ── Shared: Tier 2 + Tier 3 + session persist + review state ─────────────
+
+  async function runTier2AndFinish(profile: FullProfile, initialFilled: FilledField[]) {
+    let aiUnavailable = false
+    const allFilled = [...initialFilled]
+
+    // Tier 2 — Haiku analysis for unfilled fields
+    const filledSelectors = new Set(initialFilled.map((f) => f.selector))
+    // Import dynamically to avoid circular dependency in fill.ts
+    const { getUnfilledFields } = await import('../content/fill')
+    const unfilledFields = getUnfilledFields(filledSelectors)
+
+    if (unfilledFields.length > 0) {
       setState({ status: 'filling', stage: 'tier2' })
       try {
         const analysisResults = await Promise.race([
-          analyzePage(result.unfilledFields),
+          analyzePage(unfilledFields),
           new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), 5000)),
         ]) as Awaited<ReturnType<typeof analyzePage>>
 
@@ -231,17 +280,16 @@ export function Sidebar({ initialPage }: { initialPage: PageInfo }) {
       }
     }
 
-    // Refresh skills field after fill
     setSkillsField(findSkillsField())
 
-    setState({
-      status: 'review',
-      filled: allFilled,
-      skipped: result.skipped,
-      page,
-      profile,
-      aiUnavailable,
-    })
+    // Collect skipped fields for profile gaps
+    const skipped: SkippedField[] = []
+    if (!profile.user.full_name) skipped.push({ label: 'Name', reason: 'Not set in profile' })
+    if (!profile.user.email) skipped.push({ label: 'Email', reason: 'Not set in profile' })
+    if (!profile.user.phone) skipped.push({ label: 'Phone', reason: 'Not set in profile' })
+    if (!profile.user.resume_url) skipped.push({ label: 'Resume', reason: 'Upload resume in Backlog first' })
+
+    setState({ status: 'review', filled: allFilled, skipped, page, profile, aiUnavailable })
   }
 
   // ── Skills improvement ─────────────────────────────────────────────────────
@@ -257,7 +305,6 @@ export function Sidebar({ initialPage }: { initialPage: PageInfo }) {
       })
       if (improved) {
         applyFieldValues([{ selector: skillsField.selector, value: improved }])
-        // Update the cached value
         setSkillsField({ ...skillsField, currentValue: improved })
       }
     } catch { /* silently ignore */ } finally {
@@ -381,16 +428,14 @@ export function Sidebar({ initialPage }: { initialPage: PageInfo }) {
           <ErrorState message={state.message} onRetry={() => { setState({ status: 'loading' }); void init() }} />
         )}
 
-        {(state.status === 'ready' || state.status === 'filling' || state.status === 'review' || state.status === 'added') && (
+        {(state.status === 'ready' || state.status === 'filling' || state.status === 'scanning' || state.status === 'scan-preview' || state.status === 'review' || state.status === 'added') && (
           <>
-            {/* Profile card */}
             {state.status !== 'added' && (() => {
               const profile = 'profile' in state ? state.profile : null
               if (!profile) return null
               return <ProfileCard profile={profile} />
             })()}
 
-            {/* Job detection card */}
             {page.isJobPage && (
               <JobCard page={page} />
             )}
@@ -410,9 +455,23 @@ export function Sidebar({ initialPage }: { initialPage: PageInfo }) {
             onAutoAdvanceChange={setAutoAdvance}
             skillsField={skillsField}
             improvingSkills={improvingSkills}
+            onScan={handleScan}
             onAutoFill={autoFill}
             onImproveSkills={handleImproveSkills}
             onAddToBacklog={handleAddToBacklog}
+          />
+        )}
+
+        {state.status === 'scanning' && (
+          <ScanningState />
+        )}
+
+        {state.status === 'scan-preview' && (
+          <ScanPreviewState
+            fields={state.fields}
+            page={state.page}
+            onApply={handleApplyScanned}
+            onCancel={() => setState({ status: 'ready', profile: state.profile, page: state.page })}
           />
         )}
 
@@ -515,13 +574,14 @@ function JobCard({ page }: { page: PageInfo }) {
 
 function ReadyActions({
   page, autoAdvance, onAutoAdvanceChange, skillsField, improvingSkills,
-  onAutoFill, onImproveSkills, onAddToBacklog,
+  onScan, onAutoFill, onImproveSkills, onAddToBacklog,
 }: {
   page: PageInfo
   autoAdvance: boolean
   onAutoAdvanceChange: (v: boolean) => void
   skillsField: SkillsField | null
   improvingSkills: boolean
+  onScan: () => void
   onAutoFill: () => void
   onImproveSkills: () => void
   onAddToBacklog: () => void
@@ -530,9 +590,9 @@ function ReadyActions({
     <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
       {page.isJobPage && (
         <>
-          {/* Primary autofill button */}
+          {/* Scan button — primary CTA for Workday/preview flow */}
           <button
-            onClick={onAutoFill}
+            onClick={onScan}
             style={{
               width: '100%', padding: '10px',
               background: '#4f46e5', color: '#fff',
@@ -543,12 +603,31 @@ function ReadyActions({
             }}
           >
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-              <path d="M2 7h10M7 2l5 5-5 5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+              <circle cx="7" cy="7" r="5" stroke="currentColor" strokeWidth="1.5" />
+              <path d="M7 4v3l2 1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
             </svg>
-            Auto-fill form
+            Scan form
           </button>
 
-          {/* Skills improve button — shown only when skills field is detected */}
+          {/* Auto-fill shortcut — scan + apply in one click */}
+          <button
+            onClick={onAutoFill}
+            style={{
+              width: '100%', padding: '8px',
+              background: 'transparent', color: '#a1a1aa',
+              border: '1px solid #3f3f46', borderRadius: '8px',
+              fontSize: '12px', fontWeight: 500, cursor: 'pointer',
+              transition: 'all 0.15s',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px',
+            }}
+          >
+            <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
+              <path d="M2 7h10M7 2l5 5-5 5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            Auto-fill (skip preview)
+          </button>
+
+          {/* Skills improve button */}
           {skillsField && (
             <button
               onClick={onImproveSkills}
@@ -622,6 +701,108 @@ function ReadyActions({
       >
         + Add to Backlog
       </button>
+    </div>
+  )
+}
+
+function ScanningState() {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px', padding: '20px 0' }}>
+      <span className="bl-spin" style={{
+        display: 'inline-block', width: '20px', height: '20px',
+        border: '2px solid #27272a', borderTopColor: '#6366f1', borderRadius: '50%',
+      }} />
+      <p style={{ fontSize: '12px', color: '#71717a', margin: 0, textAlign: 'center' }}>
+        Scanning form fields…
+      </p>
+    </div>
+  )
+}
+
+const SOURCE_LABEL: Record<ScannedField['source'], string> = {
+  'automation-id': 'WD',
+  'label': 'label',
+  'aria': 'aria',
+}
+
+const SOURCE_COLOR: Record<ScannedField['source'], string> = {
+  'automation-id': '#6366f1',
+  'label': '#52525b',
+  'aria': '#52525b',
+}
+
+function ScanPreviewState({
+  fields, page, onApply, onCancel,
+}: {
+  fields: ScannedField[]
+  page: PageInfo
+  onApply: () => void
+  onCancel: () => void
+}) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <span style={{ fontSize: '12px', fontWeight: 500, color: '#f4f4f5' }}>
+          {fields.length} field{fields.length !== 1 ? 's' : ''} detected
+          {page.ats === 'workday' && (
+            <span style={{ marginLeft: '6px', fontSize: '10px', color: '#6366f1', fontWeight: 400 }}>· Workday</span>
+          )}
+        </span>
+        <button
+          onClick={onCancel}
+          style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '11px', color: '#52525b', padding: 0 }}
+        >
+          ← Back
+        </button>
+      </div>
+
+      {fields.length === 0 ? (
+        <div style={{ background: '#18181b', border: '1px solid #27272a', borderRadius: '6px', padding: '10px 12px' }}>
+          <p style={{ fontSize: '11px', color: '#71717a', margin: 0 }}>
+            No fillable fields detected. The form may still be loading, or this page uses a format we don't recognize yet.
+          </p>
+        </div>
+      ) : (
+        <>
+          <div className="sidebar-scroll" style={{ maxHeight: '240px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '2px' }}>
+            {fields.map((f, i) => (
+              <div key={i} style={{ display: 'flex', gap: '8px', padding: '4px 0', alignItems: 'flex-start', borderBottom: '1px solid #18181b' }}>
+                <span style={{
+                  fontSize: '9px', fontWeight: 600, padding: '1px 4px', borderRadius: '3px',
+                  background: SOURCE_COLOR[f.source] + '22',
+                  color: SOURCE_COLOR[f.source],
+                  flexShrink: 0, marginTop: '1px', letterSpacing: '0.03em',
+                }}>
+                  {SOURCE_LABEL[f.source]}
+                </span>
+                <div style={{ minWidth: 0, flex: 1 }}>
+                  <span style={{ fontSize: '11px', color: '#71717a', textTransform: 'capitalize' }}>{f.label}</span>
+                  <span style={{ fontSize: '11px', color: '#71717a' }}> → </span>
+                  <span style={{ fontSize: '11px', color: '#e4e4e7', wordBreak: 'break-all' }}>{f.value}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <button
+            onClick={onApply}
+            style={{
+              width: '100%', padding: '10px',
+              background: '#4f46e5', color: '#fff',
+              border: 'none', borderRadius: '8px',
+              fontSize: '13px', fontWeight: 500, cursor: 'pointer',
+              transition: 'background 0.15s',
+            }}
+          >
+            Apply {fields.length} field{fields.length !== 1 ? 's' : ''}
+          </button>
+        </>
+      )}
+
+      <p style={{ fontSize: '10px', color: '#3f3f46', margin: 0 }}>
+        Review values above — click Apply to write to the form.
+        {page.ats === 'workday' && ' Dropdown fields (country, state) need manual input for now.'}
+      </p>
     </div>
   )
 }

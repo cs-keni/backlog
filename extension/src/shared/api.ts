@@ -76,6 +76,20 @@ export async function answerQuestion(question: string): Promise<string | null> {
   return json.answer ?? null
 }
 
+export async function improveSkills(payload: {
+  currentSkills: string
+  profileSkills: string[]
+  jobDescription: string | null
+}): Promise<string | null> {
+  const res = await apiFetch('/api/extension/improve-skills', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+  if (!res.ok) return null
+  const json = await res.json() as { skills?: string }
+  return json.skills ?? null
+}
+
 export async function addJob(payload: {
   url: string
   title: string

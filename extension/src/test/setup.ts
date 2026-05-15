@@ -28,3 +28,20 @@ const chromeMock = {
 }
 
 Object.defineProperty(globalThis, 'chrome', { value: chromeMock, writable: true })
+
+// jsdom 29 does not expose a global CSS object (window.CSS), so CSS.escape throws
+// inside fill.ts which swallows it in the try/catch, silently dropping fields.
+// This polyfill matches the spec algorithm for ASCII-safe identifiers.
+function cssEscapePolyfill(str: string): string {
+  return str.replace(/[^\w-]/g, (c) => `\\${c}`)
+}
+const CSSGlobal = (globalThis as Record<string, unknown>)['CSS'] as Record<string, unknown> | undefined
+if (CSSGlobal == null) {
+  Object.defineProperty(globalThis, 'CSS', {
+    value: { escape: cssEscapePolyfill },
+    writable: true,
+    configurable: true,
+  })
+} else if (typeof CSSGlobal['escape'] !== 'function') {
+  CSSGlobal['escape'] = cssEscapePolyfill
+}

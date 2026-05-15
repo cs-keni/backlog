@@ -95,7 +95,38 @@ async function fillTabPage(tabId: number): Promise<void> {
 
 // ─── Message handlers ─────────────────────────────────────────────────────────
 
+// ─── Toolbar click → toggle sidebar ──────────────────────────────────────────
+// First try to toggle an existing sidebar; if it's not there yet, inject sidebar.js.
+chrome.action.onClicked.addListener(async (tab) => {
+  if (!tab.id) return
+  try {
+    const results = await chrome.scripting.executeScript({
+      target: { tabId: tab.id },
+      func: () => {
+        const host = document.getElementById('backlog-sidebar-host')
+        if (!host?.shadowRoot) return false
+        const inner = host.shadowRoot.getElementById('backlog-sidebar-inner')
+        if (!inner) return false
+        inner.style.display = inner.style.display === 'none' ? '' : 'none'
+        return true
+      },
+    })
+    if (!results[0]?.result) {
+      await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ['sidebar.js'] })
+    }
+  } catch (err) {
+    console.error('[Backlog] Sidebar injection failed:', err)
+  }
+})
+
+// ─── Message handlers ─────────────────────────────────────────────────────────
+
 chrome.runtime.onMessage.addListener((message: ExtensionMessage, sender, sendResponse) => {
+  if (message.type === 'GET_TAB_ID') {
+    sendResponse({ tabId: sender.tab?.id ?? 0 })
+    return true
+  }
+
   if (message.type === 'MARK_APPLIED') {
     const { jobUrl, jobTitle, company } = message.payload
     markApplied({ jobUrl, jobTitle, company })

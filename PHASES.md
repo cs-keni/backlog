@@ -1376,3 +1376,28 @@ A lightweight LeetCode study tracker integrated into Backlog. Tracks which NeetC
 **UNRESOLVED:** 0 decisions open.
 
 **VERDICT:** ENG REVIEW CLEARED — ready to implement. Suggested sequencing: Phase 10 immediate fixes first (remove fillGreenhouse, add blur dispatch, EEO profile UI, open-ended answer endpoint), then Phase 10A multi-page engine.
+
+---
+
+### Phase 10B — Workday Autofill (Scan-Preview + Shadow DOM)
+
+> Bring extension fill quality up to JobRight.ai parity for `*.myworkdayjobs.com`. Primary goal: reliable field detection + a scan-preview UX so the user can review proposed fills before they're applied.
+
+**Architectural decisions (D1–D6 from eng review):**
+- D1: `computeFills` (read-only) + `applyFills` (DOM write) split — mirrors the JobRight.ai "Autofill preview" pattern
+- D2: `WeakRef<HTMLElement>` in `ScannedField` for stable element references between scan and apply
+- D3: `WORKDAY_ID_MAP` keyed by `data-automation-id` regex as primary fill strategy; label matching as fallback
+- D4: `getLabelForInput` shadow boundary climbing — climbs up to 3 `getRootNode().host` hops to find labels in parent shadow scope
+- D5: `isElementFillable()` visibility filter to skip hidden/off-step wizard inputs
+- D6: Real Workday live test required before declaring Phase 10B complete
+
+**Tasks:**
+- [x] `extension/src/shared/types.ts` — add `ScannedField` interface + `SCAN_FORM` / `APPLY_SCANNED` message types
+- [x] `extension/src/content/fill.ts` — add `computeFills`, `applyFills`, `isElementFillable`, `queryShadowScoped`, `WORKDAY_ID_MAP`, shadow boundary crossing in `getLabelForInput`
+- [x] `extension/src/sidebar/Sidebar.tsx` — scan-preview UX: "Scan form" → preview list → "Apply N fields"; "Auto-fill (skip preview)" secondary button
+- [x] `extension/src/content/fill.test.ts` — 48 tests covering label regression, isElementFillable, queryShadowAll, Workday automation-id map, generic label fills, applyFills, shadow boundary crossing
+- [x] `extension/src/test/setup.ts` — add `CSS.escape` polyfill for jsdom 29 (does not expose global CSS object)
+- [x] `docs/AI_CONTEXT.md`, `docs/HANDOFF.md`, `docs/CURRENT_TASK.md`, `docs/ENGINEERING_LOG.md` — Codex collaboration docs
+- [ ] **Phase 10B.2 — Async combobox fill** — Workday country/state/city use async comboboxes (`[data-automation-id="countryDropdown"]` etc.); need to type into the input, wait for dropdown items to appear, then click the match; currently shows "manual input required" note in preview
+- [ ] **Phase 10B.3 — Real Workday smoke test** — test on a live Workday application (`*.myworkdayjobs.com`); capture a DOM fixture from a real Workday form for deterministic regression testing
+- [ ] E2E test (Playwright): scan preview shows correct fields → apply → inputs are filled

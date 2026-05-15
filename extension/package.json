@@ -4,8 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite build --watch",
-    "build": "vite build",
+    "dev": "vite build --watch & vite build --config vite.sidebar.config.ts --watch",
+    "build": "vite build && vite build --config vite.sidebar.config.ts",
     "test": "vitest run",
     "test:watch": "vitest"
   },
