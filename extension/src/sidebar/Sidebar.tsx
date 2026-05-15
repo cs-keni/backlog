@@ -102,6 +102,8 @@ export function Sidebar({ initialPage }: { initialPage: PageInfo }) {
   const [improvingSkills, setImprovingSkills] = useState(false)
   const [page, setPage] = useState<PageInfo>(initialPage)
   const tabIdRef = useRef<number>(0)
+  const cancelledRef = useRef(false)
+  const lastProfileRef = useRef<FullProfile | null>(null)
 
   const init = useCallback(async () => {
     try {
@@ -170,6 +172,8 @@ export function Sidebar({ initialPage }: { initialPage: PageInfo }) {
     if (state.status !== 'scan-preview') return
     const { fields, profile } = state
 
+    cancelledRef.current = false
+    lastProfileRef.current = profile
     setState({ status: 'filling', stage: 'tier1' })
 
     let filled: FilledField[]
@@ -189,6 +193,8 @@ export function Sidebar({ initialPage }: { initialPage: PageInfo }) {
     if (state.status !== 'ready') return
     const { profile } = state
 
+    cancelledRef.current = false
+    lastProfileRef.current = profile
     setState({ status: 'filling', stage: 'tier1' })
 
     let tier1Filled: FilledField[]
@@ -208,6 +214,8 @@ export function Sidebar({ initialPage }: { initialPage: PageInfo }) {
   async function runTier2AndFinish(profile: FullProfile, initialFilled: FilledField[]) {
     let aiUnavailable = false
     const allFilled = [...initialFilled]
+
+    if (cancelledRef.current) return
 
     // Tier 2 — Haiku analysis for unfilled fields
     const filledSelectors = new Set(initialFilled.map((f) => f.selector))
@@ -254,21 +262,26 @@ export function Sidebar({ initialPage }: { initialPage: PageInfo }) {
       }
     }
 
+    if (cancelledRef.current) return
+
     // Persist to session for background auto-advance
+    // chrome.storage.session is blocked on some pages (e.g. Workday) — must not throw
     const tabId = tabIdRef.current
     if (tabId) {
-      const current = await getTabState(tabId)
-      const pageFill: PageFill = {
-        url: page.jobTitle ? `${page.company ?? ''} — ${page.jobTitle}` : location.href,
-        pageIndex: current ? current.currentPageIndex + 1 : 0,
-        filled: allFilled,
-      }
-      await setTabState(tabId, {
-        autoAdvance,
-        profile,
-        pages: [...(current?.pages ?? []), pageFill],
-        currentPageIndex: pageFill.pageIndex,
-      })
+      try {
+        const current = await getTabState(tabId)
+        const pageFill: PageFill = {
+          url: page.jobTitle ? `${page.company ?? ''} — ${page.jobTitle}` : location.href,
+          pageIndex: current ? current.currentPageIndex + 1 : 0,
+          filled: allFilled,
+        }
+        await setTabState(tabId, {
+          autoAdvance,
+          profile,
+          pages: [...(current?.pages ?? []), pageFill],
+          currentPageIndex: pageFill.pageIndex,
+        })
+      } catch { /* storage unavailable in this page context — skip persistence */ }
     }
 
     // Auto-advance: click Next if toggled
@@ -476,7 +489,19 @@ export function Sidebar({ initialPage }: { initialPage: PageInfo }) {
         )}
 
         {state.status === 'filling' && (
-          <FillingState stage={state.stage} />
+          <FillingState
+            stage={state.stage}
+            onCancel={() => {
+              cancelledRef.current = true
+              const profile = lastProfileRef.current
+              if (profile) {
+                setState({ status: 'ready', profile, page })
+              } else {
+                setState({ status: 'loading' })
+                void init()
+              }
+            }}
+          />
         )}
 
         {state.status === 'review' && (
@@ -807,7 +832,7 @@ function ScanPreviewState({
   )
 }
 
-function FillingState({ stage }: { stage: FillStage }) {
+function FillingState({ stage, onCancel }: { stage: FillStage; onCancel: () => void }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px', padding: '20px 0' }}>
       <span className="bl-spin" style={{
@@ -822,6 +847,17 @@ function FillingState({ stage }: { stage: FillStage }) {
           Analyzing fields that couldn't be matched automatically…
         </p>
       )}
+      <button
+        onClick={onCancel}
+        style={{
+          marginTop: '4px',
+          background: 'none', border: '1px solid #3f3f46',
+          borderRadius: '6px', padding: '4px 12px',
+          fontSize: '11px', color: '#71717a', cursor: 'pointer',
+        }}
+      >
+        Cancel
+      </button>
     </div>
   )
 }
