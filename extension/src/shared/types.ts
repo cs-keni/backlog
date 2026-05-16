@@ -106,7 +106,7 @@ export interface ScannedField {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   elRef: WeakRef<any>
   source: 'automation-id' | 'label' | 'aria'
-  kind: 'text' | 'select' | 'radio'
+  kind: 'text' | 'select' | 'radio' | 'combobox'
 }
 
 // Haiku's verdict on each unfilled field

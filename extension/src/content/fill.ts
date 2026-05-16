@@ -389,6 +389,11 @@ export function computeFills(profile: FullProfile, ats: AtsType): ScannedField[]
   // ── Radio button groups (Yes/No and compliance questions) ─────────────────
   // Query both native radio inputs and ARIA radio elements (Workday uses both).
   // Group by name attribute, find the question via fieldset/legend, resolve answer.
+  //
+  // NOTE: Workday (and many ATS) visually hides native radio inputs for custom
+  // styling (opacity:0, zero-size). We intentionally skip the full
+  // isElementFillable check here — only filtering out truly disabled inputs —
+  // because .click() works on visually-hidden radios.
   {
     const radioInputs = ats === 'workday'
       ? queryShadowScoped<HTMLInputElement>('input[type="radio"]')
@@ -397,7 +402,7 @@ export function computeFills(profile: FullProfile, ats: AtsType): ScannedField[]
     // Group by [name] attribute to find unique questions
     const groups = new Map<string, HTMLInputElement[]>()
     for (const input of radioInputs) {
-      if (!isElementFillable(input)) continue
+      if ((input as HTMLInputElement).disabled) continue // skip only truly disabled
       const key = input.name || input.getAttribute('data-automation-id') || input.id
       if (!key) continue
       if (!groups.has(key)) groups.set(key, [])
@@ -406,21 +411,37 @@ export function computeFills(profile: FullProfile, ats: AtsType): ScannedField[]
 
     for (const [, options] of groups) {
       try {
-        // Find the question text from the nearest fieldset legend or ancestor label
+        // Find the question text from the nearest fieldset legend or ancestor label.
+        // Shadow DOM note: closest()/parentElement do NOT cross shadow boundaries,
+        // so we also probe the shadow root that contains the radio for label-like text.
         const first = options[0]
         let question = ''
+
         const fieldset = first.closest('fieldset')
         if (fieldset) {
           question = fieldset.querySelector('legend')?.textContent?.trim().toLowerCase() ?? ''
         }
         if (!question) {
-          // Walk up for a label-like ancestor
           let ancestor = first.parentElement
           while (ancestor && ancestor !== document.body) {
             const labelEl = ancestor.querySelector(':scope > label, :scope > [class*="label"], :scope > legend')
             if (labelEl) { question = labelEl.textContent?.trim().toLowerCase() ?? ''; break }
             if (ancestor.tagName === 'FORM' || ancestor.tagName === 'FIELDSET') break
             ancestor = ancestor.parentElement
+          }
+        }
+        if (!question) {
+          // Shadow-root probe: search label-like elements in the same shadow root as
+          // the radio (Workday puts the question text alongside the inputs in the
+          // same shadow scope but not in a <fieldset>/<legend>).
+          const rootNode = first.getRootNode()
+          if (rootNode instanceof ShadowRoot) {
+            for (const el of Array.from(rootNode.querySelectorAll('label, legend, p, [class*="question"], [class*="label"]'))) {
+              const txt = el.textContent?.trim().toLowerCase() ?? ''
+              if (txt.length > 4 && txt.length < 200 && !txt.includes('\n')) {
+                question = txt; break
+              }
+            }
           }
         }
         if (!question) question = getLabelForInput(first)
@@ -453,6 +474,37 @@ export function computeFills(profile: FullProfile, ats: AtsType): ScannedField[]
     }
   }
 
+  // ── Workday combobox fields (state/province, etc.) ───────────────────────
+  // These use custom async components; we add them to the scan so they appear
+  // in the preview. applyFills skips them — fillWorkdayComboboxes handles them.
+  if (ats === 'workday') {
+    for (const { ids, resolve, label } of WORKDAY_COMBOBOX_MAP) {
+      try {
+        const value = resolve(profile)
+        if (!value) continue
+        const displayValue = US_STATES[value.toUpperCase()] ?? value
+
+        const wrappers = queryShadowAll<HTMLElement>('[data-automation-id]').filter((el) =>
+          ids.test(el.getAttribute('data-automation-id') ?? '')
+        )
+        for (const wrapper of wrappers) {
+          const automationId = wrapper.getAttribute('data-automation-id') ?? ''
+          if (seen.has(wrapper)) continue
+          seen.add(wrapper)
+          scanned.push({
+            label,
+            value: displayValue,
+            selector: `[data-automation-id="${automationId}"]`,
+            elRef: new WeakRef(wrapper),
+            source: 'automation-id',
+            kind: 'combobox',
+          })
+          break
+        }
+      } catch { /* skip */ }
+    }
+  }
+
   return scanned
 }
 
@@ -473,6 +525,8 @@ export function applyFills(fields: ScannedField[]): FilledField[] {
     try {
       const el = field.elRef.deref()
       if (!el) continue // Element was garbage collected / unmounted
+
+      if (field.kind === 'combobox') continue // handled async by fillWorkdayComboboxes
 
       if (field.kind === 'radio') {
         const radio = el as HTMLInputElement

@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import {
   getApiKey, setApiKey, fetchProfile, analyzePage, answerQuestion, improveSkills, addJob,
 } from '../shared/api'
-import { computeFills, applyFills, applyFieldValues, getLabelForInput } from '../content/fill'
+import { computeFills, applyFills, applyFieldValues, getLabelForInput, fillWorkdayComboboxes } from '../content/fill'
 import { detectNextButton, detectPageType } from '../content/detect'
 import type {
   FullProfile, PageInfo, FilledField, SkippedField, FillResult,
@@ -179,6 +179,10 @@ export function Sidebar({ initialPage }: { initialPage: PageInfo }) {
     let filled: FilledField[]
     try {
       filled = applyFills(fields)
+      if (page.ats === 'workday') {
+        const comboboxFilled = await fillWorkdayComboboxes(profile)
+        filled = [...filled, ...comboboxFilled]
+      }
     } catch {
       setState({ status: 'error', message: 'Fill failed. Try refreshing the page.' })
       return
@@ -201,6 +205,10 @@ export function Sidebar({ initialPage }: { initialPage: PageInfo }) {
     try {
       const scanned = computeFills(profile, page.ats)
       tier1Filled = applyFills(scanned)
+      if (page.ats === 'workday') {
+        const comboboxFilled = await fillWorkdayComboboxes(profile)
+        tier1Filled = [...tier1Filled, ...comboboxFilled]
+      }
     } catch {
       setState({ status: 'error', message: 'Fill failed. Try refreshing the page.' })
       return
