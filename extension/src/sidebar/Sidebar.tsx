@@ -878,6 +878,17 @@ function ReviewState({
   aiUnavailable: boolean
   onDone: () => void
 }) {
+  // Detect the next/continue button once when the review panel mounts.
+  // useState initializer runs once — safe to call DOM APIs here.
+  const [pageType] = useState(() => detectPageType())
+
+  const handleContinue = () => {
+    if (pageType.hasNextButton) {
+      detectNextButton()?.click()
+    }
+    onDone()
+  }
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -933,9 +944,29 @@ function ReviewState({
         </div>
       )}
 
-      <p style={{ fontSize: '11px', color: '#52525b', margin: 0 }}>
-        Review the form, then submit when ready.
-      </p>
+      {pageType.hasNextButton ? (
+        <button
+          onClick={handleContinue}
+          style={{
+            width: '100%',
+            padding: '8px 0',
+            background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+            border: 'none',
+            borderRadius: '6px',
+            color: '#fff',
+            fontSize: '12px',
+            fontWeight: 600,
+            cursor: 'pointer',
+            letterSpacing: '0.01em',
+          }}
+        >
+          {pageType.nextButtonText ?? 'Continue'} →
+        </button>
+      ) : (
+        <p style={{ fontSize: '11px', color: '#52525b', margin: 0 }}>
+          Review the form, then submit when ready.
+        </p>
+      )}
     </div>
   )
 }
