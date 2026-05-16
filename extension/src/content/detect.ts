@@ -1,4 +1,5 @@
 import type { AtsType, PageInfo, PageTypeInfo } from '../shared/types'
+import { queryShadowAll } from '../shared/domUtils'
 
 export function detectAts(url: string): AtsType {
   if (/boards\.greenhouse\.io/.test(url) || /[?&]gh_jid=/.test(url)) return 'greenhouse'
@@ -96,11 +97,15 @@ export function detectNextButton(): HTMLElement | null {
   // Don't advance if a modal is open
   if (isModalVisible()) return null
 
-  const candidates = Array.from(
-    document.querySelectorAll<HTMLElement>(
-      'button[type="submit"], button[type="button"], button:not([type]), input[type="button"], input[type="submit"]'
-    )
-  )
+  // Workday-specific: stable automation-id attributes on next/continue buttons
+  const workdayBtn = queryShadowAll<HTMLElement>(
+    '[data-automation-id="nextButton"], [data-automation-id="bottomNavigationNext"], [data-automation-id="continueButton"]'
+  ).find(isVisible)
+  if (workdayBtn) return workdayBtn
+
+  // Generic: text-pattern scan across both light DOM and shadow DOM
+  const BTN_SELECTOR = 'button[type="submit"], button[type="button"], button:not([type]), input[type="button"], input[type="submit"]'
+  const candidates = queryShadowAll<HTMLElement>(BTN_SELECTOR)
 
   for (const btn of candidates) {
     const rawText = btn instanceof HTMLInputElement
@@ -123,9 +128,9 @@ export function detectPageType(): PageTypeInfo {
   const nextBtn = detectNextButton()
   const hasNextButton = nextBtn !== null
 
-  // Look for a submit button that isn't also a Next button
-  const submitBtns = Array.from(
-    document.querySelectorAll<HTMLElement>('button[type="submit"], input[type="submit"]')
+  // Look for a submit button that isn't also a Next button — shadow-aware
+  const submitBtns = queryShadowAll<HTMLElement>(
+    'button[type="submit"], input[type="submit"], [data-automation-id="submitButton"]'
   ).filter(isVisible)
 
   const hasFinalSubmit = !hasNextButton && submitBtns.length > 0

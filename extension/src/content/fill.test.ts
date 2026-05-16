@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest'
-import { getLabelForInput, isElementFillable, queryShadowAll, computeFills, applyFills } from './fill'
+import { getLabelForInput, isElementFillable, computeFills, applyFills, parseAddress } from './fill'
+import { queryShadowAll } from '../shared/domUtils'
 import type { FullProfile, ScannedField } from '../shared/types'
 
 // ─── Minimal profile fixture ──────────────────────────────────────────────────
@@ -322,6 +323,7 @@ describe('applyFills', () => {
       selector: '#fn',
       elRef: new WeakRef(input),
       source: 'label',
+      kind: 'text',
     }]
 
     const filled = applyFills(fields)
@@ -347,6 +349,7 @@ describe('applyFills', () => {
       selector: '#gone',
       elRef: ref,
       source: 'label',
+      kind: 'text',
     }]
 
     // After setBody(''), the element still exists in memory (WeakRef alive).
@@ -368,6 +371,7 @@ describe('applyFills', () => {
       selector: '#pre',
       elRef: new WeakRef(input),
       source: 'label',
+      kind: 'text',
     }]
 
     const filled = applyFills(fields)
@@ -386,6 +390,7 @@ describe('applyFills', () => {
       selector: '#em',
       elRef: new WeakRef(input),
       source: 'automation-id',
+      kind: 'text',
     }]
 
     const filled = applyFills(fields)
@@ -427,5 +432,178 @@ describe('getLabelForInput — shadow DOM boundary crossing', () => {
     const label = getLabelForInput(input)
     // The heading is >80 chars so it should not be returned
     expect(label.length).toBe(0)
+  })
+})
+
+// ─── parseAddress ─────────────────────────────────────────────────────────────
+
+describe('parseAddress', () => {
+  it('parses 3-part US address with street', () => {
+    const r = parseAddress('6925 SE 152nd Ave., Portland, OR 97236')
+    expect(r.street).toBe('6925 SE 152nd Ave.')
+    expect(r.city).toBe('Portland')
+    expect(r.state).toBe('OR')
+    expect(r.zip).toBe('97236')
+  })
+
+  it('parses 2-part address without street (city + ST ZIP)', () => {
+    const r = parseAddress('Portland, OR 97236')
+    expect(r.street).toBeNull()
+    expect(r.city).toBe('Portland')
+    expect(r.state).toBe('OR')
+    expect(r.zip).toBe('97236')
+  })
+
+  it('parses 2-part address without zip (city + ST)', () => {
+    const r = parseAddress('Portland, OR')
+    expect(r.street).toBeNull()
+    expect(r.city).toBe('Portland')
+    expect(r.state).toBe('OR')
+    expect(r.zip).toBeNull()
+  })
+
+  it('returns null state and zip for unrecognized international format', () => {
+    const r = parseAddress('123 Main St')
+    expect(r.state).toBeNull()
+    expect(r.zip).toBeNull()
+  })
+})
+
+// ─── computeFills — address resolvers ────────────────────────────────────────
+
+describe('computeFills — address field parsing', () => {
+  beforeEach(() => setBody(''))
+
+  const ADDR_PROFILE: FullProfile = {
+    ...PROFILE,
+    user: { ...PROFILE.user, address: '6925 SE 152nd Ave., Portland, OR 97236' },
+  }
+
+  function makeFillable(id: string, label: string, type = 'text') {
+    const lbl = document.createElement('label')
+    lbl.htmlFor = id
+    lbl.textContent = label
+    const input = document.createElement('input')
+    input.id = id
+    input.type = type
+    input.getBoundingClientRect = () => ({ width: 200, height: 32, top: 10, left: 10, bottom: 42, right: 210, x: 10, y: 10, toJSON: () => {} })
+    document.body.appendChild(lbl)
+    document.body.appendChild(input)
+    return input
+  }
+
+  it('fills city with city part only (not street)', () => {
+    makeFillable('city', 'City')
+    const results = computeFills(ADDR_PROFILE, 'generic')
+    const city = results.find((f) => f.label === 'city')
+    expect(city?.value).toBe('Portland')
+  })
+
+  it('fills state with 2-letter code', () => {
+    makeFillable('state', 'State')
+    const results = computeFills(ADDR_PROFILE, 'generic')
+    const state = results.find((f) => f.label === 'state')
+    expect(state?.value).toBe('OR')
+  })
+
+  it('fills zip with 5-digit code', () => {
+    makeFillable('zip', 'Zip Code')
+    const results = computeFills(ADDR_PROFILE, 'generic')
+    const zip = results.find((f) => f.label === 'zip code')
+    expect(zip?.value).toBe('97236')
+  })
+})
+
+// ─── computeFills — radio button detection ───────────────────────────────────
+
+describe('computeFills — radio button detection', () => {
+  beforeEach(() => setBody(''))
+
+  it('selects No for an employment question', () => {
+    setBody(`
+      <fieldset>
+        <legend>Have you previously worked for this company?</legend>
+        <label><input type="radio" name="emp" id="r-yes" value="yes" /> Yes</label>
+        <label><input type="radio" name="emp" id="r-no" value="no" /> No</label>
+      </fieldset>
+    `)
+    document.querySelectorAll<HTMLInputElement>('input[type="radio"]').forEach((el) => {
+      el.getBoundingClientRect = () => ({ width: 20, height: 20, top: 10, left: 10, bottom: 30, right: 30, x: 10, y: 10, toJSON: () => {} })
+    })
+    const results = computeFills(PROFILE, 'generic')
+    const radio = results.find((f) => f.kind === 'radio')
+    expect(radio).toBeDefined()
+    expect(radio?.value.toLowerCase()).toBe('no')
+  })
+
+  it('skips radio groups matching SKIP_LABEL_PATTERNS', () => {
+    setBody(`
+      <fieldset>
+        <legend>Were you referred by an employee?</legend>
+        <label><input type="radio" name="ref" id="r-yes2" value="yes" /> Yes</label>
+        <label><input type="radio" name="ref" id="r-no2" value="no" /> No</label>
+      </fieldset>
+    `)
+    document.querySelectorAll<HTMLInputElement>('input[type="radio"]').forEach((el) => {
+      el.getBoundingClientRect = () => ({ width: 20, height: 20, top: 10, left: 10, bottom: 30, right: 30, x: 10, y: 10, toJSON: () => {} })
+    })
+    const results = computeFills(PROFILE, 'generic')
+    expect(results.filter((f) => f.kind === 'radio')).toHaveLength(0)
+  })
+
+  it('does not re-select an already-checked radio', () => {
+    setBody(`
+      <fieldset>
+        <legend>Have you previously worked for this company?</legend>
+        <label><input type="radio" name="emp2" id="r-yes3" value="yes" checked /> Yes</label>
+        <label><input type="radio" name="emp2" id="r-no3" value="no" /> No</label>
+      </fieldset>
+    `)
+    document.querySelectorAll<HTMLInputElement>('input[type="radio"]').forEach((el) => {
+      el.getBoundingClientRect = () => ({ width: 20, height: 20, top: 10, left: 10, bottom: 30, right: 30, x: 10, y: 10, toJSON: () => {} })
+    })
+    const results = computeFills(PROFILE, 'generic')
+    const radios = results.filter((f) => f.kind === 'radio')
+    // "No" option should be found but "Yes" is already checked, so targeting No
+    // The test verifies neither option causes a re-select of an already-checked input
+    radios.forEach((r) => {
+      const el = r.elRef.deref() as HTMLInputElement | undefined
+      expect(el?.checked).toBe(false)
+    })
+  })
+
+  it('selects Yes for work authorization question', () => {
+    setBody(`
+      <fieldset>
+        <legend>Are you legally authorized to work in the US?</legend>
+        <label><input type="radio" name="auth" id="auth-yes" value="yes" /> Yes</label>
+        <label><input type="radio" name="auth" id="auth-no" value="no" /> No</label>
+      </fieldset>
+    `)
+    document.querySelectorAll<HTMLInputElement>('input[type="radio"]').forEach((el) => {
+      el.getBoundingClientRect = () => ({ width: 20, height: 20, top: 10, left: 10, bottom: 30, right: 30, x: 10, y: 10, toJSON: () => {} })
+    })
+    const results = computeFills(PROFILE, 'generic')
+    const radio = results.find((f) => f.kind === 'radio')
+    expect(radio?.value.toLowerCase()).toBe('yes')
+  })
+
+  it('applies radio fill — dispatches click and marks as filled', () => {
+    setBody(`
+      <fieldset>
+        <legend>Are you legally authorized to work in the US?</legend>
+        <label><input type="radio" name="auth2" id="auth2-yes" value="yes" /> Yes</label>
+        <label><input type="radio" name="auth2" id="auth2-no" value="no" /> No</label>
+      </fieldset>
+    `)
+    document.querySelectorAll<HTMLInputElement>('input[type="radio"]').forEach((el) => {
+      el.getBoundingClientRect = () => ({ width: 20, height: 20, top: 10, left: 10, bottom: 30, right: 30, x: 10, y: 10, toJSON: () => {} })
+    })
+    const scanned = computeFills(PROFILE, 'generic')
+    const filled = applyFills(scanned)
+    expect(filled.length).toBeGreaterThan(0)
+    // The Yes radio should now be clicked (jsdom sets checked on click)
+    const yesInput = document.getElementById('auth2-yes') as HTMLInputElement
+    expect(yesInput.checked).toBe(true)
   })
 })

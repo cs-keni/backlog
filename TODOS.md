@@ -25,6 +25,18 @@ Deferred tasks and known issues. Each item has enough context to pick up months 
 **Trigger condition:** Test the text-only Workday fill on a real application first. If country/state/work-auth block page 1 advancement, this becomes high priority.
 **Depends on:** Workday text-input fill (Phase 1) + live testing to identify gated fields.
 
+### Profile address subfields (street, city, state, zip)
+**What:** Add separate `street_address`, `city`, `state`, `postal_code` columns to the user profile DB table and expose them in the Profile UI. The extension would read from these directly instead of parsing a single address string.
+**Why:** `parseAddress()` (added 2026-05-15) is a stopgap that parses "6925 SE 152nd Ave., Portland, OR 97236". Explicit fields eliminate parsing fragility and correctly handle international addresses where there is no 2-letter state code.
+**How to apply:** DB migration to add the 4 columns. Update `/api/profile` to return them. Update the Profile page to have separate input fields. Update extension's `WORKDAY_ID_MAP` and `FIELD_MAP` to read the explicit fields directly (no `parseAddress()` needed). Keep `parseAddress()` as a fallback when explicit fields are absent.
+**Depends on:** Nothing blocking. Can be done anytime.
+
+### Radio button workHistory check
+**What:** When filling "Have you previously worked at [company]?" radio buttons, check `profile.work_experience` for prior employment at the company name instead of always defaulting "No".
+**Why:** The current implementation (added 2026-05-15) defaults to "No" for any employment question. This is safe (user reviews before submitting) but will give the wrong answer for users applying back to former employers.
+**How to apply:** In the `RADIO_FIELD_MAP` employment resolver, extract the company name from the question text and cross-reference against `profile.work_experience[].company`. If a match is found, answer "Yes"; otherwise "No".
+**Depends on:** Radio button support (Phase 10B) + profile.work_experience being populated.
+
 ### Workday DOM fixture capture for fill.test.ts
 **What:** After live testing on a real Workday application, capture serialized HTML (including shadow DOM) as a test fixture file. Use this in fill.test.ts to test Workday-specific behavior against a real DOM structure rather than synthetic jsdom trees.
 **Why:** Codex flagged during the 2026-05-15 eng review that synthetic tests won't catch real Workday behavior: nested shadow roots, repeated automation IDs across steps, async mount order, React controlled inputs.

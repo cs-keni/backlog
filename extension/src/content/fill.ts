@@ -1,4 +1,5 @@
 import type { FullProfile, FilledField, SkippedField, FillResult, AtsType, UnfilledField, ScannedField } from '../shared/types'
+import { queryShadowAll, queryShadowScoped } from '../shared/domUtils'
 
 // ─── Input value setter ───────────────────────────────────────────────────────
 // Works for standard inputs and React/Angular controlled inputs by dispatching
@@ -32,6 +33,49 @@ function setSelectValue(select: HTMLSelectElement, value: string) {
     select.dispatchEvent(new Event('change', { bubbles: true }))
     select.dispatchEvent(new Event('blur', { bubbles: true }))
   }
+}
+
+// ─── Address parser ───────────────────────────────────────────────────────────
+// Handles the two common US formats stored in profile.user.address:
+//   "6925 SE 152nd Ave., Portland, OR 97236"  (3-part: street, city, ST ZIP)
+//   "Portland, OR 97236"                       (2-part: city, ST ZIP)
+// Falls back gracefully when format doesn't match (international addresses, etc.)
+
+interface ParsedAddress {
+  street: string | null
+  city: string | null
+  state: string | null
+  zip: string | null
+}
+
+export function parseAddress(address: string): ParsedAddress {
+  const parts = address.split(',').map((s) => s.trim()).filter(Boolean)
+  const parseStateZip = (s: string) => {
+    const m = s.match(/^([A-Z]{2})\s+(\d{5}(?:-\d{4})?)$/)
+    return m ? { state: m[1], zip: m[2] } : null
+  }
+
+  if (parts.length >= 3) {
+    // "Street, City, ST ZIP" — the last part may be "ST ZIP" or just "ZIP" after a separate state
+    const stateZip = parseStateZip(parts[parts.length - 1])
+    if (stateZip) {
+      return { street: parts[0], city: parts[1], ...stateZip }
+    }
+    // "Street, City, State, ZIP" — 4 explicit parts
+    if (parts.length >= 4) {
+      return { street: parts[0], city: parts[1], state: parts[2], zip: parts[3] }
+    }
+    return { street: parts[0], city: parts[1], state: parts[2], zip: null }
+  }
+
+  if (parts.length === 2) {
+    // "City, ST ZIP"
+    const stateZip = parseStateZip(parts[1])
+    if (stateZip) return { street: null, city: parts[0], ...stateZip }
+    return { street: null, city: parts[0], state: parts[1], zip: null }
+  }
+
+  return { street: null, city: parts[0] ?? null, state: null, zip: null }
 }
 
 // ─── Visibility check ─────────────────────────────────────────────────────────
@@ -140,19 +184,19 @@ const FIELD_MAP: Array<FieldEntry> = [
   { patterns: /linkedin/, resolve: (p) => p.user.linkedin_url },
   { patterns: /github/, resolve: (p) => p.user.github_url },
   { patterns: /portfolio|personal\s*site|personal\s*website|website|url/, resolve: (p) => p.user.portfolio_url },
-  { patterns: /address/, resolve: (p) => p.user.address },
+  { patterns: /address/, exclude: /line.*2|apt|suite|unit/, resolve: (p) => parseAddress(p.user.address ?? '').street ?? p.user.address },
   // City+State combined must come before individual city/state patterns
   {
     patterns: /\bcity\b.*\bstate\b|\bcity.*province/,
     resolve: (p) => {
-      const parts = p.user.address?.split(',').map((s) => s.trim()) ?? []
-      return parts.length >= 2 ? `${parts[0]}, ${parts[1]}` : (p.user.address ?? null)
+      const { city, state } = parseAddress(p.user.address ?? '')
+      return city && state ? `${city}, ${state}` : (p.user.address ?? null)
     },
   },
-  { patterns: /\bcity\b/, resolve: (p) => p.user.address?.split(',')[0]?.trim() ?? null },
+  { patterns: /\bcity\b/, resolve: (p) => parseAddress(p.user.address ?? '').city },
   // Use word boundary so "United States" and "statements" don't match
-  { patterns: /\bstate\b|\bprovince\b|\bregion\b/, resolve: (p) => p.user.address?.split(',')[1]?.trim() ?? null },
-  { patterns: /zip|postal/, resolve: (p) => p.user.address?.split(',').pop()?.trim() ?? null },
+  { patterns: /\bstate\b|\bprovince\b|\bregion\b/, resolve: (p) => parseAddress(p.user.address ?? '').state },
+  { patterns: /zip|postal/, resolve: (p) => parseAddress(p.user.address ?? '').zip },
   { patterns: /country/, resolve: () => 'United States' },
   // Compliance yes/no — these must come before /state/ to avoid false matches on "United States"
   { patterns: /at least 18|18 years of age/, resolve: () => 'Yes' },
@@ -197,10 +241,10 @@ const WORKDAY_ID_MAP: Array<{ ids: RegExp; resolve: Resolver }> = [
   // Contact
   { ids: /^email$|^emailAddress$|^workEmail$/, resolve: (p) => p.user.email },
   { ids: /^phone$|^phoneNumber$|^phonePrimary$|^mobilePhone$/, resolve: (p) => p.user.phone },
-  // Address
-  { ids: /^addressLine1$|^addressSection_addressLine1$/, resolve: (p) => p.user.address?.split(',')[0]?.trim() ?? null },
-  { ids: /^city$|^addressSection_city$/, resolve: (p) => p.user.address?.split(',')[0]?.trim() ?? null },
-  { ids: /^postalCode$|^zipCode$|^addressSection_postalCode$/, resolve: (p) => p.user.address?.split(',').pop()?.trim() ?? null },
+  // Address — all resolvers use parseAddress() for consistent splitting
+  { ids: /^addressLine1$|^addressSection_addressLine1$/, resolve: (p) => parseAddress(p.user.address ?? '').street ?? p.user.address?.split(',')[0]?.trim() ?? null },
+  { ids: /^city$|^addressSection_city$/, resolve: (p) => parseAddress(p.user.address ?? '').city },
+  { ids: /^postalCode$|^zipCode$|^addressSection_postalCode$/, resolve: (p) => parseAddress(p.user.address ?? '').zip },
   // Online presence
   { ids: /^linkedIn(Url)?$|^linkedInProfile$/, resolve: (p) => p.user.linkedin_url },
   { ids: /^gitHub(Url)?$|^githubProfile$/, resolve: (p) => p.user.github_url },
@@ -222,40 +266,33 @@ function resolveWorkdayField(automationId: string, profile: FullProfile): string
 }
 
 // ─── Shadow DOM traversal ─────────────────────────────────────────────────────
-// Scoped to form containers first (fast), falls back to full document.
-// Workday renders inputs inside nested shadow roots — must recurse into each.
-
-export function queryShadowAll<T extends Element>(selector: string, root: Document | ShadowRoot | Element = document): T[] {
-  const results: T[] = Array.from((root as Document | ShadowRoot | Element).querySelectorAll<T>(selector))
-  for (const host of (root as Document | ShadowRoot | Element).querySelectorAll('*')) {
-    if ((host as Element & { shadowRoot?: ShadowRoot }).shadowRoot) {
-      results.push(...queryShadowAll<T>(selector, (host as Element & { shadowRoot: ShadowRoot }).shadowRoot))
-    }
-  }
-  return results
-}
-
-function queryShadowScoped<T extends Element>(selector: string): T[] {
-  // Try form containers first (much faster on React-heavy Workday pages)
-  const containers = Array.from(document.querySelectorAll<Element>(
-    'form, main, [role="main"], [data-automation-id]'
-  ))
-  if (containers.length === 0) return queryShadowAll<T>(selector)
-
-  const seen = new Set<T>()
-  const results: T[] = []
-  for (const container of containers) {
-    for (const el of queryShadowAll<T>(selector, container)) {
-      if (!seen.has(el)) { seen.add(el); results.push(el) }
-    }
-  }
-  // Fallback: if scoped traversal found nothing, try full document
-  if (results.length === 0) return queryShadowAll<T>(selector)
-  return results
-}
 
 // ─── Labels to never auto-fill ────────────────────────────────────────────────
 const SKIP_LABEL_PATTERNS = /referr(ed|al)|someone else|employee.*email|recruiter/
+
+// ─── Radio button resolution ──────────────────────────────────────────────────
+// Maps question text patterns to Yes/No/profile-based answers.
+// Keep separate from FIELD_MAP since radio groups need question-level matching
+// rather than field-label matching, and the answer is a click target label.
+
+const RADIO_FIELD_MAP: Array<{ patterns: RegExp; resolve: (profile: FullProfile) => string | null }> = [
+  // Employment at the applying company — default No (safe; user reviews before submit)
+  { patterns: /previously worked|current.*employ|work.*here|employed.*here|former.*employ/, resolve: () => 'No' },
+  // Legal / work authorization
+  { patterns: /legally authorized|authorized to work|eligible to work/, resolve: () => 'Yes' },
+  { patterns: /require.*sponsor|visa.*sponsor|need.*sponsor|sponsorship.*required/, resolve: (p) => p.user.visa_sponsorship_required ? 'Yes' : 'No' },
+  // Age / compliance
+  { patterns: /at least 18|18 years|age requirement/, resolve: () => 'Yes' },
+  // Relocation
+  { patterns: /willing.*relocat|open.*relocat/, resolve: (p) => p.user.willing_to_relocate ? 'Yes' : 'No' },
+]
+
+function resolveRadio(question: string, profile: FullProfile): string | null {
+  for (const { patterns, resolve } of RADIO_FIELD_MAP) {
+    if (patterns.test(question)) return resolve(profile)
+  }
+  return null
+}
 
 // ─── computeFills — read-only scan ───────────────────────────────────────────
 // Returns a list of fields that would be filled, without touching the DOM.
@@ -311,6 +348,7 @@ export function computeFills(profile: FullProfile, ats: AtsType): ScannedField[]
         selector,
         elRef: new WeakRef(input),
         source,
+        kind: 'text',
       })
     } catch { /* skip bad element */ }
   }
@@ -342,6 +380,78 @@ export function computeFills(profile: FullProfile, ats: AtsType): ScannedField[]
           selector,
           elRef: new WeakRef(select),
           source: 'label',
+          kind: 'select',
+        })
+      } catch { /* skip */ }
+    }
+  }
+
+  // ── Radio button groups (Yes/No and compliance questions) ─────────────────
+  // Query both native radio inputs and ARIA radio elements (Workday uses both).
+  // Group by name attribute, find the question via fieldset/legend, resolve answer.
+  {
+    const radioInputs = ats === 'workday'
+      ? queryShadowScoped<HTMLInputElement>('input[type="radio"]')
+      : Array.from(document.querySelectorAll<HTMLInputElement>('input[type="radio"]'))
+
+    // Group by [name] attribute to find unique questions
+    const groups = new Map<string, HTMLInputElement[]>()
+    for (const input of radioInputs) {
+      if (!isElementFillable(input)) continue
+      const key = input.name || input.getAttribute('data-automation-id') || input.id
+      if (!key) continue
+      if (!groups.has(key)) groups.set(key, [])
+      groups.get(key)!.push(input)
+    }
+
+    for (const [, options] of groups) {
+      try {
+        // Find the question text from the nearest fieldset legend or ancestor label
+        const first = options[0]
+        let question = ''
+        const fieldset = first.closest('fieldset')
+        if (fieldset) {
+          question = fieldset.querySelector('legend')?.textContent?.trim().toLowerCase() ?? ''
+        }
+        if (!question) {
+          // Walk up for a label-like ancestor
+          let ancestor = first.parentElement
+          while (ancestor && ancestor !== document.body) {
+            const labelEl = ancestor.querySelector(':scope > label, :scope > [class*="label"], :scope > legend')
+            if (labelEl) { question = labelEl.textContent?.trim().toLowerCase() ?? ''; break }
+            if (ancestor.tagName === 'FORM' || ancestor.tagName === 'FIELDSET') break
+            ancestor = ancestor.parentElement
+          }
+        }
+        if (!question) question = getLabelForInput(first)
+        if (!question || SKIP_LABEL_PATTERNS.test(question)) continue
+
+        const answer = resolveRadio(question, profile)
+        if (!answer) continue
+
+        // Find the option whose visible label matches the answer (case-insensitive)
+        const targetOption = options.find((opt) => {
+          if (opt.checked) return false // Already selected — do not change
+          const label =
+            document.querySelector(`label[for="${opt.id}"]`)?.textContent?.trim().toLowerCase() ??
+            opt.closest('label')?.textContent?.trim().toLowerCase() ??
+            opt.getAttribute('aria-label')?.toLowerCase() ??
+            opt.value.toLowerCase()
+          return label === answer.toLowerCase() || label.startsWith(answer.toLowerCase())
+        })
+        if (!targetOption) continue
+
+        const selector = targetOption.id
+          ? `#${CSS.escape(targetOption.id)}`
+          : `input[name="${targetOption.name}"][value="${targetOption.value}"]`
+
+        scanned.push({
+          label: question,
+          value: answer,
+          selector,
+          elRef: new WeakRef(targetOption),
+          source: 'label',
+          kind: 'radio',
         })
       } catch { /* skip */ }
     }
@@ -354,6 +464,12 @@ export function computeFills(profile: FullProfile, ats: AtsType): ScannedField[]
 // Takes the output of computeFills and writes to DOM.
 // Uses WeakRef to get the live element — skips gracefully if element was unmounted.
 
+function flashFill(el: HTMLElement) {
+  el.style.outline = '2px solid #6366f1'
+  el.style.transition = 'outline 0.15s ease'
+  setTimeout(() => { el.style.outline = ''; el.style.transition = '' }, 700)
+}
+
 export function applyFills(fields: ScannedField[]): FilledField[] {
   const filled: FilledField[] = []
 
@@ -362,10 +478,18 @@ export function applyFills(fields: ScannedField[]): FilledField[] {
       const el = field.elRef.deref()
       if (!el) continue // Element was garbage collected / unmounted
 
-      if (el instanceof HTMLSelectElement) {
+      if (field.kind === 'radio') {
+        const radio = el as HTMLInputElement
+        if (radio.checked) continue // Already selected — do not change
+        radio.click()
+        radio.dispatchEvent(new Event('change', { bubbles: true }))
+        flashFill(radio)
+        filled.push({ label: field.label, value: field.value, selector: field.selector })
+      } else if (el instanceof HTMLSelectElement) {
         const before = el.value
         setSelectValue(el, field.value)
         if (el.value !== before && el.value !== '') {
+          flashFill(el)
           filled.push({
             label: field.label,
             value: el.options[el.selectedIndex]?.text ?? field.value,
@@ -375,6 +499,7 @@ export function applyFills(fields: ScannedField[]): FilledField[] {
       } else if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) {
         if (el.value.trim()) continue // Don't overwrite existing values
         setNativeValue(el, field.value)
+        flashFill(el)
         filled.push({ label: field.label, value: field.value, selector: field.selector })
       }
     } catch { /* skip bad element */ }

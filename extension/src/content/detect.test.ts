@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest'
-import { detectAts } from './detect'
+import { detectAts, detectNextButton } from './detect'
 
 // hasJobForm is not exported — we test it indirectly through detectAts('') on a generic page
 // by checking the full extractPageInfo behavior via the DOM it reads.
@@ -173,5 +173,68 @@ describe('hasJobForm — MUST detect real job application forms', () => {
       </form>
     `)
     expect(detectAts(window.location.href)).toBe('generic')
+  })
+})
+
+// ─── detectNextButton — light DOM ────────────────────────────────────────────
+
+describe('detectNextButton — light DOM', () => {
+  beforeEach(() => { document.body.innerHTML = '' })
+
+  function makeVisible(el: HTMLElement) {
+    el.getBoundingClientRect = () => ({
+      width: 100, height: 40, top: 10, left: 10,
+      bottom: 50, right: 110, x: 10, y: 10, toJSON: () => {},
+    })
+  }
+
+  it('finds a Next button by text', () => {
+    setBody('<button type="button">Next</button>')
+    const btn = document.querySelector<HTMLButtonElement>('button')!
+    makeVisible(btn)
+    expect(detectNextButton()).toBe(btn)
+  })
+
+  it('ignores a Back button', () => {
+    setBody('<button type="button">Back</button>')
+    const btn = document.querySelector<HTMLButtonElement>('button')!
+    makeVisible(btn)
+    expect(detectNextButton()).toBeNull()
+  })
+})
+
+// ─── detectNextButton — shadow DOM ────────────────────────────────────────────
+
+describe('detectNextButton — shadow DOM traversal', () => {
+  beforeEach(() => { document.body.innerHTML = '' })
+
+  it('finds a Next button inside a shadow root', () => {
+    setBody('<div id="host"></div>')
+    const host = document.getElementById('host')!
+    const shadow = host.attachShadow({ mode: 'open' })
+    const btn = document.createElement('button')
+    btn.type = 'button'
+    btn.textContent = 'Next'
+    btn.getBoundingClientRect = () => ({
+      width: 100, height: 40, top: 10, left: 10,
+      bottom: 50, right: 110, x: 10, y: 10, toJSON: () => {},
+    })
+    shadow.appendChild(btn)
+    expect(detectNextButton()).toBe(btn)
+  })
+
+  it('finds a Workday nextButton by data-automation-id in shadow root', () => {
+    setBody('<div id="wdhost"></div>')
+    const host = document.getElementById('wdhost')!
+    const shadow = host.attachShadow({ mode: 'open' })
+    const btn = document.createElement('button')
+    btn.setAttribute('data-automation-id', 'nextButton')
+    btn.textContent = 'Go'
+    btn.getBoundingClientRect = () => ({
+      width: 100, height: 40, top: 10, left: 10,
+      bottom: 50, right: 110, x: 10, y: 10, toJSON: () => {},
+    })
+    shadow.appendChild(btn)
+    expect(detectNextButton()).toBe(btn)
   })
 })
