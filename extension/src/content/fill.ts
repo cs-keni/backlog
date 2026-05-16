@@ -579,87 +579,85 @@ const US_STATES: Record<string, string> = {
   DC: 'District of Columbia',
 }
 
-// Maps data-automation-id patterns to their value resolvers for Workday comboboxes
-const WORKDAY_COMBOBOX_MAP: Array<{ ids: RegExp; resolve: Resolver; label: string }> = [
+// Maps automation-id patterns (for scan preview) + direct button selectors (for fill).
+// The button selector comes from inspecting the live page: Workday renders state as
+// <button aria-haspopup="listbox" name="countryRegion" id="address--countryRegion">.
+const WORKDAY_COMBOBOX_MAP: Array<{ ids: RegExp; buttonSelector: string; resolve: Resolver; label: string }> = [
   {
     ids: /^countryRegion$|^formField-countryRegion$|^stateProvince$|^addressSection_stateProvince$|^countryRegionAbbreviation$/,
+    buttonSelector: 'button[name="countryRegion"], button[id*="countryRegion"][aria-haspopup]',
     resolve: (p) => parseAddress(p.user.address ?? '').state,
     label: 'State / Province',
   },
 ]
 
-function waitForMenuItems(timeoutMs = 2000): Promise<HTMLElement[]> {
+// Polls for a [role="listbox"] with multiple [role="option"] children.
+// Avoids [data-automation-id="menuItem"] which is used for tag/chip components
+// (e.g. the phone country-code selector chip shows a menuItem even when no
+// dropdown is open, causing false-positives in the old waitForMenuItems approach).
+function waitForListboxOptions(timeoutMs = 2000): Promise<HTMLElement[]> {
   return new Promise((resolve) => {
     const deadline = Date.now() + timeoutMs
     const check = () => {
-      const items = queryShadowAll<HTMLElement>('[data-automation-id="menuItem"]')
-      if (items.length > 0) { resolve(items); return }
+      const listboxes = queryShadowAll<HTMLElement>('[role="listbox"]')
+      for (const lb of listboxes) {
+        const opts = queryShadowAll<HTMLElement>('[role="option"]', lb)
+        if (opts.length > 1) { resolve(opts); return }
+      }
       if (Date.now() >= deadline) { resolve([]); return }
       setTimeout(check, 100)
     }
-    // Give the open animation a head start before the first poll
     setTimeout(check, 150)
   })
 }
 
-async function clickWorkdayCombobox(wrapper: Element, targetValue: string): Promise<boolean> {
+async function clickWorkdayCombobox(button: HTMLElement, targetValue: string): Promise<boolean> {
   const fullName = US_STATES[targetValue.toUpperCase()] ?? targetValue
   const normalized = fullName.toLowerCase()
 
-  // Click the trigger inside the wrapper (button, combobox role, or the wrapper itself)
-  const trigger =
-    queryShadowAll<HTMLElement>('button, [role="combobox"], [role="button"], [aria-haspopup]', wrapper)
-      .find((el) => isElementFillable(el)) ??
-    (wrapper as HTMLElement)
+  button.click()
 
-  trigger.click()
+  const options = await waitForListboxOptions(2000)
+  if (options.length === 0) return false
 
-  const menuItems = await waitForMenuItems(2000)
-  if (menuItems.length === 0) return false
-
-  // Match by full state name (includes is more robust than startsWith —
-  // Workday may label options "OR - Oregon" or add region suffixes)
-  const match = menuItems.find((li) => {
-    const text = li.textContent?.trim().toLowerCase() ?? ''
+  const match = options.find((opt) => {
+    const text = opt.textContent?.trim().toLowerCase() ?? ''
     return text === normalized || text.includes(normalized)
   })
   if (!match) return false
 
-  // The LI has role="presentation" — clicking it does nothing in React's event
-  // system. Click the inner [role="option"] or [data-automation-id="promptOption"]
-  // which is the actual interactive element that Workday listens on.
-  const clickTarget =
-    queryShadowAll<HTMLElement>('[role="option"], [data-automation-id="promptOption"]', match)[0] ??
-    match
-
-  clickTarget.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }))
-  clickTarget.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true }))
-  clickTarget.click()
+  match.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }))
+  match.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true }))
+  match.click()
   return true
 }
 
 export async function fillWorkdayComboboxes(profile: FullProfile): Promise<FilledField[]> {
   const filled: FilledField[] = []
 
-  for (const { ids, resolve, label } of WORKDAY_COMBOBOX_MAP) {
+  for (const { ids, buttonSelector, resolve, label } of WORKDAY_COMBOBOX_MAP) {
     try {
       const value = resolve(profile)
       if (!value) continue
 
-      const wrappers = queryShadowAll<HTMLElement>('[data-automation-id]').filter((el) =>
-        ids.test(el.getAttribute('data-automation-id') ?? '')
-      )
-
-      for (const wrapper of wrappers) {
-        if (!isElementFillable(wrapper)) continue
-        const automationId = wrapper.getAttribute('data-automation-id') ?? ''
-        const success = await clickWorkdayCombobox(wrapper, value)
-        if (success) {
-          const displayValue = US_STATES[value.toUpperCase()] ?? value
-          flashFill(wrapper)
-          filled.push({ label, value: displayValue, selector: `[data-automation-id="${automationId}"]` })
-          break
+      // Try direct button selector first (most reliable); fall back to wrapper scan
+      let button = queryShadowAll<HTMLElement>(buttonSelector)[0]
+      if (!button) {
+        const wrappers = queryShadowAll<HTMLElement>('[data-automation-id]').filter((el) =>
+          ids.test(el.getAttribute('data-automation-id') ?? '')
+        )
+        for (const wrapper of wrappers) {
+          const btn = queryShadowAll<HTMLElement>('button[aria-haspopup]', wrapper)[0]
+          if (btn) { button = btn; break }
         }
+      }
+      if (!button) continue
+
+      const success = await clickWorkdayCombobox(button, value)
+      if (success) {
+        const fullName = US_STATES[value.toUpperCase()] ?? value
+        flashFill(button)
+        filled.push({ label, value: fullName, selector: buttonSelector })
       }
     } catch { /* skip */ }
   }
