@@ -16,7 +16,7 @@ export async function PATCH(
     return Response.json({ error: 'Invalid request body' }, { status: 400 })
   }
 
-  const allowed = ['company', 'title', 'start_date', 'end_date', 'is_current', 'description', 'display_order']
+  const allowed = ['company', 'title', 'location', 'start_date', 'end_date', 'is_current', 'description', 'display_order']
   const updates: Record<string, unknown> = {}
   for (const key of allowed) {
     if (key in body) updates[key] = body[key]

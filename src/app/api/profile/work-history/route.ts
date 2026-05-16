@@ -37,6 +37,7 @@ export async function POST(request: Request) {
       user_id: user.id,
       company: body.company,
       title: body.title,
+      location: body.location ?? null,
       start_date: body.start_date ?? null,
       end_date: body.end_date ?? null,
       is_current: body.is_current ?? false,

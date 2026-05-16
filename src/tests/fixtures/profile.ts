@@ -9,6 +9,7 @@ export function makeWorkHistory(overrides: Partial<WorkHistory> = {}): WorkHisto
     user_id: 'user-1',
     company: 'Startup Inc',
     title: 'Software Engineer',
+    location: null,
     start_date: '2023-06-01',
     end_date: null,
     is_current: true,

@@ -10,7 +10,7 @@ interface WorkHistorySectionProps {
 }
 
 const EMPTY_FORM = {
-  company: '', title: '', start_date: '', end_date: '', is_current: false, description: '',
+  company: '', title: '', location: '', start_date: '', end_date: '', is_current: false, description: '',
 }
 
 type FormState = typeof EMPTY_FORM
@@ -51,6 +51,15 @@ function EntryForm({
             className="w-full px-3 py-1.5 rounded-lg bg-zinc-800 border border-zinc-700 text-sm text-zinc-100 placeholder:text-zinc-600 outline-none focus:border-zinc-500"
           />
         </div>
+      </div>
+      <div className="space-y-1">
+        <label className="text-xs text-zinc-400">Location</label>
+        <input
+          value={form.location}
+          onChange={e => set('location', e.target.value)}
+          placeholder="Portland, OR"
+          className="w-full px-3 py-1.5 rounded-lg bg-zinc-800 border border-zinc-700 text-sm text-zinc-100 placeholder:text-zinc-600 outline-none focus:border-zinc-500"
+        />
       </div>
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-1">
@@ -190,6 +199,7 @@ export function WorkHistorySection({ entries, onChange }: WorkHistorySectionProp
                 initial={{
                   company: entry.company,
                   title: entry.title,
+                  location: entry.location ?? '',
                   start_date: entry.start_date?.slice(0, 7) ?? '',
                   end_date: entry.end_date?.slice(0, 7) ?? '',
                   is_current: entry.is_current,
@@ -203,7 +213,7 @@ export function WorkHistorySection({ entries, onChange }: WorkHistorySectionProp
               <div className="flex items-start justify-between gap-3 p-3 rounded-lg border border-zinc-800 bg-zinc-900/50">
                 <div className="min-w-0">
                   <p className="text-sm font-medium text-zinc-100">{entry.title}</p>
-                  <p className="text-xs text-zinc-400">{entry.company}</p>
+                  <p className="text-xs text-zinc-400">{entry.company}{entry.location ? ` · ${entry.location}` : ''}</p>
                   {(entry.start_date || entry.end_date || entry.is_current) && (
                     <p className="text-xs text-zinc-600 mt-0.5">
                       {formatDate(entry.start_date)} – {entry.is_current ? 'Present' : formatDate(entry.end_date)}

@@ -664,13 +664,16 @@ async function fillWorkdaySkillsInternal(profile: FullProfile): Promise<FilledFi
   const skills = profile.user.skills
   if (!skills || skills.length === 0) return []
 
-  // Find the skills input by placeholder or label
+  // Find the skills input by placeholder, label, or container data-automation-id.
+  // Workday tag comboboxes don't label their inner <input> directly, so we also
+  // check the ancestor container's automation-id (e.g. "skill", "formField-skill").
   const skillsInput = queryShadowAll<HTMLInputElement>(
     'input[type="text"], input[type="search"]'
   ).find((el) => {
     const ph = el.placeholder?.toLowerCase() ?? ''
     const lbl = getLabelForInput(el).toLowerCase()
-    return ph.includes('skill') || lbl.includes('skill')
+    const cid = getContainerAutomationId(el)
+    return ph.includes('skill') || lbl.includes('skill') || cid.includes('skill')
   })
   if (!skillsInput) return []
 
@@ -726,6 +729,28 @@ function fmtMMYYYY(dateStr: string | null): string | null {
   return null
 }
 
+// Walk up from an element to find its nearest ancestor's data-automation-id,
+// crossing one shadow root boundary if needed. Used to identify tag combobox
+// containers (e.g. formField-school, skills) when the inner <input> has no label.
+function getContainerAutomationId(el: HTMLElement): string {
+  let current: Element | null = el.parentElement
+  for (let i = 0; i < 8 && current; i++) {
+    const id = current.getAttribute('data-automation-id') ?? ''
+    if (id && id !== 'promptOption') return id.toLowerCase()
+    current = current.parentElement
+  }
+  const root = el.getRootNode()
+  if (root instanceof ShadowRoot) {
+    let host: Element | null = root.host
+    for (let i = 0; i < 6 && host; i++) {
+      const id = host.getAttribute('data-automation-id') ?? ''
+      if (id) return id.toLowerCase()
+      host = host.parentElement
+    }
+  }
+  return ''
+}
+
 // Find the "Add" button for a section identified by data-automation-id pattern or
 // surrounding text content. Used for Work Experience and Education sections.
 function findSectionAdd(sectionIds: RegExp, sectionText: RegExp): HTMLElement | null {
@@ -775,30 +800,49 @@ function waitForNewInputs(baseline: number, timeoutMs = 1200): Promise<void> {
 }
 
 // Fill a single work history entry's visible form fields.
-// Called after "Add" / "Add Another" has been clicked and the form is in the DOM.
-async function fillWorkHistoryEntry(job: WorkHistory): Promise<FilledField[]> {
+// newTextInputs: inputs that appeared after clicking Add for this entry (scoped to avoid
+// cross-entry pollution). Falls back to global scan when not provided.
+async function fillWorkHistoryEntry(
+  job: WorkHistory,
+  newTextInputs?: HTMLInputElement[],
+  newCheckboxes?: HTMLInputElement[],
+  newTextareas?: HTMLTextAreaElement[],
+): Promise<FilledField[]> {
   const filled: FilledField[] = []
 
-  const tryFillInput = (labelPattern: RegExp, value: string | null) => {
+  // Find text input: first try within new inputs (scoped), then global fallback
+  const findTextInput = (pattern: RegExp): HTMLInputElement | null => {
+    const pool = newTextInputs
+      ?? queryShadowAll<HTMLInputElement>('input[type="text"]')
+    return pool.find((inp) => {
+      if (inp.value.trim()) return false
+      const lbl = getLabelForInput(inp).toLowerCase()
+      const cid = getContainerAutomationId(inp)
+      return pattern.test(lbl) || pattern.test(cid)
+    }) ?? null
+  }
+
+  const fillText = (pattern: RegExp, value: string | null, label: string) => {
     if (!value) return
-    for (const inp of queryShadowAll<HTMLInputElement>('input[type="text"]')) {
-      if (inp.value.trim()) continue
-      if (labelPattern.test(getLabelForInput(inp).toLowerCase())) {
-        setNativeValue(inp, value)
-        flashFill(inp)
-        filled.push({ label: getLabelForInput(inp) || String(labelPattern), value, selector: '' })
-        return
-      }
+    const inp = findTextInput(pattern)
+    if (inp) {
+      setNativeValue(inp, value)
+      flashFill(inp)
+      filled.push({ label, value, selector: '' })
     }
   }
 
-  tryFillInput(/job title|position|title/i, job.title)
-  tryFillInput(/company|employer|organization/i, job.company)
+  fillText(/job.?title|position|^title$/i, job.title, 'Job Title')
+  fillText(/company|employer|organization/i, job.company, 'Company')
+  if ((job as WorkHistory & { location?: string | null }).location) {
+    fillText(/^location$|city/i, (job as WorkHistory & { location?: string | null }).location!, 'Location')
+  }
 
-  // "I currently work here" checkbox
+  // "I currently work here" checkbox — scoped to new checkboxes if tracked
   if (job.is_current) {
-    const cbs = queryShadowAll<HTMLInputElement>('input[type="checkbox"]')
-    for (const cb of cbs) {
+    const cbPool = newCheckboxes
+      ?? queryShadowAll<HTMLInputElement>('input[type="checkbox"]')
+    for (const cb of cbPool) {
       if (/current|present/i.test(getLabelForInput(cb).toLowerCase()) && !cb.checked) {
         cb.click()
         filled.push({ label: 'Currently work here', value: 'checked', selector: '' })
@@ -808,29 +852,46 @@ async function fillWorkHistoryEntry(job: WorkHistory): Promise<FilledField[]> {
     }
   }
 
-  // Dates — look for inputs whose label is exactly "From" or "To"
+  // Date inputs — Workday uses placeholder "MM/YYYY" with no label on the inner input.
+  // We scope to the NEW inputs for this entry to avoid filling the wrong entry's dates.
+  // Within the new inputs, date fields are identified by MM/YYYY placeholder; first = From,
+  // second = To.
   const startFmt = fmtMMYYYY(job.start_date)
   const endFmt = job.is_current ? null : fmtMMYYYY(job.end_date)
 
-  for (const inp of queryShadowAll<HTMLInputElement>('input[type="text"]')) {
-    if (inp.value.trim()) continue
-    const lbl = getLabelForInput(inp).toLowerCase().replace(/[*\s]+/g, ' ').trim()
-    if (/^from$|^start date$/.test(lbl) && startFmt) {
-      setNativeValue(inp, startFmt)
-      flashFill(inp)
-      filled.push({ label: 'From', value: startFmt, selector: '' })
-    } else if (/^to$|^end date$/.test(lbl) && endFmt) {
-      setNativeValue(inp, endFmt)
-      flashFill(inp)
-      filled.push({ label: 'To', value: endFmt, selector: '' })
-    }
+  const datePool = (newTextInputs ?? queryShadowAll<HTMLInputElement>('input[type="text"]'))
+    .filter((inp) => {
+      if (inp.value.trim()) return false
+      const ph = inp.placeholder?.toLowerCase() ?? ''
+      const lbl = getLabelForInput(inp).toLowerCase()
+      const cid = getContainerAutomationId(inp)
+      return /mm\/?yyyy/i.test(ph) ||
+             /^from$|^start.?date$/i.test(lbl) ||
+             /startdate|datefrom|fromdate/i.test(cid)
+    })
+
+  if (startFmt && datePool[0]) {
+    setNativeValue(datePool[0], startFmt)
+    flashFill(datePool[0])
+    filled.push({ label: 'From', value: startFmt, selector: '' })
+  }
+  if (endFmt && datePool[1]) {
+    setNativeValue(datePool[1], endFmt)
+    flashFill(datePool[1])
+    filled.push({ label: 'To', value: endFmt, selector: '' })
   }
 
-  // Role Description (textarea)
+  // Role Description (textarea) — scoped to new textareas if tracked
   if (job.description) {
-    for (const ta of queryShadowAll<HTMLTextAreaElement>('textarea')) {
+    const taPool = newTextareas
+      ?? queryShadowAll<HTMLTextAreaElement>('textarea')
+    for (const ta of taPool) {
       if (ta.value.trim()) continue
-      if (/description|summary|role|responsibilities/i.test(getLabelForInput(ta).toLowerCase())) {
+      const lbl = getLabelForInput(ta).toLowerCase()
+      const cid = getContainerAutomationId(ta)
+      if (/description|summary|role|responsibilities/i.test(lbl) ||
+          /description|roledescription/i.test(cid) ||
+          taPool.length === 1) {
         setNativeValue(ta, job.description)
         flashFill(ta)
         filled.push({ label: 'Role Description', value: job.description, selector: '' })
@@ -842,20 +903,35 @@ async function fillWorkHistoryEntry(job: WorkHistory): Promise<FilledField[]> {
   return filled
 }
 
-// Fill a single education entry's visible form fields
-async function fillEducationEntry(edu: Education): Promise<FilledField[]> {
+// Fill a single education entry's visible form fields.
+// newTextInputs / newHaspopupBtns: elements that appeared after clicking Add for this entry.
+async function fillEducationEntry(
+  edu: Education,
+  newTextInputs?: HTMLInputElement[],
+  newHaspopupBtns?: HTMLButtonElement[],
+): Promise<FilledField[]> {
   const filled: FilledField[] = []
   const ns = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set
 
-  // School / University — tag combobox (type and pick from autocomplete)
-  const schoolInput = queryShadowAll<HTMLInputElement>('input[type="text"]')
-    .find((el) => /school|university|institution/i.test(getLabelForInput(el).toLowerCase()))
+  // Helper: find tag-combobox input by label or container data-automation-id
+  const findTagInput = (pattern: RegExp): HTMLInputElement | null => {
+    const pool = newTextInputs
+      ?? queryShadowAll<HTMLInputElement>('input[type="text"]')
+    return pool.find((inp) => {
+      const lbl = getLabelForInput(inp).toLowerCase()
+      const cid = getContainerAutomationId(inp)
+      return pattern.test(lbl) || pattern.test(cid)
+    }) ?? null
+  }
+
+  // School / University — tag combobox
+  const schoolInput = findTagInput(/school|university|institution/i)
 
   if (schoolInput && edu.school) {
     const baseline = countExistingListboxOptions()
     ns?.call(schoolInput, edu.school)
     schoolInput.dispatchEvent(new Event('input', { bubbles: true }))
-    const opts = await waitForNewListboxOptions(baseline, 1500)
+    const opts = await waitForNewListboxOptions(baseline, 2000)
     const match = opts.find((o) => {
       const text = o.textContent?.trim().toLowerCase() ?? ''
       return text.includes(edu.school.toLowerCase().slice(0, 10)) ||
@@ -865,17 +941,24 @@ async function fillEducationEntry(edu: Education): Promise<FilledField[]> {
       match.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }))
       match.click()
       filled.push({ label: 'School', value: edu.school, selector: '' })
-      await new Promise<void>((r) => setTimeout(r, 300))
+      await new Promise<void>((r) => setTimeout(r, 400))
     } else {
       ns?.call(schoolInput, '')
       schoolInput.dispatchEvent(new Event('input', { bubbles: true }))
     }
   }
 
-  // Degree — listbox dropdown (aria-haspopup="listbox")
+  // Degree — listbox dropdown (aria-haspopup)
   if (edu.degree) {
-    const degreeBtn = queryShadowAll<HTMLButtonElement>('button[aria-haspopup]')
-      .find((btn) => /degree/i.test(getLabelForInput(btn).toLowerCase()))
+    const btnPool = newHaspopupBtns
+      ?? queryShadowAll<HTMLButtonElement>('button[aria-haspopup]')
+    const degreeBtn = btnPool.find((btn) => {
+      const lbl = getLabelForInput(btn).toLowerCase()
+      const al = btn.getAttribute('aria-label')?.toLowerCase() ?? ''
+      const cid = getContainerAutomationId(btn)
+      return /degree/i.test(lbl) || /degree/i.test(al) || /degree/i.test(cid)
+    }) ?? (btnPool.length === 1 ? btnPool[0] : null)
+
     if (degreeBtn) {
       degreeBtn.click()
       const opts = await waitForListboxOptions(2000)
@@ -888,21 +971,20 @@ async function fillEducationEntry(edu: Education): Promise<FilledField[]> {
         match.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }))
         match.click()
         filled.push({ label: 'Degree', value: edu.degree, selector: '' })
-        await new Promise<void>((r) => setTimeout(r, 300))
+        await new Promise<void>((r) => setTimeout(r, 400))
       }
     }
   }
 
-  // Field of Study — tag combobox (type and pick from autocomplete)
+  // Field of Study — tag combobox
   if (edu.field_of_study) {
-    await new Promise<void>((r) => setTimeout(r, 200)) // let degree selection settle
-    const fieldInput = queryShadowAll<HTMLInputElement>('input[type="text"]')
-      .find((el) => /field.?of.?study|major|discipline/i.test(getLabelForInput(el).toLowerCase()))
+    await new Promise<void>((r) => setTimeout(r, 200))
+    const fieldInput = findTagInput(/field.?of.?study|major|discipline|fieldofstudy/i)
     if (fieldInput) {
       const baseline = countExistingListboxOptions()
       ns?.call(fieldInput, edu.field_of_study)
       fieldInput.dispatchEvent(new Event('input', { bubbles: true }))
-      const opts = await waitForNewListboxOptions(baseline, 1500)
+      const opts = await waitForNewListboxOptions(baseline, 2000)
       const normalized = edu.field_of_study.toLowerCase()
       const match = opts.find((o) => {
         const text = o.textContent?.trim().toLowerCase() ?? ''
@@ -929,18 +1011,36 @@ async function fillWorkdayWorkHistoryInternal(profile: FullProfile): Promise<Fil
   const filled: FilledField[] = []
 
   for (let i = 0; i < jobs.length; i++) {
-    const baseline = queryShadowAll('input[type="text"], textarea').length
+    // Snapshot existing inputs before clicking Add so we can identify the new form's fields
+    const existingTextInputs = new Set<HTMLInputElement>(
+      queryShadowAll<HTMLInputElement>('input[type="text"]')
+    )
+    const existingCheckboxes = new Set<HTMLInputElement>(
+      queryShadowAll<HTMLInputElement>('input[type="checkbox"]')
+    )
+    const existingTextareas = new Set<HTMLTextAreaElement>(
+      queryShadowAll<HTMLTextAreaElement>('textarea')
+    )
+
+    let addBtn: HTMLElement | null
     if (i === 0) {
-      const btn = findSectionAdd(/workExperience|work.?experience/i, /work experience/i)
-      if (!btn) break
-      btn.click()
+      addBtn = findSectionAdd(/workExperience|work.?experience/i, /work experience/i)
     } else {
-      const btn = findAddAnother(/workExperience|work.?experience/i)
-      if (!btn) break
-      btn.click()
+      addBtn = findAddAnother(/workExperience|work.?experience/i)
     }
-    await waitForNewInputs(baseline, 1200)
-    filled.push(...await fillWorkHistoryEntry(jobs[i]))
+    if (!addBtn) break
+
+    addBtn.click()
+    await waitForNewInputs(existingTextInputs.size, 1500)
+
+    const newTextInputs = queryShadowAll<HTMLInputElement>('input[type="text"]')
+      .filter((inp) => !existingTextInputs.has(inp))
+    const newCheckboxes = queryShadowAll<HTMLInputElement>('input[type="checkbox"]')
+      .filter((cb) => !existingCheckboxes.has(cb))
+    const newTextareas = queryShadowAll<HTMLTextAreaElement>('textarea')
+      .filter((ta) => !existingTextareas.has(ta))
+
+    filled.push(...await fillWorkHistoryEntry(jobs[i], newTextInputs, newCheckboxes, newTextareas))
   }
 
   return filled
@@ -952,18 +1052,30 @@ async function fillWorkdayEducationInternal(profile: FullProfile): Promise<Fille
   const filled: FilledField[] = []
 
   for (let i = 0; i < edus.length; i++) {
-    const baseline = queryShadowAll('input[type="text"], textarea').length
+    const existingTextInputs = new Set<HTMLInputElement>(
+      queryShadowAll<HTMLInputElement>('input[type="text"]')
+    )
+    const existingBtns = new Set<HTMLButtonElement>(
+      queryShadowAll<HTMLButtonElement>('button[aria-haspopup]')
+    )
+
+    let addBtn: HTMLElement | null
     if (i === 0) {
-      const btn = findSectionAdd(/\beducation\b/i, /\beducation\b/i)
-      if (!btn) break
-      btn.click()
+      addBtn = findSectionAdd(/\beducation\b/i, /\beducation\b/i)
     } else {
-      const btn = findAddAnother(/\beducation\b/i)
-      if (!btn) break
-      btn.click()
+      addBtn = findAddAnother(/\beducation\b/i)
     }
-    await waitForNewInputs(baseline, 1200)
-    filled.push(...await fillEducationEntry(edus[i]))
+    if (!addBtn) break
+
+    addBtn.click()
+    await waitForNewInputs(existingTextInputs.size, 1500)
+
+    const newTextInputs = queryShadowAll<HTMLInputElement>('input[type="text"]')
+      .filter((inp) => !existingTextInputs.has(inp))
+    const newHaspopupBtns = queryShadowAll<HTMLButtonElement>('button[aria-haspopup]')
+      .filter((btn) => !existingBtns.has(btn))
+
+    filled.push(...await fillEducationEntry(edus[i], newTextInputs, newHaspopupBtns))
   }
 
   return filled

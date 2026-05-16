@@ -27,6 +27,7 @@ export interface UserProfile {
 export interface WorkHistory {
   company: string
   title: string
+  location: string | null
   start_date: string | null
   end_date: string | null
   is_current: boolean

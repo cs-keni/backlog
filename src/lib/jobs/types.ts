@@ -155,6 +155,7 @@ export interface WorkHistory {
   user_id: string
   company: string
   title: string
+  location: string | null
   start_date: string | null
   end_date: string | null
   is_current: boolean
