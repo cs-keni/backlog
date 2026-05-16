@@ -105,6 +105,15 @@ export function Sidebar({ initialPage }: { initialPage: PageInfo }) {
   const cancelledRef = useRef(false)
   const lastProfileRef = useRef<FullProfile | null>(null)
 
+  // When collapsed, the mount div (360×100vh, pointer-events:auto) would still eat
+  // clicks on the underlying page even though visually only the 28px tab is visible.
+  // Set it to pointer-events:none when collapsed; the tab div overrides with its own auto.
+  useEffect(() => {
+    const host = document.getElementById('backlog-sidebar-host')
+    const inner = host?.shadowRoot?.getElementById('backlog-sidebar-inner')
+    if (inner) inner.style.pointerEvents = collapsed ? 'none' : 'auto'
+  }, [collapsed])
+
   const init = useCallback(async () => {
     try {
       const key = await getApiKey()
@@ -374,6 +383,7 @@ export function Sidebar({ initialPage }: { initialPage: PageInfo }) {
           zIndex: 2147483647,
           boxShadow: '-2px 0 12px rgba(0,0,0,0.4)',
           transition: 'background 0.15s',
+          pointerEvents: 'auto', // parent mount div is pointer-events:none when collapsed
         }}
         title="Open Backlog"
       >

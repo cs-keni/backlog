@@ -632,6 +632,89 @@ async function clickWorkdayCombobox(button: HTMLElement, targetValue: string): P
   return true
 }
 
+// Counts all [role="option"] elements visible in any listbox right now.
+// Used to detect NEW options appearing after typing (avoids false-positives
+// from existing listboxes like the phone country-code chip which also uses
+// role="option" inside a listbox).
+function countExistingListboxOptions(): number {
+  return queryShadowAll<HTMLElement>('[role="listbox"]').reduce((n, lb) =>
+    n + queryShadowAll<HTMLElement>('[role="option"]', lb).length, 0
+  )
+}
+
+function waitForNewListboxOptions(baseline: number, timeoutMs = 1500): Promise<HTMLElement[]> {
+  return new Promise((resolve) => {
+    const deadline = Date.now() + timeoutMs
+    const check = () => {
+      const listboxes = queryShadowAll<HTMLElement>('[role="listbox"]')
+      for (const lb of listboxes) {
+        const opts = queryShadowAll<HTMLElement>('[role="option"]', lb)
+        if (opts.length > baseline) { resolve(opts); return }
+      }
+      if (Date.now() >= deadline) { resolve([]); return }
+      setTimeout(check, 100)
+    }
+    setTimeout(check, 150)
+  })
+}
+
+// Types each skill from the profile into Workday's "Type to Add Skills" autocomplete
+// and clicks the matching suggestion. Skips skills with no autocomplete match.
+async function fillWorkdaySkillsInternal(profile: FullProfile): Promise<FilledField[]> {
+  const skills = profile.user.skills
+  if (!skills || skills.length === 0) return []
+
+  // Find the skills input by placeholder or label
+  const skillsInput = queryShadowAll<HTMLInputElement>(
+    'input[type="text"], input[type="search"]'
+  ).find((el) => {
+    const ph = el.placeholder?.toLowerCase() ?? ''
+    const lbl = getLabelForInput(el).toLowerCase()
+    return ph.includes('skill') || lbl.includes('skill')
+  })
+  if (!skillsInput) return []
+
+  const filled: FilledField[] = []
+  const nativeSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set
+
+  for (const skill of skills) {
+    try {
+      const baselineCount = countExistingListboxOptions()
+      skillsInput.focus()
+      nativeSetter?.call(skillsInput, skill)
+      skillsInput.dispatchEvent(new Event('input', { bubbles: true }))
+
+      const options = await waitForNewListboxOptions(baselineCount, 1500)
+      if (options.length === 0) {
+        // No match — clear and move on
+        nativeSetter?.call(skillsInput, '')
+        skillsInput.dispatchEvent(new Event('input', { bubbles: true }))
+        continue
+      }
+
+      const normalized = skill.toLowerCase()
+      const match = options.find((opt) => {
+        const text = opt.textContent?.trim().toLowerCase() ?? ''
+        return text === normalized || text.startsWith(normalized) || text.includes(normalized)
+      })
+      if (!match) {
+        nativeSetter?.call(skillsInput, '')
+        skillsInput.dispatchEvent(new Event('input', { bubbles: true }))
+        continue
+      }
+
+      match.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }))
+      match.click()
+      filled.push({ label: 'Skills', value: skill, selector: '' })
+
+      // Wait for the tag to be added and input to clear before the next skill
+      await new Promise<void>((r) => setTimeout(r, 300))
+    } catch { /* skip this skill */ }
+  }
+
+  return filled
+}
+
 export async function fillWorkdayComboboxes(profile: FullProfile): Promise<FilledField[]> {
   const filled: FilledField[] = []
 
@@ -661,6 +744,12 @@ export async function fillWorkdayComboboxes(profile: FullProfile): Promise<Fille
       }
     } catch { /* skip */ }
   }
+
+  // Skills tag autocomplete
+  try {
+    const skillsFilled = await fillWorkdaySkillsInternal(profile)
+    filled.push(...skillsFilled)
+  } catch { /* skip */ }
 
   return filled
 }
