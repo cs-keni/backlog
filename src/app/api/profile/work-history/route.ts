@@ -31,6 +31,12 @@ export async function POST(request: Request) {
     return Response.json({ error: 'company and title are required' }, { status: 400 })
   }
 
+  for (const key of ['start_date', 'end_date'] as const) {
+    if (typeof body[key] === 'string' && /^\d{4}-\d{2}$/.test(body[key] as string)) {
+      body[key] = (body[key] as string) + '-01'
+    }
+  }
+
   const { data, error } = await supabase
     .from('work_history')
     .insert({

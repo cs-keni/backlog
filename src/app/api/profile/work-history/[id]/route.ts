@@ -16,6 +16,13 @@ export async function PATCH(
     return Response.json({ error: 'Invalid request body' }, { status: 400 })
   }
 
+  // Normalize YYYY-MM (from <input type="month">) → YYYY-MM-01 for PostgreSQL date columns
+  for (const key of ['start_date', 'end_date'] as const) {
+    if (typeof body[key] === 'string' && /^\d{4}-\d{2}$/.test(body[key] as string)) {
+      body[key] = (body[key] as string) + '-01'
+    }
+  }
+
   const allowed = ['company', 'title', 'location', 'start_date', 'end_date', 'is_current', 'description', 'display_order']
   const updates: Record<string, unknown> = {}
   for (const key of allowed) {
