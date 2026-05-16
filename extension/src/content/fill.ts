@@ -429,14 +429,10 @@ export function computeFills(profile: FullProfile, ats: AtsType): ScannedField[]
         const answer = resolveRadio(question, profile)
         if (!answer) continue
 
-        // Find the option whose visible label matches the answer (case-insensitive)
+        // Find the option whose visible label matches the answer (shadow-aware via getLabelForInput)
         const targetOption = options.find((opt) => {
           if (opt.checked) return false // Already selected — do not change
-          const label =
-            document.querySelector(`label[for="${opt.id}"]`)?.textContent?.trim().toLowerCase() ??
-            opt.closest('label')?.textContent?.trim().toLowerCase() ??
-            opt.getAttribute('aria-label')?.toLowerCase() ??
-            opt.value.toLowerCase()
+          const label = getLabelForInput(opt) || opt.value.toLowerCase()
           return label === answer.toLowerCase() || label.startsWith(answer.toLowerCase())
         })
         if (!targetOption) continue
@@ -503,6 +499,104 @@ export function applyFills(fields: ScannedField[]): FilledField[] {
         filled.push({ label: field.label, value: field.value, selector: field.selector })
       }
     } catch { /* skip bad element */ }
+  }
+
+  return filled
+}
+
+// ─── Workday combobox (async) ────────────────────────────────────────────────
+// Workday uses custom combobox components (not native <select>) for fields like
+// State/Province. These require: click trigger → wait for options → click match.
+// The polling approach works because queryShadowAll traverses shadow roots each
+// call, unlike MutationObserver which can't observe cross-root mutations from
+// document.body.
+
+const US_STATES: Record<string, string> = {
+  AL: 'Alabama', AK: 'Alaska', AZ: 'Arizona', AR: 'Arkansas', CA: 'California',
+  CO: 'Colorado', CT: 'Connecticut', DE: 'Delaware', FL: 'Florida', GA: 'Georgia',
+  HI: 'Hawaii', ID: 'Idaho', IL: 'Illinois', IN: 'Indiana', IA: 'Iowa',
+  KS: 'Kansas', KY: 'Kentucky', LA: 'Louisiana', ME: 'Maine', MD: 'Maryland',
+  MA: 'Massachusetts', MI: 'Michigan', MN: 'Minnesota', MS: 'Mississippi', MO: 'Missouri',
+  MT: 'Montana', NE: 'Nebraska', NV: 'Nevada', NH: 'New Hampshire', NJ: 'New Jersey',
+  NM: 'New Mexico', NY: 'New York', NC: 'North Carolina', ND: 'North Dakota', OH: 'Ohio',
+  OK: 'Oklahoma', OR: 'Oregon', PA: 'Pennsylvania', RI: 'Rhode Island', SC: 'South Carolina',
+  SD: 'South Dakota', TN: 'Tennessee', TX: 'Texas', UT: 'Utah', VT: 'Vermont',
+  VA: 'Virginia', WA: 'Washington', WV: 'West Virginia', WI: 'Wisconsin', WY: 'Wyoming',
+  DC: 'District of Columbia',
+}
+
+// Maps data-automation-id patterns to their value resolvers for Workday comboboxes
+const WORKDAY_COMBOBOX_MAP: Array<{ ids: RegExp; resolve: Resolver; label: string }> = [
+  {
+    ids: /^countryRegion$|^formField-countryRegion$|^stateProvince$|^addressSection_stateProvince$|^countryRegionAbbreviation$/,
+    resolve: (p) => parseAddress(p.user.address ?? '').state,
+    label: 'State / Province',
+  },
+]
+
+function waitForMenuItems(timeoutMs = 1500): Promise<HTMLElement[]> {
+  return new Promise((resolve) => {
+    const deadline = Date.now() + timeoutMs
+    const check = () => {
+      const items = queryShadowAll<HTMLElement>('[data-automation-id="menuItem"]')
+      if (items.length > 0) { resolve(items); return }
+      if (Date.now() >= deadline) { resolve([]); return }
+      setTimeout(check, 100)
+    }
+    check()
+  })
+}
+
+async function clickWorkdayCombobox(wrapper: Element, targetValue: string): Promise<boolean> {
+  const fullName = US_STATES[targetValue.toUpperCase()] ?? targetValue
+  const normalized = fullName.toLowerCase()
+  const abbr = targetValue.toLowerCase()
+
+  // Click the trigger inside the wrapper (button, combobox role, or the wrapper itself)
+  const trigger =
+    queryShadowAll<HTMLElement>('button, [role="combobox"], [role="button"], [aria-haspopup]', wrapper)
+      .find((el) => isElementFillable(el)) ??
+    (wrapper as HTMLElement)
+
+  trigger.click()
+
+  const menuItems = await waitForMenuItems(1500)
+  if (menuItems.length === 0) return false
+
+  const match = menuItems.find((li) => {
+    const text = li.textContent?.trim().toLowerCase() ?? ''
+    return text === normalized || text === abbr || text.startsWith(normalized)
+  })
+  if (!match) return false
+
+  match.click()
+  return true
+}
+
+export async function fillWorkdayComboboxes(profile: FullProfile): Promise<FilledField[]> {
+  const filled: FilledField[] = []
+
+  for (const { ids, resolve, label } of WORKDAY_COMBOBOX_MAP) {
+    try {
+      const value = resolve(profile)
+      if (!value) continue
+
+      const wrappers = queryShadowAll<HTMLElement>('[data-automation-id]').filter((el) =>
+        ids.test(el.getAttribute('data-automation-id') ?? '')
+      )
+
+      for (const wrapper of wrappers) {
+        if (!isElementFillable(wrapper)) continue
+        const automationId = wrapper.getAttribute('data-automation-id') ?? ''
+        const success = await clickWorkdayCombobox(wrapper, value)
+        if (success) {
+          const displayValue = US_STATES[value.toUpperCase()] ?? value
+          flashFill(wrapper)
+          filled.push({ label, value: displayValue, selector: `[data-automation-id="${automationId}"]` })
+          break
+        }
+      }
+    } catch { /* skip */ }
   }
 
   return filled

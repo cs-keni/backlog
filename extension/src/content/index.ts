@@ -1,5 +1,5 @@
 import { extractPageInfo } from './detect'
-import { fillForm, applyFieldValues } from './fill'
+import { fillForm, applyFieldValues, fillWorkdayComboboxes } from './fill'
 import { detectNextButton, detectPageType } from './detect'
 import type { ExtensionMessage, FillResult, PageInfo, PageTypeInfo } from '../shared/types'
 
@@ -70,7 +70,16 @@ chrome.runtime.onMessage.addListener((message: ExtensionMessage, _sender, sendRe
     waitForInputs(() => {
       const { ats } = cachedPageInfo
       const result: FillResult = fillForm(message.payload, ats)
-      sendResponse(result)
+      if (ats === 'workday') {
+        fillWorkdayComboboxes(message.payload)
+          .then((comboboxFilled) => {
+            result.filled.push(...comboboxFilled)
+            sendResponse(result)
+          })
+          .catch(() => sendResponse(result))
+      } else {
+        sendResponse(result)
+      }
     })
     return true
   }
