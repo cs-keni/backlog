@@ -588,7 +588,7 @@ const WORKDAY_COMBOBOX_MAP: Array<{ ids: RegExp; resolve: Resolver; label: strin
   },
 ]
 
-function waitForMenuItems(timeoutMs = 1500): Promise<HTMLElement[]> {
+function waitForMenuItems(timeoutMs = 2000): Promise<HTMLElement[]> {
   return new Promise((resolve) => {
     const deadline = Date.now() + timeoutMs
     const check = () => {
@@ -597,14 +597,14 @@ function waitForMenuItems(timeoutMs = 1500): Promise<HTMLElement[]> {
       if (Date.now() >= deadline) { resolve([]); return }
       setTimeout(check, 100)
     }
-    check()
+    // Give the open animation a head start before the first poll
+    setTimeout(check, 150)
   })
 }
 
 async function clickWorkdayCombobox(wrapper: Element, targetValue: string): Promise<boolean> {
   const fullName = US_STATES[targetValue.toUpperCase()] ?? targetValue
   const normalized = fullName.toLowerCase()
-  const abbr = targetValue.toLowerCase()
 
   // Click the trigger inside the wrapper (button, combobox role, or the wrapper itself)
   const trigger =
@@ -614,16 +614,27 @@ async function clickWorkdayCombobox(wrapper: Element, targetValue: string): Prom
 
   trigger.click()
 
-  const menuItems = await waitForMenuItems(1500)
+  const menuItems = await waitForMenuItems(2000)
   if (menuItems.length === 0) return false
 
+  // Match by full state name (includes is more robust than startsWith —
+  // Workday may label options "OR - Oregon" or add region suffixes)
   const match = menuItems.find((li) => {
     const text = li.textContent?.trim().toLowerCase() ?? ''
-    return text === normalized || text === abbr || text.startsWith(normalized)
+    return text === normalized || text.includes(normalized)
   })
   if (!match) return false
 
-  match.click()
+  // The LI has role="presentation" — clicking it does nothing in React's event
+  // system. Click the inner [role="option"] or [data-automation-id="promptOption"]
+  // which is the actual interactive element that Workday listens on.
+  const clickTarget =
+    queryShadowAll<HTMLElement>('[role="option"], [data-automation-id="promptOption"]', match)[0] ??
+    match
+
+  clickTarget.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }))
+  clickTarget.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true }))
+  clickTarget.click()
   return true
 }
 
