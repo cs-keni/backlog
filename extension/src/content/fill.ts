@@ -1,4 +1,4 @@
-import type { FullProfile, FilledField, SkippedField, FillResult, AtsType, UnfilledField, ScannedField } from '../shared/types'
+import type { FullProfile, FilledField, SkippedField, FillResult, AtsType, UnfilledField, ScannedField, WorkHistory, Education } from '../shared/types'
 import { queryShadowAll, queryShadowScoped } from '../shared/domUtils'
 
 // ─── Input value setter ───────────────────────────────────────────────────────
@@ -715,6 +715,260 @@ async function fillWorkdaySkillsInternal(profile: FullProfile): Promise<FilledFi
   return filled
 }
 
+// ─── Work Experience + Education (async section-open fill) ───────────────────
+
+// Convert stored date strings (YYYY-MM-DD or YYYY-MM) → Workday's MM/YYYY format
+function fmtMMYYYY(dateStr: string | null): string | null {
+  if (!dateStr) return null
+  const m = dateStr.match(/^(\d{4})-(\d{2})/)
+  if (m) return `${m[2]}/${m[1]}`
+  if (/^\d{2}\/\d{4}$/.test(dateStr)) return dateStr
+  return null
+}
+
+// Find the "Add" button for a section identified by data-automation-id pattern or
+// surrounding text content. Used for Work Experience and Education sections.
+function findSectionAdd(sectionIds: RegExp, sectionText: RegExp): HTMLElement | null {
+  // Primary: container has matching automation-id and contains an "Add" button
+  for (const el of queryShadowAll<HTMLElement>('[data-automation-id]')) {
+    if (!sectionIds.test(el.getAttribute('data-automation-id') ?? '')) continue
+    const btn = queryShadowAll<HTMLElement>('button', el)
+      .find((b) => /^add$/i.test(b.textContent?.trim() ?? ''))
+    if (btn) return btn
+  }
+  // Fallback: walk up from "Add" buttons looking for sectionText in ancestors
+  for (const btn of queryShadowAll<HTMLElement>('button')) {
+    if (!/^add$/i.test(btn.textContent?.trim() ?? '')) continue
+    let el: Element | null = btn
+    for (let depth = 0; depth < 7; depth++) {
+      const txt = el?.textContent?.toLowerCase() ?? ''
+      if (sectionText.test(txt) && txt.length < 4000) return btn
+      el = el?.parentElement ?? null
+    }
+  }
+  return null
+}
+
+// Find "Add Another" within a section (by automation-id or proximity)
+function findAddAnother(sectionIds: RegExp): HTMLElement | null {
+  for (const el of queryShadowAll<HTMLElement>('[data-automation-id]')) {
+    if (!sectionIds.test(el.getAttribute('data-automation-id') ?? '')) continue
+    const btn = queryShadowAll<HTMLElement>('button', el)
+      .find((b) => /add another/i.test(b.textContent?.trim() ?? ''))
+    if (btn) return btn
+  }
+  return queryShadowAll<HTMLElement>('button')
+    .find((b) => /add another/i.test(b.textContent?.trim() ?? '')) ?? null
+}
+
+// Wait until new text inputs appear (after clicking Add, forms render asynchronously)
+function waitForNewInputs(baseline: number, timeoutMs = 1200): Promise<void> {
+  return new Promise((resolve) => {
+    const deadline = Date.now() + timeoutMs
+    const check = () => {
+      if (queryShadowAll('input[type="text"], textarea').length > baseline ||
+          Date.now() >= deadline) resolve()
+      else setTimeout(check, 100)
+    }
+    setTimeout(check, 200)
+  })
+}
+
+// Fill a single work history entry's visible form fields.
+// Called after "Add" / "Add Another" has been clicked and the form is in the DOM.
+async function fillWorkHistoryEntry(job: WorkHistory): Promise<FilledField[]> {
+  const filled: FilledField[] = []
+
+  const tryFillInput = (labelPattern: RegExp, value: string | null) => {
+    if (!value) return
+    for (const inp of queryShadowAll<HTMLInputElement>('input[type="text"]')) {
+      if (inp.value.trim()) continue
+      if (labelPattern.test(getLabelForInput(inp).toLowerCase())) {
+        setNativeValue(inp, value)
+        flashFill(inp)
+        filled.push({ label: getLabelForInput(inp) || String(labelPattern), value, selector: '' })
+        return
+      }
+    }
+  }
+
+  tryFillInput(/job title|position|title/i, job.title)
+  tryFillInput(/company|employer|organization/i, job.company)
+
+  // "I currently work here" checkbox
+  if (job.is_current) {
+    const cbs = queryShadowAll<HTMLInputElement>('input[type="checkbox"]')
+    for (const cb of cbs) {
+      if (/current|present/i.test(getLabelForInput(cb).toLowerCase()) && !cb.checked) {
+        cb.click()
+        filled.push({ label: 'Currently work here', value: 'checked', selector: '' })
+        await new Promise<void>((r) => setTimeout(r, 200))
+        break
+      }
+    }
+  }
+
+  // Dates — look for inputs whose label is exactly "From" or "To"
+  const startFmt = fmtMMYYYY(job.start_date)
+  const endFmt = job.is_current ? null : fmtMMYYYY(job.end_date)
+
+  for (const inp of queryShadowAll<HTMLInputElement>('input[type="text"]')) {
+    if (inp.value.trim()) continue
+    const lbl = getLabelForInput(inp).toLowerCase().replace(/[*\s]+/g, ' ').trim()
+    if (/^from$|^start date$/.test(lbl) && startFmt) {
+      setNativeValue(inp, startFmt)
+      flashFill(inp)
+      filled.push({ label: 'From', value: startFmt, selector: '' })
+    } else if (/^to$|^end date$/.test(lbl) && endFmt) {
+      setNativeValue(inp, endFmt)
+      flashFill(inp)
+      filled.push({ label: 'To', value: endFmt, selector: '' })
+    }
+  }
+
+  // Role Description (textarea)
+  if (job.description) {
+    for (const ta of queryShadowAll<HTMLTextAreaElement>('textarea')) {
+      if (ta.value.trim()) continue
+      if (/description|summary|role|responsibilities/i.test(getLabelForInput(ta).toLowerCase())) {
+        setNativeValue(ta, job.description)
+        flashFill(ta)
+        filled.push({ label: 'Role Description', value: job.description, selector: '' })
+        break
+      }
+    }
+  }
+
+  return filled
+}
+
+// Fill a single education entry's visible form fields
+async function fillEducationEntry(edu: Education): Promise<FilledField[]> {
+  const filled: FilledField[] = []
+  const ns = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set
+
+  // School / University — tag combobox (type and pick from autocomplete)
+  const schoolInput = queryShadowAll<HTMLInputElement>('input[type="text"]')
+    .find((el) => /school|university|institution/i.test(getLabelForInput(el).toLowerCase()))
+
+  if (schoolInput && edu.school) {
+    const baseline = countExistingListboxOptions()
+    ns?.call(schoolInput, edu.school)
+    schoolInput.dispatchEvent(new Event('input', { bubbles: true }))
+    const opts = await waitForNewListboxOptions(baseline, 1500)
+    const match = opts.find((o) => {
+      const text = o.textContent?.trim().toLowerCase() ?? ''
+      return text.includes(edu.school.toLowerCase().slice(0, 10)) ||
+             edu.school.toLowerCase().includes(text)
+    })
+    if (match) {
+      match.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }))
+      match.click()
+      filled.push({ label: 'School', value: edu.school, selector: '' })
+      await new Promise<void>((r) => setTimeout(r, 300))
+    } else {
+      ns?.call(schoolInput, '')
+      schoolInput.dispatchEvent(new Event('input', { bubbles: true }))
+    }
+  }
+
+  // Degree — listbox dropdown (aria-haspopup="listbox")
+  if (edu.degree) {
+    const degreeBtn = queryShadowAll<HTMLButtonElement>('button[aria-haspopup]')
+      .find((btn) => /degree/i.test(getLabelForInput(btn).toLowerCase()))
+    if (degreeBtn) {
+      degreeBtn.click()
+      const opts = await waitForListboxOptions(2000)
+      const normalized = edu.degree.toLowerCase()
+      const match = opts.find((o) => {
+        const text = o.textContent?.trim().toLowerCase() ?? ''
+        return text === normalized || text.includes(normalized) || normalized.includes(text.slice(0, 6))
+      })
+      if (match) {
+        match.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }))
+        match.click()
+        filled.push({ label: 'Degree', value: edu.degree, selector: '' })
+        await new Promise<void>((r) => setTimeout(r, 300))
+      }
+    }
+  }
+
+  // Field of Study — tag combobox (type and pick from autocomplete)
+  if (edu.field_of_study) {
+    await new Promise<void>((r) => setTimeout(r, 200)) // let degree selection settle
+    const fieldInput = queryShadowAll<HTMLInputElement>('input[type="text"]')
+      .find((el) => /field.?of.?study|major|discipline/i.test(getLabelForInput(el).toLowerCase()))
+    if (fieldInput) {
+      const baseline = countExistingListboxOptions()
+      ns?.call(fieldInput, edu.field_of_study)
+      fieldInput.dispatchEvent(new Event('input', { bubbles: true }))
+      const opts = await waitForNewListboxOptions(baseline, 1500)
+      const normalized = edu.field_of_study.toLowerCase()
+      const match = opts.find((o) => {
+        const text = o.textContent?.trim().toLowerCase() ?? ''
+        return text.includes(normalized) || normalized.includes(text.slice(0, 8))
+      })
+      if (match) {
+        match.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }))
+        match.click()
+        filled.push({ label: 'Field of Study', value: edu.field_of_study, selector: '' })
+        await new Promise<void>((r) => setTimeout(r, 300))
+      } else {
+        ns?.call(fieldInput, '')
+        fieldInput.dispatchEvent(new Event('input', { bubbles: true }))
+      }
+    }
+  }
+
+  return filled
+}
+
+async function fillWorkdayWorkHistoryInternal(profile: FullProfile): Promise<FilledField[]> {
+  const jobs = profile.workHistory
+  if (!jobs?.length) return []
+  const filled: FilledField[] = []
+
+  for (let i = 0; i < jobs.length; i++) {
+    const baseline = queryShadowAll('input[type="text"], textarea').length
+    if (i === 0) {
+      const btn = findSectionAdd(/workExperience|work.?experience/i, /work experience/i)
+      if (!btn) break
+      btn.click()
+    } else {
+      const btn = findAddAnother(/workExperience|work.?experience/i)
+      if (!btn) break
+      btn.click()
+    }
+    await waitForNewInputs(baseline, 1200)
+    filled.push(...await fillWorkHistoryEntry(jobs[i]))
+  }
+
+  return filled
+}
+
+async function fillWorkdayEducationInternal(profile: FullProfile): Promise<FilledField[]> {
+  const edus = profile.education
+  if (!edus?.length) return []
+  const filled: FilledField[] = []
+
+  for (let i = 0; i < edus.length; i++) {
+    const baseline = queryShadowAll('input[type="text"], textarea').length
+    if (i === 0) {
+      const btn = findSectionAdd(/\beducation\b/i, /\beducation\b/i)
+      if (!btn) break
+      btn.click()
+    } else {
+      const btn = findAddAnother(/\beducation\b/i)
+      if (!btn) break
+      btn.click()
+    }
+    await waitForNewInputs(baseline, 1200)
+    filled.push(...await fillEducationEntry(edus[i]))
+  }
+
+  return filled
+}
+
 export async function fillWorkdayComboboxes(profile: FullProfile): Promise<FilledField[]> {
   const filled: FilledField[] = []
 
@@ -744,6 +998,18 @@ export async function fillWorkdayComboboxes(profile: FullProfile): Promise<Fille
       }
     } catch { /* skip */ }
   }
+
+  // Work Experience entries
+  try {
+    const workFilled = await fillWorkdayWorkHistoryInternal(profile)
+    filled.push(...workFilled)
+  } catch { /* skip */ }
+
+  // Education entries
+  try {
+    const eduFilled = await fillWorkdayEducationInternal(profile)
+    filled.push(...eduFilled)
+  } catch { /* skip */ }
 
   // Skills tag autocomplete
   try {
