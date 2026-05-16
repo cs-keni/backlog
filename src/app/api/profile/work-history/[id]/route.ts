@@ -30,7 +30,10 @@ export async function PATCH(
     .select('*')
     .single()
 
-  if (error) return Response.json({ error: 'Update failed' }, { status: 500 })
+  if (error) {
+    console.error('[PATCH /api/profile/work-history/:id]', error)
+    return Response.json({ error: 'Update failed', detail: error.message }, { status: 500 })
+  }
   return Response.json(data)
 }
 
