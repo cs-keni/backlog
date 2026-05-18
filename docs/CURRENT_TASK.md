@@ -1,20 +1,36 @@
 # Current Task
 
 **Last updated:** 2026-05-18
-**Status:** Job feed relevance filtering tightened for entry-level software engineering
+**Status:** Brave Search discovery added for entry-level SWE jobs
 
 ---
 
 ## Fixed in latest Codex session
 
-1. **Software-engineering-only feed gate** — `worker/src/jobs/relevance-filter.ts` now requires titles to match software engineering patterns before raw GitHub entries are sent to GPT normalization or portal jobs are sent to enrichment.
-2. **AI engineering allowed, ML/data/research blocked** — AI software/product engineering titles such as "AI Software Engineer" and "Applied AI Engineer" are allowed; "Machine Learning Engineer", data scientist, research scientist, NLP, computer vision, and similar ML/research roles are blocked.
-3. **Entry-level bias tightened** — PM/TPM roles are no longer allowlisted, common mid/senior title signals such as "Software Engineer II", "mid-level", architect, staff, principal, and lead are blocked, and normalized jobs with `experience_level` of `mid` or `senior` are dropped.
+1. **Brave Search source added** — worker aggregation now runs a Brave Web Search discovery pass after GitHub and curated portal scans when `BRAVE_SEARCH_API_KEY` is present.
+2. **Cost controls** — defaults to 6 search queries per aggregation run (`BRAVE_SEARCH_QUERY_LIMIT`, default `6`) and uses Brave Web Search only, not Answers API.
+3. **Search result filtering** — skips broad job-board result pages and only attempts direct ATS/company job URLs that look like actual postings.
+4. **Extraction path** — supports direct Greenhouse/Lever APIs plus generic JSON-LD `JobPosting` pages without adding extra GPT calls.
+5. **Experience gate** — Brave-discovered jobs are dropped when the posting appears to require 3+ years of professional/relevant software experience.
 
 ## Checks run
 
-- `cd worker && npm run test -- tests/unit/relevance-filter.test.ts` — 35 tests passed
+- `cd worker && npm run test -- tests/unit/brave-search.test.ts tests/unit/relevance-filter.test.ts` — 44 tests passed
 - `cd worker && npm run build` — passed
+
+## Render env vars
+
+- Required to enable: `BRAVE_SEARCH_API_KEY`
+- Optional query budget: `BRAVE_SEARCH_QUERY_LIMIT=6`
+- Optional freshness window: `BRAVE_SEARCH_FRESHNESS=pw` (`pw` = past week, `pm` = past month)
+
+---
+
+## Previous Codex session
+
+1. **Software-engineering-only feed gate** — `worker/src/jobs/relevance-filter.ts` now requires titles to match software engineering patterns before raw GitHub entries are sent to GPT normalization or portal jobs are sent to enrichment.
+2. **AI engineering allowed, ML/data/research blocked** — AI software/product engineering titles such as "AI Software Engineer" and "Applied AI Engineer" are allowed; "Machine Learning Engineer", data scientist, research scientist, NLP, computer vision, and similar ML/research roles are blocked.
+3. **Entry-level bias tightened** — PM/TPM roles are no longer allowlisted, common mid/senior title signals such as "Software Engineer II", "mid-level", architect, staff, principal, and lead are blocked, and normalized jobs with `experience_level` of `mid` or `senior` are dropped.
 
 ## Known filter tradeoffs
 

@@ -4,6 +4,39 @@
 
 ---
 
+## Session: 2026-05-18 — Brave Search job discovery (Codex)
+
+### What changed
+
+- **`worker/src/search/brave.ts`**
+  - Added Brave Web Search discovery using `BRAVE_SEARCH_API_KEY`.
+  - Uses 8 targeted search phrases but runs only the first `BRAVE_SEARCH_QUERY_LIMIT` per aggregation run; default is `6`.
+  - Uses Web Search only, not Answers API.
+  - Defaults freshness to `pw` (past week); override with `BRAVE_SEARCH_FRESHNESS=pm` for past month.
+  - Filters search results before fetching: skips broad job boards and keeps likely direct ATS/company job pages.
+  - Extracts direct Greenhouse/Lever postings via public APIs and generic pages via JSON-LD `JobPosting`.
+  - Drops postings that appear to require 3+ years of professional/relevant software experience.
+- **`worker/src/aggregator.ts`**
+  - Runs Brave Search discovery after GitHub and portal scans.
+  - Reuses `filterRelevantJobs`, `filterNewJobs`, and `writeJobs`.
+  - Writes discovered jobs with source `portal` for now to avoid introducing a DB source enum migration risk.
+- **`worker/tests/unit/brave-search.test.ts`**
+  - Added tests for job URL filtering and less-than-3-years gating.
+
+### Checks run
+
+- `cd worker && npm run test -- tests/unit/brave-search.test.ts tests/unit/relevance-filter.test.ts` — passed, 44 tests
+- `cd worker && npm run build` — passed
+
+### Notes / risks
+
+- Local live Brave API test was not run because the key is only in Render.
+- This intentionally does not use Brave Answers API.
+- Default budget is 6 searches per aggregation run. With the current 8-hour cron, that is about 18 searches/day, roughly 540/month before manual force runs.
+- Direct job extraction is conservative. Sites without Greenhouse/Lever APIs or JSON-LD may be skipped rather than using GPT/browser rendering.
+
+---
+
 ## Session: 2026-05-18 — Job relevance filtering tightened (Codex)
 
 ### What changed

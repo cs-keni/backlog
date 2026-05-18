@@ -4,6 +4,37 @@ Reverse-chronological. One entry per meaningful session.
 
 ---
 
+## 2026-05-18 — Brave Search discovery source (Codex)
+
+### Implemented
+
+- Added `worker/src/search/brave.ts` to discover entry-level SWE job URLs through Brave Web Search.
+- Added targeted queries for new grad, junior, associate, entry-level, early-career, AI software engineer, applied AI engineer, and LLM software engineer roles.
+- Added cost controls:
+  - `BRAVE_SEARCH_API_KEY` enables the source.
+  - `BRAVE_SEARCH_QUERY_LIMIT` defaults to `6` per aggregation run.
+  - `BRAVE_SEARCH_FRESHNESS` defaults to `pw`.
+- Added cheap search-result filtering before fetching pages:
+  - skip broad job boards such as Indeed/LinkedIn/Glassdoor/ZipRecruiter
+  - keep likely direct ATS/company job URLs
+- Added extraction for Greenhouse, Lever, and generic JSON-LD `JobPosting` pages.
+- Added less-than-3-years gate that blocks explicit 3+ years professional/relevant experience requirements.
+- Wired the source into `worker/src/aggregator.ts` after portal scanning.
+- Added `worker/tests/unit/brave-search.test.ts`.
+
+### Checks
+
+- `cd worker && npm run test -- tests/unit/brave-search.test.ts tests/unit/relevance-filter.test.ts` — 44 passed
+- `cd worker && npm run build` — passed
+
+### Gotchas
+
+- No live Brave API test was run locally; the API key is configured in Render.
+- Search-discovered jobs currently write with source `portal` to avoid introducing a DB source constraint migration risk until the real Supabase constraint is verified.
+- The source is intentionally conservative and may skip pages that require JavaScript or lack JSON-LD.
+
+---
+
 ## 2026-05-18 — Entry-level SWE relevance filter (Codex)
 
 ### Implemented

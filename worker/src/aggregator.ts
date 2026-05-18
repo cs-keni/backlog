@@ -8,6 +8,7 @@ import { backfillMissingSalaries } from './jobs/backfiller'
 import { writeJobs } from './db/writer'
 import { getOrCreateSource, updateSourceSha } from './db/sources'
 import { scanPortals } from './portals/index'
+import { discoverJobsViaBraveSearch } from './search/brave'
 
 interface SourceConfig {
   name: string
@@ -69,6 +70,18 @@ export async function runAggregation(force = false): Promise<AggregationResult> 
     console.error('[aggregator] Portal scan failed:', err)
   }
 
+  // Brave Search discovery: finds direct job-posting URLs beyond curated repos
+  // and company portals. Kept separate from Answers API to minimize cost.
+  try {
+    const searchResult = await runBraveSearchAggregation()
+    totalWritten += searchResult.written
+    allNewJobs.push(...searchResult.newJobs)
+    allWrittenJobIds.push(...searchResult.writtenJobIds)
+    allWrittenJobPairs.push(...searchResult.writtenJobPairs)
+  } catch (err) {
+    console.error('[aggregator] Brave Search discovery failed:', err)
+  }
+
   // Backfill salary + description for already-stored jobs that are missing them.
   // Runs after every cycle so the DB gradually gets enriched over time.
   await backfillMissingSalaries(50)
@@ -77,6 +90,29 @@ export async function runAggregation(force = false): Promise<AggregationResult> 
   console.log(`[aggregator] ─── All sources complete in ${elapsed}s (${totalWritten} total written) ───\n`)
 
   return { written: totalWritten, newJobs: allNewJobs, writtenJobIds: allWrittenJobIds, writtenJobPairs: allWrittenJobPairs, skipped: false }
+}
+
+async function runBraveSearchAggregation(): Promise<AggregationResult> {
+  console.log('\n[aggregator] Running Brave Search discovery...')
+
+  const discoveredJobs = await discoverJobsViaBraveSearch()
+  if (discoveredJobs.length === 0) {
+    console.log('[aggregator] Brave Search: no candidate jobs extracted')
+    return { written: 0, newJobs: [], writtenJobIds: [], writtenJobPairs: [], skipped: false }
+  }
+
+  const relevantJobs = filterRelevantJobs(discoveredJobs)
+  const newJobs = await filterNewJobs(relevantJobs)
+  if (newJobs.length === 0) {
+    console.log('[aggregator] Brave Search: all jobs already stored or filtered out')
+    return { written: 0, newJobs: [], writtenJobIds: [], writtenJobPairs: [], skipped: false }
+  }
+
+  console.log(`[aggregator] Brave Search: writing ${newJobs.length} new jobs`)
+  const { written, jobIds, writtenJobPairs } = await writeJobs(newJobs, 'full_time', 'portal')
+  console.log(`[aggregator] Brave Search: wrote ${written}/${newJobs.length} jobs`)
+
+  return { written, newJobs, writtenJobIds: jobIds, writtenJobPairs, skipped: false }
 }
 
 async function runPortalAggregation(): Promise<AggregationResult> {
