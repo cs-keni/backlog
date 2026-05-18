@@ -25,7 +25,7 @@ interface AnalyticsData {
   funnel: Array<{ status: string; count: number }>
   jobActivity: Array<{ date: string; count: number }>
   topCompanies: Array<{ company: string; count: number }>
-  sourceBreakdown: { github: number; manual: number }
+  sourceBreakdown: { github: number; portal: number; manual: number }
   medianDaysToResponse: number | null
 }
 
@@ -403,6 +403,13 @@ export default function AnalyticsPage() {
                         count={data.sourceBreakdown.github}
                         total={data.stats.jobsInRange}
                         color="bg-indigo-500"
+                      />
+                      <SourceRow
+                        label="Company/search discovery"
+                        sub="Portal scan and Brave Search"
+                        count={data.sourceBreakdown.portal}
+                        total={data.stats.jobsInRange}
+                        color="bg-emerald-500"
                       />
                       <SourceRow
                         label="Manually added"

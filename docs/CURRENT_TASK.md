@@ -1,22 +1,32 @@
 # Current Task
 
 **Last updated:** 2026-05-18
-**Status:** Brave Search discovery added for entry-level SWE jobs
+**Status:** Source tracking schema/UI cleanup complete after Brave Search discovery
 
 ---
 
 ## Fixed in latest Codex session
+
+1. **Cleaned generated artifacts** — removed ignored local build outputs `.next/` and `extension/dist/`.
+2. **Added DB migration for `jobs.source='portal'`** — `supabase/migrations/019_allow_portal_job_source.sql` updates the source check constraint to allow `github`, `portal`, and `manual`.
+3. **Updated source types/UI** — app job types now include `portal`, analytics source breakdown shows GitHub vs portal/search vs manual, and job details show a discovered badge for portal jobs.
+4. **Cleaned stale testing docs** — `TESTING-SUITE.md` now matches current relevance-filter expectations and includes Brave Search discovery tests.
+
+## Checks run
+
+- `npm run test -- src/tests/integration/jobs-feed.test.ts` — 12 tests passed
+- `cd worker && npm run test -- tests/unit/brave-search.test.ts tests/unit/relevance-filter.test.ts` — 44 tests passed
+- `npx tsc --noEmit` — passed
+
+---
+
+## Previous Codex session
 
 1. **Brave Search source added** — worker aggregation now runs a Brave Web Search discovery pass after GitHub and curated portal scans when `BRAVE_SEARCH_API_KEY` is present.
 2. **Cost controls** — defaults to 6 search queries per aggregation run (`BRAVE_SEARCH_QUERY_LIMIT`, default `6`) and uses Brave Web Search only, not Answers API.
 3. **Search result filtering** — skips broad job-board result pages and only attempts direct ATS/company job URLs that look like actual postings.
 4. **Extraction path** — supports direct Greenhouse/Lever APIs plus generic JSON-LD `JobPosting` pages without adding extra GPT calls.
 5. **Experience gate** — Brave-discovered jobs are dropped when the posting appears to require 3+ years of professional/relevant software experience.
-
-## Checks run
-
-- `cd worker && npm run test -- tests/unit/brave-search.test.ts tests/unit/relevance-filter.test.ts` — 44 tests passed
-- `cd worker && npm run build` — passed
 
 ## Render env vars
 

@@ -4,6 +4,31 @@ Reverse-chronological. One entry per meaningful session.
 
 ---
 
+## 2026-05-18 — Source tracking cleanup (Codex)
+
+### Implemented
+
+- Removed ignored local build artifacts: `.next/` and `extension/dist/`.
+- Added `supabase/migrations/019_allow_portal_job_source.sql` so `jobs.source` accepts `github`, `portal`, and `manual`.
+- Updated app source typing and analytics:
+  - `src/lib/jobs/types.ts`
+  - `src/app/api/analytics/route.ts`
+  - `src/app/(app)/analytics/page.tsx`
+  - `src/components/feed/JobDetail.tsx`
+- Cleaned stale source/relevance docs in `PHASES.md` and `TESTING-SUITE.md`.
+
+### Checks
+
+- `npm run test -- src/tests/integration/jobs-feed.test.ts` — 12 passed
+- `cd worker && npm run test -- tests/unit/brave-search.test.ts tests/unit/relevance-filter.test.ts` — 44 passed
+- `npx tsc --noEmit` — passed
+
+### Gotcha
+
+Apply migration `019_allow_portal_job_source.sql` in Supabase before relying on portal/search-discovered inserts in an environment that still has the original `jobs_source_check`.
+
+---
+
 ## 2026-05-18 — Extension/product idea memo (Codex)
 
 ### Added
@@ -46,7 +71,7 @@ For Workday, prioritize real DOM fixture/debug export work before more broad heu
 ### Gotchas
 
 - No live Brave API test was run locally; the API key is configured in Render.
-- Search-discovered jobs currently write with source `portal` to avoid introducing a DB source constraint migration risk until the real Supabase constraint is verified.
+- Search-discovered jobs write with source `portal`; see migration `019_allow_portal_job_source.sql`.
 - The source is intentionally conservative and may skip pages that require JavaScript or lack JSON-LD.
 
 ---

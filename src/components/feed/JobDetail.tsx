@@ -253,6 +253,9 @@ export function JobDetail({ job, onClose, onApplicationChange }: JobDetailProps)
                 {job.source === 'manual' && (
                   <Chip icon="✋">Manually added</Chip>
                 )}
+                {job.source === 'portal' && (
+                  <Chip icon="🔎">Discovered</Chip>
+                )}
               </div>
 
               {/* Match score */}

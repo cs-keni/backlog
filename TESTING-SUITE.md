@@ -102,6 +102,12 @@ Pure logic tests. No network, no DB. Run in milliseconds.
 - [x] `"PhD Machine Learning Researcher"` (degree gating)
 - [x] `"Account Executive"` (non-CS role)
 - [x] `"Product Marketing Manager"` (non-CS role)
+- [x] `"Product Manager"` (software-engineering-only preference)
+- [x] `"Technical Program Manager"` (software-engineering-only preference)
+- [x] `"Machine Learning Engineer"` (ML track excluded)
+- [x] `"Data Scientist"` (data track excluded)
+- [x] `"Research Scientist, AI"` (research track excluded)
+- [x] `"Software Engineer II"` (mid-level signal)
 - [x] Location `"London, UK"` (country filter)
 - [x] Location `"Toronto, Canada"` (country filter)
 - [x] Title containing `"Intern"` (stray internship)
@@ -109,10 +115,11 @@ Pure logic tests. No network, no DB. Run in milliseconds.
 
 **Should allow:**
 - [x] `"Software Engineer"` — allowed
-- [x] `"Product Manager"` — allowed (CS grads apply)
-- [x] `"Technical Program Manager"` — allowed
+- [x] `"Associate Software Engineer"` — allowed
+- [x] `"Junior Backend Engineer"` — allowed
 - [x] `"New Grad Software Engineer"` — allowed
-- [ ] `"Principal Engineer"` — allowed (keep engineering titles with Principal)
+- [x] `"AI Software Engineer"` — allowed
+- [x] `"Applied AI Engineer"` — allowed
 - [x] Location `"Remote"` — allowed
 - [x] Location `"San Francisco, CA"` — allowed
 - [x] Location `""` (blank) — allowed (defaults US assumption)
@@ -129,6 +136,14 @@ Pure logic tests. No network, no DB. Run in milliseconds.
 - [x] `"salary: $80k to $100k"` → `{ min: 80000, max: 100000 }`
 - [ ] `"$50/hr"` (hourly × 2080) → annual equivalent
 - [x] No salary text → `{ min: null, max: null }`
+
+### Brave Search discovery (`worker/tests/unit/brave-search.test.ts`)
+
+- [x] Allows explicit new-grad and junior roles
+- [x] Blocks 3+ and 5+ year professional experience requirements
+- [x] Does not let junior wording override a 3+ year minimum
+- [x] Allows direct ATS/company careers job URLs
+- [x] Blocks broad job-board result pages and non-job pages
 
 ### Deduplicator (`worker/tests/unit/deduplicator.test.ts`)
 

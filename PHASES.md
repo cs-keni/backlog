@@ -109,8 +109,8 @@ Backlog is primarily a personal tool, but it's architected for multiple users. A
 
 **`jobs`**
 
-- `id`, `title`, `company`, `company_id`, `location`, `salary_min`, `salary_max`, `url`, `source` (github | manual), `posted_at`, `fetched_at`, `description`, `tags[]`, `is_remote`, `experience_level`
-- `source` distinguishes automated aggregation (`github`) from user-pasted manual entries (`manual`)
+- `id`, `title`, `company`, `company_id`, `location`, `salary_min`, `salary_max`, `url`, `source` (github | portal | manual), `posted_at`, `fetched_at`, `description`, `tags[]`, `is_remote`, `experience_level`
+- `source` distinguishes GitHub aggregation (`github`), direct portal/search discovery (`portal`), and user-pasted manual entries (`manual`)
 
 **`applications`**
 

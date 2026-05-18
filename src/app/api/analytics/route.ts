@@ -149,9 +149,11 @@ export async function GET(request: NextRequest) {
   // ── Source breakdown ─────────────────────────────────────────────────────────
 
   let githubCount = 0
+  let portalCount = 0
   let manualCount = 0
   for (const job of recentJobs) {
     if (job.source === 'manual') manualCount++
+    else if (job.source === 'portal') portalCount++
     else githubCount++
   }
 
@@ -199,7 +201,7 @@ export async function GET(request: NextRequest) {
     funnel,
     jobActivity,
     topCompanies,
-    sourceBreakdown: { github: githubCount, manual: manualCount },
+    sourceBreakdown: { github: githubCount, portal: portalCount, manual: manualCount },
     medianDaysToResponse,
   })
 }

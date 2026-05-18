@@ -4,6 +4,37 @@
 
 ---
 
+## Session: 2026-05-18 — Source tracking cleanup (Codex)
+
+### What changed
+
+- Removed ignored local build artifacts: `.next/` and `extension/dist/`.
+- Added **`supabase/migrations/019_allow_portal_job_source.sql`**:
+  - Drops/recreates `jobs_source_check`.
+  - Allows `source IN ('github', 'portal', 'manual')`.
+  - Matches the worker's existing `writeJobs(..., 'portal')` path for curated portal scan and Brave Search discovery.
+- Updated source typing and UI:
+  - `src/lib/jobs/types.ts` includes `portal`.
+  - `src/app/api/analytics/route.ts` returns `sourceBreakdown.github`, `sourceBreakdown.portal`, and `sourceBreakdown.manual`.
+  - `src/app/(app)/analytics/page.tsx` shows a separate "Company/search discovery" source row.
+  - `src/components/feed/JobDetail.tsx` shows a "Discovered" badge for portal jobs.
+- Cleaned stale testing/docs:
+  - `TESTING-SUITE.md` now reflects the current software-engineering-only relevance policy.
+  - Added Brave Search discovery test coverage notes.
+  - `PHASES.md` now documents `jobs.source` as `github | portal | manual`.
+
+### Checks run
+
+- `npm run test -- src/tests/integration/jobs-feed.test.ts` — passed, 12 tests
+- `cd worker && npm run test -- tests/unit/brave-search.test.ts tests/unit/relevance-filter.test.ts` — passed, 44 tests
+- `npx tsc --noEmit` — passed
+
+### Notes
+
+- Apply migration `019_allow_portal_job_source.sql` in Supabase before any DB that still has the original check constraint will accept `source='portal'`.
+
+---
+
 ## Session: 2026-05-18 — Codex extension/product idea memo (Codex)
 
 ### What changed
@@ -41,7 +72,7 @@
 - **`worker/src/aggregator.ts`**
   - Runs Brave Search discovery after GitHub and portal scans.
   - Reuses `filterRelevantJobs`, `filterNewJobs`, and `writeJobs`.
-  - Writes discovered jobs with source `portal` for now to avoid introducing a DB source enum migration risk.
+  - Writes discovered jobs with source `portal`.
 - **`worker/tests/unit/brave-search.test.ts`**
   - Added tests for job URL filtering and less-than-3-years gating.
 
