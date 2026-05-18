@@ -136,7 +136,20 @@ Expected work:
 
 ## P4 — Product Workflow
 
-### 11. Daily apply queue
+### 11. Aggressive Portland SWE discovery
+
+Owner: Codex
+
+Status: planned; do not implement until explicitly picked up.
+
+Expected work:
+
+- Add a more aggressive search path for software engineering jobs in Portland, Oregon.
+- Expand beyond the current general Brave/portal discovery strategy where useful.
+- Keep the feed scoped to software engineering roles and current entry-level/new-grad preferences.
+- Add observability so the Portland-specific search can be tuned from worker logs.
+
+### 12. Daily apply queue
 
 Owner: Codex
 
@@ -145,7 +158,7 @@ Expected work:
 - Add a focused queue of the top newest/relevant jobs.
 - Quick actions: save, open application, hide, mark applied.
 
-### 12. Negative relevance feedback
+### 13. Negative relevance feedback
 
 Owner: Codex
 
@@ -154,7 +167,7 @@ Expected work:
 - Add “Not relevant” reasons: too senior, ML/data/research, not SWE, location, duplicate/closed.
 - Use feedback to tune filters and Brave queries.
 
-### 13. Source yield analytics
+### 14. Source yield analytics
 
 Owner: Codex
 
@@ -167,7 +180,7 @@ Expected work:
 
 ## P5 — Maintenance
 
-### 14. Docs/test backlog cleanup
+### 15. Docs/test backlog cleanup
 
 Owner: Codex
 

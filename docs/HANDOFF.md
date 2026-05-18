@@ -4,6 +4,21 @@
 
 ---
 
+## Session: 2026-05-18 — Priority list update (Codex)
+
+### What changed
+
+- **`docs/PRIORITY.md`**
+  - Added Codex-owned P4 item: "Aggressive Portland SWE discovery".
+  - Intent: add a more aggressive search path for software engineering jobs in Portland, Oregon.
+  - Status is planned only; no implementation was started.
+
+### Checks run
+
+- Not run; docs-only priority update.
+
+---
+
 ## Session: 2026-05-18 — Worker run summaries (Codex)
 
 ### What changed

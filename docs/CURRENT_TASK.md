@@ -1,11 +1,17 @@
 # Current Task
 
 **Last updated:** 2026-05-18
-**Status:** Brave/portal discovery tuned after Render log review
+**Status:** Priority list updated; Portland SWE discovery not implemented yet
 
 ---
 
 ## Fixed in latest Codex session
+
+1. **Updated priority list only** — added a Codex-owned planned item for a more aggressive search path for software engineering jobs in Portland, Oregon. No implementation was started.
+
+---
+
+## Previous Codex session
 
 1. **Added worker run summaries** — Render logs now include compact per-source summaries for GitHub, portals, and Brave Search.
 2. **Added Brave discovery metrics** — Brave Search now reports query count, raw results, candidate URLs, extracted jobs, experience skips, relevant jobs, new jobs, and writes.
