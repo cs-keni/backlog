@@ -118,11 +118,13 @@ Expected work:
 
 Owner: Codex
 
+Status: implemented in code; migration 021 needs Supabase apply.
+
 Expected work:
 
-- Normalize question text.
-- Reuse generated answers for repeated questions.
-- Track answer source as saved/cached/generated.
+- Normalize question text. Done.
+- Reuse generated answers for repeated questions. Done via `extension_answer_cache`.
+- Track answer source as saved/cached/generated. Done in `/api/extension/answer-question`.
 
 ### 10. Worker run budget reporting
 

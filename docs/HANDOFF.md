@@ -4,6 +4,32 @@
 
 ---
 
+## Session: 2026-05-18 — Extension answer cache (Codex)
+
+### What changed
+
+- **`supabase/migrations/021_extension_answer_cache.sql`**
+  - Adds `extension_answer_cache` with a unique `(user_id, normalized_question)` key.
+- **`src/app/api/extension/answer-question/route.ts`**
+  - Keeps saved answers first.
+  - Checks generated-answer cache second and returns `source: 'cached'` on hit.
+  - Calls Sonnet only on cache miss, then upserts the generated answer.
+  - Exports `normalizeQuestionForCache()` for regression testing.
+- **`src/tests/unit/extension-answer-cache.test.ts`**
+  - Covers cache question normalization.
+
+### Checks run
+
+- `npm run test -- src/tests/unit/extension-answer-cache.test.ts` — passed, 2 tests
+- `npx tsc --noEmit` — passed
+
+### Required follow-up
+
+- Apply `supabase/migrations/021_extension_answer_cache.sql` in Supabase.
+- The endpoint is rollout-tolerant: if migration 021 is not applied yet, cache lookup/write errors are ignored by the current flow and generation still works.
+
+---
+
 ## Session: 2026-05-18 — Structured address fields (Codex)
 
 ### What changed

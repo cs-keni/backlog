@@ -154,6 +154,13 @@ For Workday, prioritize real DOM fixture/debug export work before more broad heu
 
 ---
 
+## 2026-05-18 — Extension answer cache (Codex)
+
+- Added `extension_answer_cache` for generated open-ended application answers.
+- `/api/extension/answer-question` resolution order is now saved answer → cached generated answer → Sonnet generation.
+- Cache keys use normalized question text, so punctuation/casing differences reuse answers.
+- Migration 021 must be applied in Supabase to enable cache persistence.
+
 ## 2026-05-18 — Structured address fields (Codex)
 
 - Added nullable structured address fields on `users`: `street_address`, `city`, `state`, `postal_code`.

@@ -1,11 +1,29 @@
 # Current Task
 
 **Last updated:** 2026-05-18
-**Status:** Structured address fields implemented; migration 020 needs Supabase apply
+**Status:** Structured address + extension answer cache implemented; migrations 020/021 need Supabase apply
 
 ---
 
 ## Fixed in latest Codex session
+
+2. **Added generated extension answer cache**
+   - Added migration `021_extension_answer_cache.sql`.
+   - `/api/extension/answer-question` now checks user-curated saved answers first, generated-answer cache second, and Sonnet generation last.
+   - Generated answers are cached by normalized question text and returned later with `source: 'cached'`.
+   - Added unit coverage for question normalization.
+
+## Additional checks run
+
+- `npm run test -- src/tests/unit/extension-answer-cache.test.ts` — passed, 2 tests
+- `npx tsc --noEmit` — passed
+
+## Needs deploy/migration
+
+- Apply `supabase/migrations/020_add_structured_address_fields.sql` in Supabase before depending on the new address fields in production.
+- Apply `supabase/migrations/021_extension_answer_cache.sql` in Supabase to enable generated answer cache writes/reads. The endpoint will still generate answers if the cache table is missing during rollout.
+
+---
 
 1. **Added structured profile address fields**
    - Added migration `020_add_structured_address_fields.sql` for `street_address`, `city`, `state`, and `postal_code`.
@@ -19,12 +37,6 @@
 - `cd extension && npm run test -- src/content/fill.test.ts` — passed, 45 tests
 - `cd extension && npm run build` — passed
 - `npx tsc --noEmit` — passed
-
-## Needs deploy/migration
-
-- Apply `supabase/migrations/020_add_structured_address_fields.sql` in Supabase before depending on the new fields in production.
-
----
 
 ## Previous Codex session
 

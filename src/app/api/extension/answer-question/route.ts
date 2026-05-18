@@ -9,6 +9,14 @@ Write a concise, professional answer (2–4 sentences) based on the applicant's 
 Focus on concrete facts from their background. Do not fabricate experiences or skills they don't have.
 Return only the answer text — no greeting, no preamble, no explanation.`
 
+export function normalizeQuestionForCache(question: string): string {
+  return question
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
 function buildUserPrompt(
   question: string,
   profile: {
@@ -70,6 +78,7 @@ export async function POST(request: Request) {
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   )
+  const normalizedQuestion = normalizeQuestionForCache(question)
 
   // ── 1. Check saved_answers for a match ────────────────────────────────────
   // Simple semantic match: check if any saved question is a substring of the
@@ -98,7 +107,21 @@ export async function POST(request: Request) {
     }
   }
 
-  // ── 2. Fetch profile + STAR responses for Sonnet context ──────────────────
+  // ── 2. Check generated-answer cache ───────────────────────────────────────
+  // This table is optional during rollout. If migration 021 is not applied yet,
+  // Supabase returns an error and we continue to generation.
+  const { data: cachedAnswer } = await supabase
+    .from('extension_answer_cache')
+    .select('answer')
+    .eq('user_id', auth.userId)
+    .eq('normalized_question', normalizedQuestion)
+    .maybeSingle()
+
+  if (cachedAnswer?.answer) {
+    return Response.json({ answer: cachedAnswer.answer, source: 'cached' })
+  }
+
+  // ── 3. Fetch profile + STAR responses for Sonnet context ──────────────────
   const [userResult, workResult, starResult] = await Promise.all([
     supabase
       .from('users')
@@ -128,7 +151,7 @@ export async function POST(request: Request) {
     starResponses: (starResult.data ?? []) as Array<{ question: string; full_response: string | null }>,
   }
 
-  // ── 3. Call Sonnet ────────────────────────────────────────────────────────
+  // ── 4. Call Sonnet ────────────────────────────────────────────────────────
   const client = new Anthropic()
 
   try {
@@ -144,7 +167,21 @@ export async function POST(request: Request) {
       return Response.json({ error: 'Unexpected response from AI' }, { status: 500 })
     }
 
-    return Response.json({ answer: content.text.trim(), source: 'generated' })
+    const answer = content.text.trim()
+    await supabase
+      .from('extension_answer_cache')
+      .upsert(
+        {
+          user_id: auth.userId,
+          normalized_question: normalizedQuestion,
+          question,
+          answer,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: 'user_id,normalized_question' }
+      )
+
+    return Response.json({ answer, source: 'generated' })
   } catch (err) {
     console.error('[answer-question] Sonnet error:', err)
     return Response.json({ error: 'AI generation failed' }, { status: 500 })
