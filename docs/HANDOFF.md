@@ -4,6 +4,40 @@
 
 ---
 
+## Session: 2026-05-18 — Structured address fields (Codex)
+
+### What changed
+
+- **`supabase/migrations/020_add_structured_address_fields.sql`**
+  - Adds nullable `users.street_address`, `users.city`, `users.state`, and `users.postal_code`.
+  - Keeps legacy `users.address` as a display/fallback field.
+- **`src/components/profile/ProfileClient.tsx`**
+  - Adds structured address inputs to Personal Info.
+  - Saves the structured fields and composes the legacy `address` value when possible.
+- **`src/app/api/profile/route.ts`**
+  - Allows structured address fields in profile PATCH updates.
+- **`src/app/api/extension/profile/route.ts`**
+  - Uses `select('*')` for the user profile so new fields flow to the extension once migration 020 exists.
+- **`extension/src/content/fill.ts`**
+  - Address autofill now prefers structured address fields.
+  - Legacy `address` parsing remains as fallback for old profiles or pre-migration payloads.
+- **Types/tests**
+  - Updated web and extension profile types.
+  - Added extension fill regression coverage for structured address fields.
+
+### Checks run
+
+- `cd extension && npm run test -- src/content/fill.test.ts` — passed, 45 tests
+- `cd extension && npm run build` — passed
+- `npx tsc --noEmit` — passed
+
+### Required follow-up
+
+- Apply `supabase/migrations/020_add_structured_address_fields.sql` in Supabase.
+- After migration, update Kenny's profile with full street/city/state/postal values so Workday address fields stop relying on brittle parsing.
+
+---
+
 ## Session: 2026-05-18 — Source yield analytics (Codex)
 
 ### What changed

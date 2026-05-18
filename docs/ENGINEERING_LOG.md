@@ -154,6 +154,12 @@ For Workday, prioritize real DOM fixture/debug export work before more broad heu
 
 ---
 
+## 2026-05-18 — Structured address fields (Codex)
+
+- Added nullable structured address fields on `users`: `street_address`, `city`, `state`, `postal_code`.
+- Extension autofill now prefers structured address values over parsing the legacy `address` string, with legacy parsing kept as fallback.
+- Migration 020 must be applied in Supabase before the new profile fields can be saved in production.
+
 ## 2026-05-18 — Source yield analytics (Codex)
 
 - Added analytics source-yield grouping so GitHub, portal/search, and manual sources can be compared by submitted applications, responses, interviews, and offers.

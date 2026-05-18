@@ -30,6 +30,7 @@ export async function PATCH(request: Request) {
   // Whitelist updatable fields — never let client overwrite id, email, resume_text, resume_url
   const allowed = [
     'full_name', 'phone', 'address',
+    'street_address', 'city', 'state', 'postal_code',
     'linkedin_url', 'github_url', 'portfolio_url',
     'citizenship_status', 'visa_sponsorship_required', 'willing_to_relocate',
     'preferred_locations', 'preferred_salary_min', 'preferred_role_types', 'remote_preference',

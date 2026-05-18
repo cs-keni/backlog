@@ -12,6 +12,10 @@ const PROFILE: FullProfile = {
     full_name: 'Kenny Nguyen',
     phone: '555-123-4567',
     address: 'San Francisco, CA, 94105',
+    street_address: null,
+    city: null,
+    state: null,
+    postal_code: null,
     linkedin_url: 'https://linkedin.com/in/kenny',
     github_url: 'https://github.com/kenny',
     portfolio_url: 'https://kennydev.com',
@@ -479,6 +483,18 @@ describe('computeFills — address field parsing', () => {
     user: { ...PROFILE.user, address: '6925 SE 152nd Ave., Portland, OR 97236' },
   }
 
+  const STRUCTURED_ADDR_PROFILE: FullProfile = {
+    ...PROFILE,
+    user: {
+      ...PROFILE.user,
+      address: 'Portland, OR',
+      street_address: '6925 SE 152nd Ave.',
+      city: 'Portland',
+      state: 'OR',
+      postal_code: '97236',
+    },
+  }
+
   function makeFillable(id: string, label: string, type = 'text') {
     const lbl = document.createElement('label')
     lbl.htmlFor = id
@@ -511,6 +527,18 @@ describe('computeFills — address field parsing', () => {
     const results = computeFills(ADDR_PROFILE, 'generic')
     const zip = results.find((f) => f.label === 'zip code')
     expect(zip?.value).toBe('97236')
+  })
+
+  it('prefers structured address fields over legacy address parsing', () => {
+    makeFillable('street', 'Address Line 1')
+    makeFillable('city', 'City')
+    makeFillable('state', 'State')
+    makeFillable('zip', 'Zip Code')
+    const results = computeFills(STRUCTURED_ADDR_PROFILE, 'generic')
+    expect(results.find((f) => f.label === 'address line 1')?.value).toBe('6925 SE 152nd Ave.')
+    expect(results.find((f) => f.label === 'city')?.value).toBe('Portland')
+    expect(results.find((f) => f.label === 'state')?.value).toBe('OR')
+    expect(results.find((f) => f.label === 'zip code')?.value).toBe('97236')
   })
 })
 

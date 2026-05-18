@@ -1,11 +1,32 @@
 # Current Task
 
 **Last updated:** 2026-05-18
-**Status:** Source yield analytics implemented; monitor next Render run for Brave tuning
+**Status:** Structured address fields implemented; migration 020 needs Supabase apply
 
 ---
 
 ## Fixed in latest Codex session
+
+1. **Added structured profile address fields**
+   - Added migration `020_add_structured_address_fields.sql` for `street_address`, `city`, `state`, and `postal_code`.
+   - Profile UI now exposes those fields and composes the legacy `address` fallback on save.
+   - Extension profile payload can include structured address fields.
+   - Extension autofill now prefers structured address data and only parses legacy `address` as fallback.
+   - Added extension regression coverage for structured address autofill.
+
+## Checks run
+
+- `cd extension && npm run test -- src/content/fill.test.ts` — passed, 45 tests
+- `cd extension && npm run build` — passed
+- `npx tsc --noEmit` — passed
+
+## Needs deploy/migration
+
+- Apply `supabase/migrations/020_add_structured_address_fields.sql` in Supabase before depending on the new fields in production.
+
+---
+
+## Previous Codex session
 
 1. **Added source yield analytics**
    - `/api/analytics` now groups application outcomes by job source (`github`, `portal`, `manual`).

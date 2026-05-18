@@ -78,6 +78,24 @@ export function parseAddress(address: string): ParsedAddress {
   return { street: null, city: parts[0] ?? null, state: null, zip: null }
 }
 
+function getProfileAddress(profile: FullProfile): ParsedAddress {
+  const fallback = parseAddress(profile.user.address ?? '')
+  return {
+    street: profile.user.street_address || fallback.street,
+    city: profile.user.city || fallback.city,
+    state: profile.user.state || fallback.state,
+    zip: profile.user.postal_code || fallback.zip,
+  }
+}
+
+function getFullAddress(profile: FullProfile): string | null {
+  const { street, city, state, zip } = getProfileAddress(profile)
+  if (street && city && state && zip) return `${street}, ${city}, ${state} ${zip}`
+  if (city && state && zip) return `${city}, ${state} ${zip}`
+  if (city && state) return `${city}, ${state}`
+  return profile.user.address
+}
+
 // ─── Visibility check ─────────────────────────────────────────────────────────
 // Skips hidden, disabled, readonly, or zero-size inputs to avoid filling
 // off-step Workday wizard fields that are rendered but not active.
@@ -184,19 +202,19 @@ const FIELD_MAP: Array<FieldEntry> = [
   { patterns: /linkedin/, resolve: (p) => p.user.linkedin_url },
   { patterns: /github/, resolve: (p) => p.user.github_url },
   { patterns: /portfolio|personal\s*site|personal\s*website|website|url/, resolve: (p) => p.user.portfolio_url },
-  { patterns: /address/, exclude: /line.*2|apt|suite|unit/, resolve: (p) => parseAddress(p.user.address ?? '').street ?? p.user.address },
+  { patterns: /address/, exclude: /line.*2|apt|suite|unit/, resolve: (p) => getProfileAddress(p).street ?? getFullAddress(p) },
   // City+State combined must come before individual city/state patterns
   {
     patterns: /\bcity\b.*\bstate\b|\bcity.*province/,
     resolve: (p) => {
-      const { city, state } = parseAddress(p.user.address ?? '')
-      return city && state ? `${city}, ${state}` : (p.user.address ?? null)
+      const { city, state } = getProfileAddress(p)
+      return city && state ? `${city}, ${state}` : getFullAddress(p)
     },
   },
-  { patterns: /\bcity\b/, resolve: (p) => parseAddress(p.user.address ?? '').city },
+  { patterns: /\bcity\b/, resolve: (p) => getProfileAddress(p).city },
   // Use word boundary so "United States" and "statements" don't match
-  { patterns: /\bstate\b|\bprovince\b|\bregion\b/, resolve: (p) => parseAddress(p.user.address ?? '').state },
-  { patterns: /zip|postal/, resolve: (p) => parseAddress(p.user.address ?? '').zip },
+  { patterns: /\bstate\b|\bprovince\b|\bregion\b/, resolve: (p) => getProfileAddress(p).state },
+  { patterns: /zip|postal/, resolve: (p) => getProfileAddress(p).zip },
   { patterns: /country/, resolve: () => 'United States' },
   // Compliance yes/no — these must come before /state/ to avoid false matches on "United States"
   { patterns: /at least 18|18 years of age/, resolve: () => 'Yes' },
@@ -242,9 +260,9 @@ const WORKDAY_ID_MAP: Array<{ ids: RegExp; resolve: Resolver }> = [
   { ids: /^email$|^emailAddress$|^workEmail$/, resolve: (p) => p.user.email },
   { ids: /^phone$|^phoneNumber$|^phonePrimary$|^mobilePhone$/, resolve: (p) => p.user.phone },
   // Address — all resolvers use parseAddress() for consistent splitting
-  { ids: /^addressLine1$|^addressSection_addressLine1$/, resolve: (p) => parseAddress(p.user.address ?? '').street ?? p.user.address?.split(',')[0]?.trim() ?? null },
-  { ids: /^city$|^addressSection_city$/, resolve: (p) => parseAddress(p.user.address ?? '').city },
-  { ids: /^postalCode$|^zipCode$|^addressSection_postalCode$/, resolve: (p) => parseAddress(p.user.address ?? '').zip },
+  { ids: /^addressLine1$|^addressSection_addressLine1$/, resolve: (p) => getProfileAddress(p).street ?? getFullAddress(p)?.split(',')[0]?.trim() ?? null },
+  { ids: /^city$|^addressSection_city$/, resolve: (p) => getProfileAddress(p).city },
+  { ids: /^postalCode$|^zipCode$|^addressSection_postalCode$/, resolve: (p) => getProfileAddress(p).zip },
   // Online presence
   { ids: /^linkedIn(Url)?$|^linkedInProfile$/, resolve: (p) => p.user.linkedin_url },
   { ids: /^gitHub(Url)?$|^githubProfile$/, resolve: (p) => p.user.github_url },
@@ -586,7 +604,7 @@ const WORKDAY_COMBOBOX_MAP: Array<{ ids: RegExp; buttonSelector: string; resolve
   {
     ids: /^countryRegion$|^formField-countryRegion$|^stateProvince$|^addressSection_stateProvince$|^countryRegionAbbreviation$/,
     buttonSelector: 'button[name="countryRegion"], button[id*="countryRegion"][aria-haspopup]',
-    resolve: (p) => parseAddress(p.user.address ?? '').state,
+    resolve: (p) => getProfileAddress(p).state,
     label: 'State / Province',
   },
 ]

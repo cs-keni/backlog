@@ -6,6 +6,10 @@ export interface UserProfile {
   full_name: string | null
   phone: string | null
   address: string | null
+  street_address: string | null
+  city: string | null
+  state: string | null
+  postal_code: string | null
   linkedin_url: string | null
   github_url: string | null
   portfolio_url: string | null

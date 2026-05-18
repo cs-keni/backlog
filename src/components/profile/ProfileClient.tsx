@@ -27,6 +27,7 @@ function computeCompleteness(profile: UserProfile, work: WorkHistory[], edu: Edu
   const checks: Array<{ label: string; ok: boolean }> = [
     { label: 'Full name', ok: !!profile.full_name },
     { label: 'Phone', ok: !!profile.phone },
+    { label: 'Address', ok: !!(profile.street_address && profile.city && profile.state && profile.postal_code) || !!profile.address },
     { label: 'LinkedIn URL', ok: !!profile.linkedin_url },
     { label: 'Skills', ok: !!(profile.skills && profile.skills.length > 0) },
     { label: 'Experience level', ok: !!profile.experience_level },
@@ -39,6 +40,17 @@ function computeCompleteness(profile: UserProfile, work: WorkHistory[], edu: Edu
   const done = checks.filter(c => c.ok)
   const missing = checks.filter(c => !c.ok).map(c => c.label)
   return { percent: Math.round((done.length / checks.length) * 100), missing }
+}
+
+function composeAddress(profile: UserProfile): string | null {
+  if (profile.street_address && profile.city && profile.state && profile.postal_code) {
+    return `${profile.street_address}, ${profile.city}, ${profile.state} ${profile.postal_code}`
+  }
+  if (profile.city && profile.state && profile.postal_code) {
+    return `${profile.city}, ${profile.state} ${profile.postal_code}`
+  }
+  if (profile.city && profile.state) return `${profile.city}, ${profile.state}`
+  return profile.address
 }
 
 // ─── Section wrapper ──────────────────────────────────────────────────────────
@@ -250,16 +262,50 @@ export function ProfileClient({
           <Input
             value={profile.address ?? ''}
             onChange={e => setProfile(p => ({ ...p, address: e.target.value }))}
-            placeholder="Portland, OR"
+            placeholder="Fallback full address"
           />
         </Field>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <Field label="Street Address">
+            <Input
+              value={profile.street_address ?? ''}
+              onChange={e => setProfile(p => ({ ...p, street_address: e.target.value || null }))}
+              placeholder="6925 SE 152nd Ave."
+            />
+          </Field>
+          <Field label="City">
+            <Input
+              value={profile.city ?? ''}
+              onChange={e => setProfile(p => ({ ...p, city: e.target.value || null }))}
+              placeholder="Portland"
+            />
+          </Field>
+          <Field label="State / Region">
+            <Input
+              value={profile.state ?? ''}
+              onChange={e => setProfile(p => ({ ...p, state: e.target.value || null }))}
+              placeholder="OR"
+            />
+          </Field>
+          <Field label="Postal Code">
+            <Input
+              value={profile.postal_code ?? ''}
+              onChange={e => setProfile(p => ({ ...p, postal_code: e.target.value || null }))}
+              placeholder="97236"
+            />
+          </Field>
+        </div>
         <SaveButton
           saving={sections['personal']?.saving ?? false}
           saved={sections['personal']?.saved ?? false}
           onClick={() => saveSection('personal', {
             full_name: profile.full_name,
             phone: profile.phone,
-            address: profile.address,
+            address: composeAddress(profile),
+            street_address: profile.street_address,
+            city: profile.city,
+            state: profile.state,
+            postal_code: profile.postal_code,
           })}
         />
       </Section>

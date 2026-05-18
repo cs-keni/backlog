@@ -81,13 +81,15 @@ Expected work:
 
 Owner: Codex or Claude
 
+Status: implemented in code; migration 020 needs Supabase apply.
+
 Why: Address parsing is brittle and affects Workday plus generic ATS forms.
 
 Expected work:
 
-- Add `street_address`, `city`, `state`, `postal_code` fields.
-- Update Profile UI and extension profile API.
-- Extension should prefer structured fields and keep `parseAddress()` as fallback.
+- Add `street_address`, `city`, `state`, `postal_code` fields. Done in migration 020.
+- Update Profile UI and extension profile API. Done.
+- Extension should prefer structured fields and keep `parseAddress()` as fallback. Done.
 
 ### 7. Prior-employer radio logic
 
