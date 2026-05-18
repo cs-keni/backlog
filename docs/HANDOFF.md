@@ -4,6 +4,28 @@
 
 ---
 
+## Session: 2026-05-18 — Codex extension/product idea memo (Codex)
+
+### What changed
+
+- Added **`docs/CODEX_IDEAS.md`** as a lightweight idea bank for Claude/Codex.
+- Captures current extension review notes:
+  - Workday has more support than older TODOs imply: timeout fallback, combobox, skills, work-history, and education helpers exist.
+  - Highest leverage next extension work is observability: real Workday fixture capture and a redacted debug export button.
+  - Still-valid Workday priorities: modal guard, prior-employer radio based on work history, structured address fields.
+- Captures broader Backlog ideas:
+  - cache/batch extension LLM calls
+  - per-run worker budget summaries
+  - daily apply queue
+  - negative feedback loop for irrelevant jobs
+  - source analytics by interview yield
+
+### Checks run
+
+- Docs-only change; no automated checks run.
+
+---
+
 ## Session: 2026-05-18 — Brave Search job discovery (Codex)
 
 ### What changed

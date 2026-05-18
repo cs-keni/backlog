@@ -4,6 +4,22 @@ Reverse-chronological. One entry per meaningful session.
 
 ---
 
+## 2026-05-18 — Extension/product idea memo (Codex)
+
+### Added
+
+- `docs/CODEX_IDEAS.md` with:
+  - Workday extension review thoughts for Claude.
+  - Token/cost optimization ideas.
+  - Backlog product ideas.
+  - Notes that `TODOS.md` / `TESTING-SUITE.md` are partially stale relative to current code.
+
+### Key recommendation
+
+For Workday, prioritize real DOM fixture/debug export work before more broad heuristics. The implementation already has timeout fallback and several Workday async fill helpers; the next bottleneck is observability from real failed applications.
+
+---
+
 ## 2026-05-18 — Brave Search discovery source (Codex)
 
 ### Implemented
