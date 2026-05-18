@@ -4,6 +4,42 @@
 
 ---
 
+## Session: 2026-05-18 — Worker run summaries (Codex)
+
+### What changed
+
+- **`worker/src/search/brave.ts`**
+  - `discoverJobsViaBraveSearch()` now returns structured metrics with the discovered jobs:
+    - query count
+    - raw result count
+    - candidate URL count
+    - extracted job count
+    - experience-skip count
+- **`worker/src/aggregator.ts`**
+  - Adds compact source summaries to Render logs.
+  - GitHub source summary: parsed, relevant, new-before-normalization.
+  - Portal summary: fetched, relevant, new-before-enrichment.
+  - Portal enrichment budget: missing descriptions vs already-described jobs.
+  - Brave summary: queries, raw results, candidate URLs, extracted, skipped by experience, relevant, new.
+  - End-of-run summary: written count by source.
+- **`docs/PRIORITY.md`**
+  - Marked worker run budget reporting as baseline implemented.
+
+### Checks run
+
+- `cd worker && npm run test -- tests/unit/brave-search.test.ts tests/unit/relevance-filter.test.ts` — passed, 48 tests
+- `cd worker && npm run build` — passed
+
+### Next production check
+
+- On the next Render worker run, use the new summary lines to decide whether to tune:
+  - Brave query count/freshness
+  - portal company list
+  - normalized relevance filter
+  - enrichment budget
+
+---
+
 ## Session: 2026-05-18 — Render log follow-up and discovery tuning (Codex)
 
 ### What changed

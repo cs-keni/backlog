@@ -39,6 +39,7 @@ export interface AggregationResult {
 export async function runAggregation(force = false): Promise<AggregationResult> {
   const startedAt = Date.now()
   console.log(`\n[aggregator] ─── Run started at ${new Date().toISOString()} ───`)
+  const runSummaries: string[] = []
 
   let totalWritten = 0
   const allNewJobs: NormalizedJob[] = []
@@ -48,6 +49,7 @@ export async function runAggregation(force = false): Promise<AggregationResult> 
   for (const sourceConfig of SOURCES) {
     try {
       const result = await runSourceAggregation(sourceConfig, force)
+      runSummaries.push(`${sourceConfig.name}: wrote ${result.written}${result.skipped ? ' (skipped)' : ''}`)
       totalWritten += result.written
       allNewJobs.push(...result.newJobs)
       allWrittenJobIds.push(...result.writtenJobIds)
@@ -62,6 +64,7 @@ export async function runAggregation(force = false): Promise<AggregationResult> 
   // These APIs return structured JSON so no LLM normalization step is needed.
   try {
     const portalResult = await runPortalAggregation()
+    runSummaries.push(`Portals: wrote ${portalResult.written}`)
     totalWritten += portalResult.written
     allNewJobs.push(...portalResult.newJobs)
     allWrittenJobIds.push(...portalResult.writtenJobIds)
@@ -74,6 +77,7 @@ export async function runAggregation(force = false): Promise<AggregationResult> 
   // and company portals. Kept separate from Answers API to minimize cost.
   try {
     const searchResult = await runBraveSearchAggregation()
+    runSummaries.push(`Brave Search: wrote ${searchResult.written}`)
     totalWritten += searchResult.written
     allNewJobs.push(...searchResult.newJobs)
     allWrittenJobIds.push(...searchResult.writtenJobIds)
@@ -87,6 +91,9 @@ export async function runAggregation(force = false): Promise<AggregationResult> 
   await backfillMissingSalaries(50)
 
   const elapsed = ((Date.now() - startedAt) / 1000).toFixed(1)
+  if (runSummaries.length > 0) {
+    console.log(`[aggregator] Run summary: ${runSummaries.join(' | ')}`)
+  }
   console.log(`[aggregator] ─── All sources complete in ${elapsed}s (${totalWritten} total written) ───\n`)
 
   return { written: totalWritten, newJobs: allNewJobs, writtenJobIds: allWrittenJobIds, writtenJobPairs: allWrittenJobPairs, skipped: false }
@@ -95,14 +102,27 @@ export async function runAggregation(force = false): Promise<AggregationResult> 
 async function runBraveSearchAggregation(): Promise<AggregationResult> {
   console.log('\n[aggregator] Running Brave Search discovery...')
 
-  const discoveredJobs = await discoverJobsViaBraveSearch()
+  const discovery = await discoverJobsViaBraveSearch()
+  const discoveredJobs = discovery.jobs
   if (discoveredJobs.length === 0) {
+    console.log(
+      `[aggregator] Brave Search summary: ${discovery.queryCount} queries, ` +
+      `${discovery.rawResultCount} raw results, ${discovery.candidateUrlCount} candidate URLs, ` +
+      `${discovery.extractedJobCount} extracted, ${discovery.skippedExperienceCount} skipped by experience, ` +
+      '0 relevant jobs before dedupe'
+    )
     console.log('[aggregator] Brave Search: no candidate jobs extracted')
     return { written: 0, newJobs: [], writtenJobIds: [], writtenJobPairs: [], skipped: false }
   }
 
   const relevantJobs = filterRelevantJobs(discoveredJobs)
   const newJobs = await filterNewJobs(relevantJobs)
+  console.log(
+    `[aggregator] Brave Search summary: ${discovery.queryCount} queries, ` +
+    `${discovery.rawResultCount} raw results, ${discovery.candidateUrlCount} candidate URLs, ` +
+    `${discovery.extractedJobCount} extracted, ${discovery.skippedExperienceCount} skipped by experience, ` +
+    `${relevantJobs.length}/${discoveredJobs.length} relevant, ${newJobs.length} new`
+  )
   if (newJobs.length === 0) {
     console.log('[aggregator] Brave Search: all jobs already stored or filtered out')
     return { written: 0, newJobs: [], writtenJobIds: [], writtenJobPairs: [], skipped: false }
@@ -129,6 +149,10 @@ async function runPortalAggregation(): Promise<AggregationResult> {
 
   // Deduplicate against what's already in the DB
   const newJobs = await filterNewJobs(relevantJobs)
+  console.log(
+    `[aggregator] Portals summary: ${allJobs.length} fetched, ` +
+    `${relevantJobs.length} relevant, ${newJobs.length} new before enrichment`
+  )
   if (newJobs.length === 0) {
     console.log('[aggregator] Portals: all jobs already stored')
     return { written: 0, newJobs: [], writtenJobIds: [], writtenJobPairs: [], skipped: false }
@@ -139,6 +163,10 @@ async function runPortalAggregation(): Promise<AggregationResult> {
   // but still run it for the ones missing descriptions (Greenhouse requires per-job API calls).
   const jobsToEnrich = newJobs.filter(j => !j.description)
   const jobsWithDesc = newJobs.filter(j => !!j.description)
+  console.log(
+    `[aggregator] Portals enrichment budget: ${jobsToEnrich.length} missing descriptions, ` +
+    `${jobsWithDesc.length} already have descriptions`
+  )
 
   let enriched = jobsWithDesc
   if (jobsToEnrich.length > 0) {
@@ -188,6 +216,10 @@ async function runSourceAggregation(
 
   // 5. Filter already-stored jobs
   const newEntries = await filterNewEntries(relevantEntries)
+  console.log(
+    `[aggregator] ${config.name} summary: ${rawEntries.length} parsed, ` +
+    `${relevantEntries.length} relevant, ${newEntries.length} new before normalization`
+  )
   if (newEntries.length === 0) {
     console.log(`[aggregator] ${config.name}: All entries already stored. Updating SHA.`)
     await updateSourceSha(source.id, latestSha)

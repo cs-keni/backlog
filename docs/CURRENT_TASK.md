@@ -7,16 +7,24 @@
 
 ## Fixed in latest Codex session
 
-1. **Diagnosed Render logs** — `jobs_source_check` failures came from `source='portal'` inserts hitting a DB constraint that did not yet allow `portal`. Kenny applied migration 19 successfully afterward; next Render run should confirm the errors are gone.
-2. **Tightened portal filtering** — normalized portal/search jobs now require explicit entry-level title signals (`new grad`, `junior`, `associate`, `entry-level`, `early career`, etc.) before writing. This avoids broad senior/generic company portal roles.
-3. **Blocked log-exposed misses** — added filters/tests for `Sr Fullstack Engineer` and non-US city signals embedded in titles such as Tokyo.
-4. **Loosened Brave Search** — removed strict negative terms from the search query itself, switched to ATS/careers-oriented searches, defaulted freshness to past month, and raised default query limit to 8. Downstream filters now do the pruning.
-5. **Added priority list** — `docs/PRIORITY.md` now lists current work in priority order with Codex/Claude ownership.
+1. **Added worker run summaries** — Render logs now include compact per-source summaries for GitHub, portals, and Brave Search.
+2. **Added Brave discovery metrics** — Brave Search now reports query count, raw results, candidate URLs, extracted jobs, experience skips, relevant jobs, new jobs, and writes.
+3. **Added portal/GitHub budget logs** — portal scan logs fetched/relevant/new counts and enrichment budget; GitHub logs parsed/relevant/new before normalization.
 
 ## Checks run
 
 - `cd worker && npm run test -- tests/unit/brave-search.test.ts tests/unit/relevance-filter.test.ts` — 48 tests passed
 - `cd worker && npm run build` — passed
+
+---
+
+## Previous Codex session
+
+1. **Diagnosed Render logs** — `jobs_source_check` failures came from `source='portal'` inserts hitting a DB constraint that did not yet allow `portal`. Kenny applied migration 19 successfully afterward; next Render run should confirm the errors are gone.
+2. **Tightened portal filtering** — normalized portal/search jobs now require explicit entry-level title signals (`new grad`, `junior`, `associate`, `entry-level`, `early career`, etc.) before writing. This avoids broad senior/generic company portal roles.
+3. **Blocked log-exposed misses** — added filters/tests for `Sr Fullstack Engineer` and non-US city signals embedded in titles such as Tokyo.
+4. **Loosened Brave Search** — removed strict negative terms from the search query itself, switched to ATS/careers-oriented searches, defaulted freshness to past month, and raised default query limit to 8. Downstream filters now do the pruning.
+5. **Added priority list** — `docs/PRIORITY.md` now lists current work in priority order with Codex/Claude ownership.
 
 ---
 

@@ -57,19 +57,30 @@ interface ExtractedJob {
   tags: string[]
 }
 
-export async function discoverJobsViaBraveSearch(): Promise<NormalizedJob[]> {
+export interface BraveSearchDiscoveryResult {
+  jobs: NormalizedJob[]
+  queryCount: number
+  rawResultCount: number
+  candidateUrlCount: number
+  extractedJobCount: number
+  skippedExperienceCount: number
+}
+
+export async function discoverJobsViaBraveSearch(): Promise<BraveSearchDiscoveryResult> {
   const apiKey = process.env.BRAVE_SEARCH_API_KEY
   if (!apiKey) {
     console.log('[brave-search] BRAVE_SEARCH_API_KEY not set; skipping search discovery')
-    return []
+    return emptyDiscoveryResult()
   }
 
   const queryLimit = parsePositiveInt(process.env.BRAVE_SEARCH_QUERY_LIMIT, DEFAULT_QUERY_LIMIT)
   const queries = SEARCH_QUERIES.slice(0, queryLimit)
   const candidateUrls = new Map<string, BraveSearchResult>()
+  let rawResultCount = 0
 
   for (const query of queries) {
     const results = await searchBrave(apiKey, query)
+    rawResultCount += results.length
     console.log(`[brave-search] "${query}" returned ${results.length} web results`)
 
     for (const result of results) {
@@ -82,13 +93,17 @@ export async function discoverJobsViaBraveSearch(): Promise<NormalizedJob[]> {
   console.log(`[brave-search] ${candidateUrls.size} candidate job URLs after search-result filtering`)
 
   const jobs: NormalizedJob[] = []
+  let extractedJobCount = 0
+  let skippedExperienceCount = 0
   for (const [url, result] of candidateUrls) {
     const job = await extractJobFromCandidate(url)
     if (!job) continue
+    extractedJobCount++
 
     const context = [job.title, job.description, result.title, result.description, ...(result.extra_snippets ?? [])].join(' ')
     if (!isLessThanThreeYears(context)) {
       console.log(`[brave-search] Skipped "${job.title}" (${url}) due to experience requirement`)
+      skippedExperienceCount++
       continue
     }
 
@@ -100,8 +115,31 @@ export async function discoverJobsViaBraveSearch(): Promise<NormalizedJob[]> {
     })
   }
 
-  console.log(`[brave-search] Extracted ${jobs.length} likely entry-level SWE jobs`)
-  return jobs
+  console.log(
+    `[brave-search] Summary: ${queries.length} queries, ${rawResultCount} raw results, ` +
+    `${candidateUrls.size} candidate URLs, ${extractedJobCount} extracted, ` +
+    `${skippedExperienceCount} skipped by experience, ${jobs.length} likely entry-level SWE jobs`
+  )
+
+  return {
+    jobs,
+    queryCount: queries.length,
+    rawResultCount,
+    candidateUrlCount: candidateUrls.size,
+    extractedJobCount,
+    skippedExperienceCount,
+  }
+}
+
+function emptyDiscoveryResult(): BraveSearchDiscoveryResult {
+  return {
+    jobs: [],
+    queryCount: 0,
+    rawResultCount: 0,
+    candidateUrlCount: 0,
+    extractedJobCount: 0,
+    skippedExperienceCount: 0,
+  }
 }
 
 async function searchBrave(apiKey: string, query: string): Promise<BraveSearchResult[]> {

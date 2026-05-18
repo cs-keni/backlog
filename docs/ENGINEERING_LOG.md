@@ -4,6 +4,35 @@ Reverse-chronological. One entry per meaningful session.
 
 ---
 
+## 2026-05-18 — Worker run summaries (Codex)
+
+### Implemented
+
+- Added structured Brave Search discovery metrics:
+  - query count
+  - raw result count
+  - candidate URL count
+  - extracted job count
+  - experience-skip count
+- Added aggregator summaries for:
+  - GitHub parsed/relevant/new-before-normalization counts
+  - portal fetched/relevant/new-before-enrichment counts
+  - portal enrichment budget
+  - Brave query/extraction/relevance/new counts
+  - end-of-run written count by source
+- Updated `docs/PRIORITY.md` to mark worker budget reporting baseline done.
+
+### Checks
+
+- `cd worker && npm run test -- tests/unit/brave-search.test.ts tests/unit/relevance-filter.test.ts` — 48 passed
+- `cd worker && npm run build` — passed
+
+### Gotcha
+
+This is log-only budget reporting. Persisted worker-run history is still a future enhancement.
+
+---
+
 ## 2026-05-18 — Render log follow-up and discovery tuning (Codex)
 
 ### Implemented

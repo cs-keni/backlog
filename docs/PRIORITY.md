@@ -124,10 +124,12 @@ Expected work:
 
 Owner: Codex
 
+Status: baseline implemented.
+
 Expected work:
 
-- Log Brave query count, candidate URLs, extracted jobs, relevant jobs, inserted jobs.
-- Log normalization/enrichment attempts.
+- Log Brave query count, candidate URLs, extracted jobs, relevant jobs, inserted jobs. Baseline done.
+- Log normalization/enrichment attempts. Baseline done for source summaries and portal enrichment budget.
 - Optional later: persist worker run summaries.
 
 ---
