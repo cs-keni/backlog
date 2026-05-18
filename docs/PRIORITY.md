@@ -173,9 +173,11 @@ Expected work:
 
 Owner: Codex
 
+Status: baseline implemented 2026-05-18.
+
 Expected work:
 
-- Track applications, responses, and interviews by source (`github`, `portal`, `manual`).
+- Track applications, responses, and interviews by source (`github`, `portal`, `manual`). Done in Analytics source yield.
 - Use source performance to decide which discovery channels deserve more budget.
 
 ---

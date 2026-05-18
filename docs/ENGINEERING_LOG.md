@@ -154,6 +154,12 @@ For Workday, prioritize real DOM fixture/debug export work before more broad heu
 
 ---
 
+## 2026-05-18 — Source yield analytics (Codex)
+
+- Added analytics source-yield grouping so GitHub, portal/search, and manual sources can be compared by submitted applications, responses, interviews, and offers.
+- Unknown/legacy job sources intentionally fall into the GitHub bucket to preserve the existing source-breakdown behavior.
+- Source yield is all-time across applications, while the feed source breakdown remains range-limited to jobs fetched in the selected window.
+
 ## 2026-05-18 — Brave Portland discovery tuning (Codex)
 
 - Reordered Brave default query budget around the production-observed winners: broad career queries produced candidates, while quoted new-grad ATS queries returned zero raw results.

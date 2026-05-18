@@ -7,6 +7,7 @@ export const dynamic = 'force-dynamic'
 
 interface ApplicationRow {
   id: string
+  job_id: string
   status: string
   is_archived: boolean
   applied_at: string | null
@@ -20,9 +21,15 @@ interface TimelineRow {
 }
 
 interface JobRow {
+  id: string
   company: string
   source: string
   fetched_at: string
+}
+
+interface JobSourceRow {
+  id: string
+  source: string
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -43,6 +50,20 @@ function toDateKey(iso: string): string {
 }
 
 const STATUSES = ['saved', 'applied', 'phone_screen', 'technical', 'final', 'offer', 'rejected'] as const
+const SOURCE_LABELS = {
+  github: 'Aggregated feed',
+  portal: 'Company/search discovery',
+  manual: 'Manually added',
+} as const
+const SOURCE_KEYS = ['github', 'portal', 'manual'] as const
+const RESPONSE_STATUSES = new Set(['phone_screen', 'technical', 'final', 'offer', 'rejected'])
+const INTERVIEW_STATUSES = new Set(['phone_screen', 'technical', 'final', 'offer'])
+
+function toSourceKey(source: string | null | undefined): typeof SOURCE_KEYS[number] {
+  if (source === 'manual') return 'manual'
+  if (source === 'portal') return 'portal'
+  return 'github'
+}
 
 // ─── Route ────────────────────────────────────────────────────────────────────
 
@@ -64,11 +85,11 @@ export async function GET(request: NextRequest) {
   const [appsResult, jobsResult] = await Promise.all([
     supabase
       .from('applications')
-      .select('id, status, is_archived, applied_at, last_updated')
+      .select('id, job_id, status, is_archived, applied_at, last_updated')
       .eq('user_id', user.id),
     supabase
       .from('jobs')
-      .select('company, source, fetched_at')
+      .select('id, company, source, fetched_at')
       .gte('fetched_at', cutoffIso),
   ])
 
@@ -86,12 +107,22 @@ export async function GET(request: NextRequest) {
     : { data: [] }
   const timeline = (timelineResult.data ?? []) as TimelineRow[]
 
+  // Fetch source for jobs attached to applications so source yield is all-time,
+  // not limited to the selected "jobs posted" range.
+  const appliedJobIds = [...new Set(allApps.map((a) => a.job_id).filter(Boolean))]
+  const appJobsResult = appliedJobIds.length > 0
+    ? await supabase
+        .from('jobs')
+        .select('id, source')
+        .in('id', appliedJobIds)
+    : { data: [] }
+  const appJobSources = (appJobsResult.data ?? []) as JobSourceRow[]
+  const sourceByJobId = new Map(appJobSources.map((job) => [job.id, toSourceKey(job.source)]))
+
   // ── Stats ───────────────────────────────────────────────────────────────────
 
   const submitted = allApps.filter((a) => a.status !== 'saved')
-  const gotResponse = allApps.filter((a) =>
-    ['phone_screen', 'technical', 'final', 'offer', 'rejected'].includes(a.status)
-  )
+  const gotResponse = allApps.filter((a) => RESPONSE_STATUSES.has(a.status))
   const inPipeline = allApps.filter((a) =>
     ['applied', 'phone_screen', 'technical', 'final'].includes(a.status) && !a.is_archived
   )
@@ -152,15 +183,50 @@ export async function GET(request: NextRequest) {
   let portalCount = 0
   let manualCount = 0
   for (const job of recentJobs) {
-    if (job.source === 'manual') manualCount++
-    else if (job.source === 'portal') portalCount++
+    const source = toSourceKey(job.source)
+    if (source === 'manual') manualCount++
+    else if (source === 'portal') portalCount++
     else githubCount++
   }
+
+  // ── Source yield ────────────────────────────────────────────────────────────
+
+  const sourceYieldCounts: Record<typeof SOURCE_KEYS[number], {
+    applications: number
+    submitted: number
+    responses: number
+    interviews: number
+    offers: number
+  }> = {
+    github: { applications: 0, submitted: 0, responses: 0, interviews: 0, offers: 0 },
+    portal: { applications: 0, submitted: 0, responses: 0, interviews: 0, offers: 0 },
+    manual: { applications: 0, submitted: 0, responses: 0, interviews: 0, offers: 0 },
+  }
+
+  for (const app of allApps) {
+    const source = sourceByJobId.get(app.job_id) ?? 'github'
+    const counts = sourceYieldCounts[source]
+    counts.applications++
+    if (app.status !== 'saved') counts.submitted++
+    if (RESPONSE_STATUSES.has(app.status)) counts.responses++
+    if (INTERVIEW_STATUSES.has(app.status)) counts.interviews++
+    if (app.status === 'offer') counts.offers++
+  }
+
+  const sourceYield = SOURCE_KEYS.map((source) => {
+    const counts = sourceYieldCounts[source]
+    return {
+      source,
+      label: SOURCE_LABELS[source],
+      ...counts,
+      responseRate: counts.submitted > 0 ? Math.round((counts.responses / counts.submitted) * 100) : 0,
+      interviewRate: counts.submitted > 0 ? Math.round((counts.interviews / counts.submitted) * 100) : 0,
+    }
+  })
 
   // ── Median time to first response (days) ─────────────────────────────────────
 
   // For each "applied" application, find first timeline entry to a response status
-  const RESPONSE_STATUSES = new Set(['phone_screen', 'technical', 'final', 'offer', 'rejected'])
   const timelineByApp: Record<string, TimelineRow[]> = {}
   for (const t of timeline) {
     if (!timelineByApp[t.application_id]) timelineByApp[t.application_id] = []
@@ -202,6 +268,7 @@ export async function GET(request: NextRequest) {
     jobActivity,
     topCompanies,
     sourceBreakdown: { github: githubCount, portal: portalCount, manual: manualCount },
+    sourceYield,
     medianDaysToResponse,
   })
 }

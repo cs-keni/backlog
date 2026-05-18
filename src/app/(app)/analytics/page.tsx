@@ -26,6 +26,17 @@ interface AnalyticsData {
   jobActivity: Array<{ date: string; count: number }>
   topCompanies: Array<{ company: string; count: number }>
   sourceBreakdown: { github: number; portal: number; manual: number }
+  sourceYield: Array<{
+    source: 'github' | 'portal' | 'manual'
+    label: string
+    applications: number
+    submitted: number
+    responses: number
+    interviews: number
+    offers: number
+    responseRate: number
+    interviewRate: number
+  }>
   medianDaysToResponse: number | null
 }
 
@@ -424,9 +435,56 @@ export default function AnalyticsPage() {
               </div>
             </div>
 
+            {/* Source yield */}
+            <div className="space-y-4">
+              <SectionHeader title="Source yield" sub="Application outcomes by source" />
+              <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 divide-y divide-zinc-800/60 overflow-hidden">
+                {data.sourceYield.every((row) => row.applications === 0) ? (
+                  <p className="text-sm text-zinc-600 px-4 py-6 text-center">No application source data yet</p>
+                ) : (
+                  data.sourceYield.map((row) => (
+                    <SourceYieldRow key={row.source} row={row} />
+                  ))
+                )}
+              </div>
+            </div>
+
           </>
         ))}
       </div>
+    </div>
+  )
+}
+
+// ─── Source yield row ─────────────────────────────────────────────────────────
+
+function SourceYieldRow({
+  row,
+}: {
+  row: AnalyticsData['sourceYield'][number]
+}) {
+  return (
+    <div className="grid gap-3 px-4 py-3 md:grid-cols-[minmax(0,1fr)_repeat(5,minmax(64px,84px))] md:items-center">
+      <div className="min-w-0">
+        <p className="text-xs font-medium text-zinc-300 truncate">{row.label}</p>
+        <p className="text-[11px] text-zinc-600">
+          {row.responseRate}% response · {row.interviewRate}% interview
+        </p>
+      </div>
+      <SourceYieldMetric label="Apps" value={row.applications} />
+      <SourceYieldMetric label="Sent" value={row.submitted} />
+      <SourceYieldMetric label="Replies" value={row.responses} />
+      <SourceYieldMetric label="Interviews" value={row.interviews} />
+      <SourceYieldMetric label="Offers" value={row.offers} />
+    </div>
+  )
+}
+
+function SourceYieldMetric({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="flex items-center justify-between gap-3 md:block md:text-right">
+      <span className="text-[11px] text-zinc-600">{label}</span>
+      <span className="text-sm font-semibold text-zinc-100 tabular-nums md:block">{value.toLocaleString()}</span>
     </div>
   )
 }

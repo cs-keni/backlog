@@ -44,18 +44,44 @@ describe('GET /api/analytics', () => {
     const applications = [
       {
         id: 'app-1',
+        job_id: 'job-github',
         status: 'applied',
         is_archived: false,
         applied_at: now,
         last_updated: now,
       },
+      {
+        id: 'app-2',
+        job_id: 'job-portal',
+        status: 'technical',
+        is_archived: false,
+        applied_at: now,
+        last_updated: now,
+      },
+      {
+        id: 'app-3',
+        job_id: 'job-manual',
+        status: 'offer',
+        is_archived: false,
+        applied_at: now,
+        last_updated: now,
+      },
+      {
+        id: 'app-4',
+        job_id: 'job-legacy',
+        status: 'saved',
+        is_archived: false,
+        applied_at: null,
+        last_updated: now,
+      },
     ]
     const jobs = [
-      { company: 'GitHub Co', source: 'github', fetched_at: now },
-      { company: 'Portal Co', source: 'portal', fetched_at: now },
-      { company: 'Manual Co', source: 'manual', fetched_at: now },
-      { company: 'Legacy Co', source: 'legacy', fetched_at: now },
+      { id: 'job-github', company: 'GitHub Co', source: 'github', fetched_at: now },
+      { id: 'job-portal', company: 'Portal Co', source: 'portal', fetched_at: now },
+      { id: 'job-manual', company: 'Manual Co', source: 'manual', fetched_at: now },
+      { id: 'job-legacy', company: 'Legacy Co', source: 'legacy', fetched_at: now },
     ]
+    let jobsCallCount = 0
 
     mockFrom.mockImplementation((table: string) => {
       if (table === 'applications') {
@@ -66,6 +92,14 @@ describe('GET /api/analytics', () => {
         }
       }
       if (table === 'jobs') {
+        jobsCallCount++
+        if (jobsCallCount === 2) {
+          return {
+            select: vi.fn().mockReturnValue({
+              in: vi.fn().mockResolvedValue({ data: jobs.map(({ id, source }) => ({ id, source })), error: null }),
+            }),
+          }
+        }
         return {
           select: vi.fn().mockReturnValue({
             gte: vi.fn().mockResolvedValue({ data: jobs, error: null }),
@@ -89,5 +123,40 @@ describe('GET /api/analytics', () => {
     const json = await res.json()
     expect(json.sourceBreakdown).toEqual({ github: 2, portal: 1, manual: 1 })
     expect(json.stats.jobsInRange).toBe(4)
+    expect(json.sourceYield).toEqual([
+      {
+        source: 'github',
+        label: 'Aggregated feed',
+        applications: 2,
+        submitted: 1,
+        responses: 0,
+        interviews: 0,
+        offers: 0,
+        responseRate: 0,
+        interviewRate: 0,
+      },
+      {
+        source: 'portal',
+        label: 'Company/search discovery',
+        applications: 1,
+        submitted: 1,
+        responses: 1,
+        interviews: 1,
+        offers: 0,
+        responseRate: 100,
+        interviewRate: 100,
+      },
+      {
+        source: 'manual',
+        label: 'Manually added',
+        applications: 1,
+        submitted: 1,
+        responses: 1,
+        interviews: 1,
+        offers: 1,
+        responseRate: 100,
+        interviewRate: 100,
+      },
+    ])
   })
 })

@@ -1,11 +1,25 @@
 # Current Task
 
 **Last updated:** 2026-05-18
-**Status:** Brave discovery query tuning implemented; monitor next Render run
+**Status:** Source yield analytics implemented; monitor next Render run for Brave tuning
 
 ---
 
 ## Fixed in latest Codex session
+
+1. **Added source yield analytics**
+   - `/api/analytics` now groups application outcomes by job source (`github`, `portal`, `manual`).
+   - Analytics UI now shows applications, submitted count, responses, interviews, offers, response rate, and interview rate per source.
+   - Added integration test coverage for source-yield calculations.
+
+## Checks run
+
+- `npm run test -- src/tests/integration/analytics.test.ts` — passed, 2 tests
+- `npx tsc --noEmit` — passed
+
+---
+
+## Previous Codex session
 
 1. **Implemented aggressive Portland/remote Brave discovery tuning**
    - Reordered Brave Search defaults so the production-proven broad career queries run first.

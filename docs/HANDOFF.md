@@ -4,6 +4,31 @@
 
 ---
 
+## Session: 2026-05-18 — Source yield analytics (Codex)
+
+### What changed
+
+- **`src/app/api/analytics/route.ts`**
+  - Added `sourceYield`, grouped by `github`, `portal`, and `manual`.
+  - Tracks applications, submitted, responses, interviews, offers, response rate, and interview rate by source.
+  - Keeps unknown/legacy sources in the GitHub bucket, matching existing source-breakdown behavior.
+- **`src/app/(app)/analytics/page.tsx`**
+  - Added a compact "Source yield" section to compare outcomes by source.
+- **`src/tests/integration/analytics.test.ts`**
+  - Extended analytics coverage to assert source-yield output.
+
+### Checks run
+
+- `npm run test -- src/tests/integration/analytics.test.ts` — passed, 2 tests
+- `npx tsc --noEmit` — passed
+
+### Remaining work
+
+- Source yield is now visible, but it is only as good as application statuses being kept current.
+- Negative feedback reasons are still not implemented.
+
+---
+
 ## Session: 2026-05-18 — Brave Portland discovery tuning (Codex)
 
 ### What changed
