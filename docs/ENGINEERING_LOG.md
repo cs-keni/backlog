@@ -154,6 +154,12 @@ For Workday, prioritize real DOM fixture/debug export work before more broad heu
 
 ---
 
+## 2026-05-18 — Brave Portland discovery tuning (Codex)
+
+- Reordered Brave default query budget around the production-observed winners: broad career queries produced candidates, while quoted new-grad ATS queries returned zero raw results.
+- Added Portland-specific and remote-specific entry-level SWE search queries to the default 8-query budget.
+- Added per-query Brave metrics so future Render logs can show which queries produced raw results, candidate URLs, extracted jobs, and accepted jobs.
+
 ## 2026-05-18 — Worker GPT-5 nano temperature compatibility (Codex)
 
 - Render worker logs at 2026-05-18 09:00 PDT showed `gpt-5-nano` rejecting `temperature: 0` in the normalizer with `unsupported_value`.

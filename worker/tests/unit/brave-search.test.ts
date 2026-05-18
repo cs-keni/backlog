@@ -1,5 +1,27 @@
 import { describe, it, expect } from 'vitest'
-import { isLessThanThreeYears, isLikelyJobUrl } from '../../src/search/brave'
+import { getBraveSearchQueries, isLessThanThreeYears, isLikelyJobUrl } from '../../src/search/brave'
+
+describe('getBraveSearchQueries', () => {
+  it('prioritizes broad career queries that produced candidates in production logs', () => {
+    const queries = getBraveSearchQueries(2)
+    expect(queries).toEqual([
+      '"associate software engineer" "careers"',
+      '"early career software engineer" "careers"',
+    ])
+  })
+
+  it('includes Portland-specific discovery in the default budget', () => {
+    const queries = getBraveSearchQueries(8)
+    expect(queries.some((query) => query.includes('"Portland"'))).toBe(true)
+    expect(queries.filter((query) => query.includes('"Portland"'))).toHaveLength(3)
+  })
+
+  it('keeps lower-yield quoted ATS queries outside the default budget', () => {
+    const queries = getBraveSearchQueries(8)
+    expect(queries).not.toContain('site:jobs.lever.co "new grad software engineer"')
+    expect(queries).not.toContain('site:boards.greenhouse.io "new grad software engineer"')
+  })
+})
 
 describe('isLessThanThreeYears', () => {
   it('allows explicit new grad roles', () => {

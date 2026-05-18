@@ -26,7 +26,7 @@ Next checks:
 
 Owner: Codex
 
-Status: in progress.
+Status: in progress; Brave query tuning updated 2026-05-18.
 
 Why: Brave Search ran but returned zero results with overly strict quoted/exclusion queries. Portal scan also let broad non-entry roles through.
 
@@ -35,7 +35,8 @@ Current direction:
 - Brave Search now uses ATS/careers-oriented queries and a past-month freshness window.
 - Normalized portal/search jobs now require explicit entry-level signals (`new grad`, `junior`, `associate`, `entry-level`, etc.) before writing.
 - 2026-05-18 Render logs: broad career queries produced candidates, but quoted ATS queries returned 0 results; relevant Brave/portal jobs were all duplicates.
-- Continue tuning by replacing low-yield queries, adding Portland/remote-specific discovery, and logging per-query candidate/extracted counts.
+- 2026-05-18 follow-up: default Brave budget now prioritizes broad career queries, includes Portland/remote-specific discovery, and logs per-query raw/candidate/extracted/accepted metrics.
+- Continue tuning after the next Render run by pruning any default-budget query with repeated zero candidate/extracted counts.
 
 ---
 
@@ -141,14 +142,14 @@ Expected work:
 
 Owner: Codex
 
-Status: planned; do not implement until explicitly picked up.
+Status: baseline implemented in Brave Search; monitor production yield.
 
 Expected work:
 
 - Add a more aggressive search path for software engineering jobs in Portland, Oregon.
 - Expand beyond the current general Brave/portal discovery strategy where useful.
 - Keep the feed scoped to software engineering roles and current entry-level/new-grad preferences.
-- Add observability so the Portland-specific search can be tuned from worker logs.
+- Add observability so the Portland-specific search can be tuned from worker logs. Baseline done with per-query Brave metrics.
 
 ### 12. Daily apply queue
 

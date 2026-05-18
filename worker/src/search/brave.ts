@@ -6,14 +6,20 @@ const RESULTS_PER_QUERY = 10
 const REQUEST_TIMEOUT_MS = 10_000
 
 const SEARCH_QUERIES = [
+  '"associate software engineer" "careers"',
+  '"early career software engineer" "careers"',
+  '"junior software engineer" "careers" "remote"',
+  '"entry level software engineer" "careers" "remote"',
+  '"software engineer" "Portland" "early career"',
+  '"junior software engineer" "Portland"',
+  '"entry level software engineer" "Portland"',
+  'site:jobs.lever.co "associate software engineer"',
+  'site:boards.greenhouse.io "associate software engineer"',
+  'site:job-boards.greenhouse.io "associate software engineer"',
   'site:jobs.lever.co "new grad software engineer"',
   'site:boards.greenhouse.io "new grad software engineer"',
   'site:job-boards.greenhouse.io "new grad software engineer"',
-  'site:jobs.lever.co "junior software engineer"',
-  'site:boards.greenhouse.io "junior software engineer"',
-  '"associate software engineer" "careers"',
   '"entry level software engineer" "careers"',
-  '"early career software engineer" "careers"',
   '"AI software engineer" "early career"',
   '"applied AI engineer" "entry level"',
   '"LLM software engineer" "new grad"',
@@ -43,6 +49,16 @@ interface BraveSearchResult {
   extra_snippets?: string[]
 }
 
+export interface BraveSearchQueryMetric {
+  query: string
+  rawResultCount: number
+  candidateUrlCount: number
+  duplicateCandidateUrlCount: number
+  extractedJobCount: number
+  skippedExperienceCount: number
+  acceptedJobCount: number
+}
+
 interface ExtractedJob {
   title: string
   company: string
@@ -64,6 +80,12 @@ export interface BraveSearchDiscoveryResult {
   candidateUrlCount: number
   extractedJobCount: number
   skippedExperienceCount: number
+  queryMetrics: BraveSearchQueryMetric[]
+}
+
+interface CandidateRecord {
+  result: BraveSearchResult
+  queryIndex: number
 }
 
 export async function discoverJobsViaBraveSearch(): Promise<BraveSearchDiscoveryResult> {
@@ -74,20 +96,42 @@ export async function discoverJobsViaBraveSearch(): Promise<BraveSearchDiscovery
   }
 
   const queryLimit = parsePositiveInt(process.env.BRAVE_SEARCH_QUERY_LIMIT, DEFAULT_QUERY_LIMIT)
-  const queries = SEARCH_QUERIES.slice(0, queryLimit)
-  const candidateUrls = new Map<string, BraveSearchResult>()
+  const queries = getBraveSearchQueries(queryLimit)
+  const queryMetrics = queries.map((query): BraveSearchQueryMetric => ({
+    query,
+    rawResultCount: 0,
+    candidateUrlCount: 0,
+    duplicateCandidateUrlCount: 0,
+    extractedJobCount: 0,
+    skippedExperienceCount: 0,
+    acceptedJobCount: 0,
+  }))
+  const candidateUrls = new Map<string, CandidateRecord>()
   let rawResultCount = 0
 
-  for (const query of queries) {
+  for (const [queryIndex, query] of queries.entries()) {
     const results = await searchBrave(apiKey, query)
     rawResultCount += results.length
-    console.log(`[brave-search] "${query}" returned ${results.length} web results`)
+    queryMetrics[queryIndex].rawResultCount = results.length
 
     for (const result of results) {
       const url = normalizeCandidateUrl(result.url)
       if (!url || !isLikelyJobUrl(url, result)) continue
-      if (!candidateUrls.has(url)) candidateUrls.set(url, { ...result, url })
+      if (candidateUrls.has(url)) {
+        queryMetrics[queryIndex].duplicateCandidateUrlCount++
+        continue
+      }
+      queryMetrics[queryIndex].candidateUrlCount++
+      candidateUrls.set(url, { result: { ...result, url }, queryIndex })
     }
+
+    console.log(
+      `[brave-search] Query ${queryIndex + 1}/${queries.length}: "${query}" ` +
+      `returned ${results.length} web results, ${queryMetrics[queryIndex].candidateUrlCount} candidate URLs` +
+      (queryMetrics[queryIndex].duplicateCandidateUrlCount > 0
+        ? `, ${queryMetrics[queryIndex].duplicateCandidateUrlCount} duplicate candidates`
+        : '')
+    )
   }
 
   console.log(`[brave-search] ${candidateUrls.size} candidate job URLs after search-result filtering`)
@@ -95,15 +139,18 @@ export async function discoverJobsViaBraveSearch(): Promise<BraveSearchDiscovery
   const jobs: NormalizedJob[] = []
   let extractedJobCount = 0
   let skippedExperienceCount = 0
-  for (const [url, result] of candidateUrls) {
+  for (const [url, candidate] of candidateUrls) {
+    const { result, queryIndex } = candidate
     const job = await extractJobFromCandidate(url)
     if (!job) continue
     extractedJobCount++
+    queryMetrics[queryIndex].extractedJobCount++
 
     const context = [job.title, job.description, result.title, result.description, ...(result.extra_snippets ?? [])].join(' ')
     if (!isLessThanThreeYears(context)) {
       console.log(`[brave-search] Skipped "${job.title}" (${url}) due to experience requirement`)
       skippedExperienceCount++
+      queryMetrics[queryIndex].skippedExperienceCount++
       continue
     }
 
@@ -113,7 +160,16 @@ export async function discoverJobsViaBraveSearch(): Promise<BraveSearchDiscovery
       tags: inferTags([job.title, job.description, result.title, result.description].join(' ')),
       posted_at: null,
     })
+    queryMetrics[queryIndex].acceptedJobCount++
   }
+
+  const querySummary = queryMetrics
+    .map((metric, i) =>
+      `q${i + 1}: raw ${metric.rawResultCount}, candidates ${metric.candidateUrlCount}, ` +
+      `extracted ${metric.extractedJobCount}, accepted ${metric.acceptedJobCount}`
+    )
+    .join(' | ')
+  if (querySummary) console.log(`[brave-search] Per-query summary: ${querySummary}`)
 
   console.log(
     `[brave-search] Summary: ${queries.length} queries, ${rawResultCount} raw results, ` +
@@ -128,7 +184,12 @@ export async function discoverJobsViaBraveSearch(): Promise<BraveSearchDiscovery
     candidateUrlCount: candidateUrls.size,
     extractedJobCount,
     skippedExperienceCount,
+    queryMetrics,
   }
+}
+
+export function getBraveSearchQueries(limit = DEFAULT_QUERY_LIMIT): string[] {
+  return SEARCH_QUERIES.slice(0, parsePositiveInt(String(limit), DEFAULT_QUERY_LIMIT))
 }
 
 function emptyDiscoveryResult(): BraveSearchDiscoveryResult {
@@ -139,6 +200,7 @@ function emptyDiscoveryResult(): BraveSearchDiscoveryResult {
     candidateUrlCount: 0,
     extractedJobCount: 0,
     skippedExperienceCount: 0,
+    queryMetrics: [],
   }
 }
 

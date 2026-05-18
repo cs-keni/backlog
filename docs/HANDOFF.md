@@ -4,6 +4,39 @@
 
 ---
 
+## Session: 2026-05-18 — Brave Portland discovery tuning (Codex)
+
+### What changed
+
+- **`worker/src/search/brave.ts`**
+  - Reordered default Brave queries based on production logs:
+    - broad `"associate software engineer" "careers"` and `"early career software engineer" "careers"` queries now run first.
+    - Portland-specific and remote-specific entry-level SWE queries are now inside the default 8-query budget.
+    - low-yield quoted new-grad ATS queries are still available later but no longer consume default budget.
+  - Added per-query metrics:
+    - raw result count
+    - candidate URL count
+    - duplicate candidate count
+    - extracted job count
+    - skipped-by-experience count
+    - accepted job count
+  - Logs a compact per-query summary after extraction so the next Render run can show exactly which queries deserve budget.
+- **`worker/tests/unit/brave-search.test.ts`**
+  - Added coverage for default query ordering, Portland inclusion, and keeping low-yield new-grad ATS queries outside the default budget.
+
+### Checks run
+
+- `cd worker && npm run test -- tests/unit/brave-search.test.ts` — passed, 13 tests
+- `cd worker && npm run build` — passed
+
+### Next production check
+
+- Watch the next Render run for the new `[brave-search] Per-query summary`.
+- Keep queries with accepted jobs or strong candidate/extracted counts.
+- Replace any default-budget query that repeatedly has `raw 0` or `candidates 0`.
+
+---
+
 ## Session: 2026-05-18 — Worker GPT-5 nano parameter fix (Codex)
 
 ### What changed

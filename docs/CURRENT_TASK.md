@@ -1,11 +1,27 @@
 # Current Task
 
 **Last updated:** 2026-05-18
-**Status:** GPT-5 nano worker parameter fix applied; Brave/portal tuning remains
+**Status:** Brave discovery query tuning implemented; monitor next Render run
 
 ---
 
 ## Fixed in latest Codex session
+
+1. **Implemented aggressive Portland/remote Brave discovery tuning**
+   - Reordered Brave Search defaults so the production-proven broad career queries run first.
+   - Added Portland-specific and remote-specific software engineering search queries inside the default 8-query budget.
+   - Moved low-yield quoted new-grad ATS queries outside the default budget.
+   - Added per-query raw/candidate/extracted/accepted metrics to Brave logs and returned discovery metrics.
+   - Added tests for the default Brave query mix.
+
+## Checks run
+
+- `cd worker && npm run test -- tests/unit/brave-search.test.ts` — passed, 13 tests
+- `cd worker && npm run build` — passed
+
+---
+
+## Previous Codex session
 
 1. **Fixed worker GPT-5 nano request compatibility**
    - Render logs showed `400 Unsupported value: 'temperature' does not support 0 with this model` during GitHub job normalization at 2026-05-18 09:00 PDT.
