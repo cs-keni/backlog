@@ -149,7 +149,6 @@ async function extractWithGpt(text: string): Promise<EnrichedData | null> {
   try {
     const completion = await getOpenAI().chat.completions.create({
       model: 'gpt-5-nano',
-      temperature: 0,
       response_format: { type: 'json_object' },
       messages: [
         {

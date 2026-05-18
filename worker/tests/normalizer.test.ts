@@ -1,5 +1,20 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import { parsePostedDate } from '../src/llm/normalizer'
+
+const { mockCreateCompletion } = vi.hoisted(() => ({
+  mockCreateCompletion: vi.fn(),
+}))
+
+vi.mock('openai', () => ({
+  default: vi.fn(() => ({
+    chat: {
+      completions: {
+        create: mockCreateCompletion,
+      },
+    },
+  })),
+}))
+
+import { normalizeEntries, parsePostedDate } from '../src/llm/normalizer'
 
 describe('parsePostedDate', () => {
   // Pin "today" to 2026-03-20 for deterministic year inference
@@ -52,5 +67,50 @@ describe('parsePostedDate', () => {
     const upper = parsePostedDate('JAN 1')
     const lower = parsePostedDate('jan 1')
     expect(upper).toBe(lower)
+  })
+})
+
+describe('normalizeEntries', () => {
+  beforeEach(() => {
+    mockCreateCompletion.mockReset()
+  })
+
+  it('omits unsupported temperature override for gpt-5-nano', async () => {
+    mockCreateCompletion.mockResolvedValue({
+      choices: [
+        {
+          message: {
+            content: JSON.stringify({
+              jobs: [
+                {
+                  title: 'Junior Software Engineer',
+                  company: 'Acme',
+                  location: 'Portland, OR',
+                  country: 'United States',
+                  is_remote: false,
+                  salary_min: null,
+                  salary_max: null,
+                  experience_level: 'entry',
+                  tags: ['typescript'],
+                },
+              ],
+            }),
+          },
+        },
+      ],
+    })
+
+    await normalizeEntries([
+      {
+        company: 'Acme',
+        title: 'Junior Software Engineer',
+        location: 'Portland, OR',
+        url: 'https://example.com/job',
+        rawDate: '0d',
+      },
+    ])
+
+    expect(mockCreateCompletion).toHaveBeenCalledTimes(1)
+    expect(mockCreateCompletion.mock.calls[0][0]).not.toHaveProperty('temperature')
   })
 })

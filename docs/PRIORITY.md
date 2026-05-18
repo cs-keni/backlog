@@ -34,7 +34,8 @@ Current direction:
 
 - Brave Search now uses ATS/careers-oriented queries and a past-month freshness window.
 - Normalized portal/search jobs now require explicit entry-level signals (`new grad`, `junior`, `associate`, `entry-level`, etc.) before writing.
-- Continue tuning after observing the next Render run.
+- 2026-05-18 Render logs: broad career queries produced candidates, but quoted ATS queries returned 0 results; relevant Brave/portal jobs were all duplicates.
+- Continue tuning by replacing low-yield queries, adding Portland/remote-specific discovery, and logging per-query candidate/extracted counts.
 
 ---
 

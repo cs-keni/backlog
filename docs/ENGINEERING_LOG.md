@@ -154,6 +154,13 @@ For Workday, prioritize real DOM fixture/debug export work before more broad heu
 
 ---
 
+## 2026-05-18 — Worker GPT-5 nano temperature compatibility (Codex)
+
+- Render worker logs at 2026-05-18 09:00 PDT showed `gpt-5-nano` rejecting `temperature: 0` in the normalizer with `unsupported_value`.
+- Removed `temperature` from worker `gpt-5-nano` calls in normalizer and enrichment fallback. The API accepts the model default instead.
+- Production logs also confirmed migration 19 resolved the `jobs.source='portal'` check-constraint issue: portal/search inserts are no longer being rejected.
+- Brave Search is yielding candidates but mostly duplicates. The zero-result quoted ATS queries are likely low-value compared with broader career queries.
+
 ## 2026-05-18 — Feed/source test coverage (Codex)
 
 - Added direct worker coverage for `filterNewJobs()` so portal/search dedupe behavior is now tested alongside raw GitHub entry dedupe.

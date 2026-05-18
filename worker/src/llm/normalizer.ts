@@ -69,7 +69,6 @@ Return ONLY the JSON object, no markdown, no explanation.`
       model: 'gpt-5-nano',
       messages: [{ role: 'user', content: prompt }],
       response_format: { type: 'json_object' },
-      temperature: 0,
     })
 
     const content = response.choices[0].message.content ?? '{}'

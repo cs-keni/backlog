@@ -1,11 +1,35 @@
 # Current Task
 
 **Last updated:** 2026-05-18
-**Status:** Feed/source test coverage updated; production feed log verification still pending
+**Status:** GPT-5 nano worker parameter fix applied; Brave/portal tuning remains
 
 ---
 
 ## Fixed in latest Codex session
+
+1. **Fixed worker GPT-5 nano request compatibility**
+   - Render logs showed `400 Unsupported value: 'temperature' does not support 0 with this model` during GitHub job normalization at 2026-05-18 09:00 PDT.
+   - Removed `temperature: 0` from worker GPT-5 nano calls in normalization and enrichment fallback.
+   - Added a regression test that asserts normalization requests omit `temperature`.
+
+## Checks run
+
+- `cd worker && npm run test -- tests/normalizer.test.ts tests/unit/enricher.test.ts` — passed, 15 tests
+- `cd worker && npm run build` — passed
+
+---
+
+## Production log observations from 2026-05-18
+
+- Migration 19 appears healthy: logs no longer show `jobs_source_check` failures.
+- GitHub source wrote 2 new jobs at 09:00 PDT after fallback normalization.
+- Portal scan fetched ~1.4k jobs, but only 2 passed relevance and both were already stored.
+- Brave Search produced 17 raw results, 13 candidate URLs, 6 extracted jobs, 4 relevant jobs after filters, and 0 new jobs. Current searches are working but mostly rediscover stored jobs.
+- Optimization candidate: replace or supplement zero-result quoted ATS queries with Portland/remote/company-specific queries and add per-query candidate/extracted counts so low-yield queries are easier to prune.
+
+---
+
+## Previous Codex session
 
 1. **Added missing source/feed tests**
    - `worker/tests/deduplicator.test.ts` now covers `filterNewJobs()` for new jobs, existing URL filtering, empty input, DB fail-open behavior, and chunking over the 50 URL PostgREST limit.

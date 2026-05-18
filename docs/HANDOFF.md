@@ -4,6 +4,33 @@
 
 ---
 
+## Session: 2026-05-18 — Worker GPT-5 nano parameter fix (Codex)
+
+### What changed
+
+- Reviewed Render logs from the 2026-05-18 09:00 PDT worker run.
+- **`worker/src/llm/normalizer.ts`**
+  - Removed `temperature: 0` from `gpt-5-nano` chat completion calls.
+  - This fixes the logged `400 Unsupported value: 'temperature' does not support 0 with this model` error.
+- **`worker/src/jobs/enricher.ts`**
+  - Removed the same unsupported `temperature: 0` override from the GPT fallback enrichment path.
+- **`worker/tests/normalizer.test.ts`**
+  - Added regression coverage proving normalization requests omit `temperature`.
+
+### Checks run
+
+- `cd worker && npm run test -- tests/normalizer.test.ts tests/unit/enricher.test.ts` — passed, 15 tests
+- `cd worker && npm run build` — passed
+
+### Log interpretation
+
+- Migration 19 looks good in production: no `jobs_source_check` failures appeared.
+- GitHub discovery wrote 2 new jobs at 09:00 PDT despite fallback normalization.
+- Portal and Brave are functioning, but both produced 0 new jobs in the shown runs because relevant results were already stored.
+- Brave query quality can still be improved: five quoted ATS queries returned 0 results, while broader career queries produced candidates. Next tuning should add per-query candidate/extracted metrics and likely replace some zero-yield queries with Portland/remote/company-specific searches.
+
+---
+
 ## Session: 2026-05-18 — Feed/source test coverage (Codex)
 
 ### What changed
