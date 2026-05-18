@@ -108,6 +108,9 @@ Pure logic tests. No network, no DB. Run in milliseconds.
 - [x] `"Data Scientist"` (data track excluded)
 - [x] `"Research Scientist, AI"` (research track excluded)
 - [x] `"Software Engineer II"` (mid-level signal)
+- [x] `"Sr Fullstack Engineer"` (seniority abbreviation)
+- [x] Normalized generic `"Software Engineer"` from portals without entry signal
+- [x] Normalized title with non-US city signal, e.g. Tokyo
 - [x] Location `"London, UK"` (country filter)
 - [x] Location `"Toronto, Canada"` (country filter)
 - [x] Title containing `"Intern"` (stray internship)
@@ -143,6 +146,7 @@ Pure logic tests. No network, no DB. Run in milliseconds.
 - [x] Blocks 3+ and 5+ year professional experience requirements
 - [x] Does not let junior wording override a 3+ year minimum
 - [x] Allows direct ATS/company careers job URLs
+- [x] Allows direct Greenhouse job-board URLs
 - [x] Blocks broad job-board result pages and non-job pages
 
 ### Deduplicator (`worker/tests/unit/deduplicator.test.ts`)

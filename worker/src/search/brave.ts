@@ -1,31 +1,22 @@
 import type { NormalizedJob } from '../llm/normalizer'
 
 const BRAVE_SEARCH_URL = 'https://api.search.brave.com/res/v1/web/search'
-const DEFAULT_QUERY_LIMIT = 6
+const DEFAULT_QUERY_LIMIT = 8
 const RESULTS_PER_QUERY = 10
 const REQUEST_TIMEOUT_MS = 10_000
 
 const SEARCH_QUERIES = [
-  '"new grad software engineer" "United States" apply',
-  '"junior software engineer" "United States" apply',
-  '"associate software engineer" "United States" apply',
-  '"entry level software engineer" "United States" apply',
-  '"early career software engineer" "United States" apply',
-  '"AI software engineer" "entry level" apply',
-  '"applied AI engineer" junior apply',
-  '"LLM software engineer" "new grad" apply',
-]
-
-const EXCLUDED_QUERY_TERMS = [
-  '-"machine learning"',
-  '-"data scientist"',
-  '-"research scientist"',
-  '-intern',
-  '-internship',
-  '-senior',
-  '-staff',
-  '-principal',
-  '-lead',
+  'site:jobs.lever.co "new grad software engineer"',
+  'site:boards.greenhouse.io "new grad software engineer"',
+  'site:job-boards.greenhouse.io "new grad software engineer"',
+  'site:jobs.lever.co "junior software engineer"',
+  'site:boards.greenhouse.io "junior software engineer"',
+  '"associate software engineer" "careers"',
+  '"entry level software engineer" "careers"',
+  '"early career software engineer" "careers"',
+  '"AI software engineer" "early career"',
+  '"applied AI engineer" "entry level"',
+  '"LLM software engineer" "new grad"',
 ]
 
 const JOB_BOARD_HOST_BLOCKLIST = [
@@ -74,7 +65,7 @@ export async function discoverJobsViaBraveSearch(): Promise<NormalizedJob[]> {
   }
 
   const queryLimit = parsePositiveInt(process.env.BRAVE_SEARCH_QUERY_LIMIT, DEFAULT_QUERY_LIMIT)
-  const queries = SEARCH_QUERIES.slice(0, queryLimit).map(buildQuery)
+  const queries = SEARCH_QUERIES.slice(0, queryLimit)
   const candidateUrls = new Map<string, BraveSearchResult>()
 
   for (const query of queries) {
@@ -113,10 +104,6 @@ export async function discoverJobsViaBraveSearch(): Promise<NormalizedJob[]> {
   return jobs
 }
 
-function buildQuery(query: string): string {
-  return `${query} ${EXCLUDED_QUERY_TERMS.join(' ')}`
-}
-
 async function searchBrave(apiKey: string, query: string): Promise<BraveSearchResult[]> {
   const params = new URLSearchParams({
     q: query,
@@ -124,7 +111,7 @@ async function searchBrave(apiKey: string, query: string): Promise<BraveSearchRe
     search_lang: 'en',
     ui_lang: 'en-US',
     count: String(RESULTS_PER_QUERY),
-    freshness: process.env.BRAVE_SEARCH_FRESHNESS ?? 'pw',
+    freshness: process.env.BRAVE_SEARCH_FRESHNESS ?? 'pm',
     result_filter: 'web',
     safesearch: 'moderate',
     text_decorations: 'false',

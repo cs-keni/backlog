@@ -82,6 +82,11 @@ describe('filterRelevantEntries — title blocklist', () => {
     const result = filterRelevantEntries([makeRawEntry({ title: 'Software Engineer II' })])
     expect(result).toHaveLength(0)
   })
+
+  it('blocks "Sr Fullstack Engineer"', () => {
+    const result = filterRelevantEntries([makeRawEntry({ title: 'Sr Fullstack Engineer' })])
+    expect(result).toHaveLength(0)
+  })
 })
 
 describe('filterRelevantEntries — location blocklist', () => {
@@ -183,18 +188,36 @@ describe('filterRelevantJobs', () => {
     expect(result).toHaveLength(0)
   })
 
+  it('blocks normalized generic software roles without entry-level signal', () => {
+    const result = filterRelevantJobs([
+      makeNormalizedJob({ title: 'Software Engineer', experience_level: null }),
+    ])
+    expect(result).toHaveLength(0)
+  })
+
+  it('blocks normalized title with non-US city signal', () => {
+    const result = filterRelevantJobs([
+      makeNormalizedJob({ title: 'Software Engineer - Fullstack - Tokyo', experience_level: 'entry' }),
+    ])
+    expect(result).toHaveLength(0)
+  })
+
   it('blocks jobs with non-US country', () => {
     const result = filterRelevantJobs([makeNormalizedJob({ country: 'United Kingdom', location: 'London' })])
     expect(result).toHaveLength(0)
   })
 
   it('allows US jobs', () => {
-    const result = filterRelevantJobs([makeNormalizedJob({ country: 'United States' })])
+    const result = filterRelevantJobs([
+      makeNormalizedJob({ title: 'New Grad Software Engineer', country: 'United States' }),
+    ])
     expect(result).toHaveLength(1)
   })
 
   it('allows null country with US location', () => {
-    const result = filterRelevantJobs([makeNormalizedJob({ country: null, location: 'Austin, TX' })])
+    const result = filterRelevantJobs([
+      makeNormalizedJob({ title: 'Associate Software Engineer', country: null, location: 'Austin, TX' }),
+    ])
     expect(result).toHaveLength(1)
   })
 })

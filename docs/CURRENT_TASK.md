@@ -1,22 +1,31 @@
 # Current Task
 
 **Last updated:** 2026-05-18
-**Status:** Source tracking schema/UI cleanup complete after Brave Search discovery
+**Status:** Brave/portal discovery tuned after Render log review
 
 ---
 
 ## Fixed in latest Codex session
 
+1. **Diagnosed Render logs** — `jobs_source_check` failures came from `source='portal'` inserts hitting a DB constraint that did not yet allow `portal`. Kenny applied migration 19 successfully afterward; next Render run should confirm the errors are gone.
+2. **Tightened portal filtering** — normalized portal/search jobs now require explicit entry-level title signals (`new grad`, `junior`, `associate`, `entry-level`, `early career`, etc.) before writing. This avoids broad senior/generic company portal roles.
+3. **Blocked log-exposed misses** — added filters/tests for `Sr Fullstack Engineer` and non-US city signals embedded in titles such as Tokyo.
+4. **Loosened Brave Search** — removed strict negative terms from the search query itself, switched to ATS/careers-oriented searches, defaulted freshness to past month, and raised default query limit to 8. Downstream filters now do the pruning.
+5. **Added priority list** — `docs/PRIORITY.md` now lists current work in priority order with Codex/Claude ownership.
+
+## Checks run
+
+- `cd worker && npm run test -- tests/unit/brave-search.test.ts tests/unit/relevance-filter.test.ts` — 48 tests passed
+- `cd worker && npm run build` — passed
+
+---
+
+## Previous Codex session
+
 1. **Cleaned generated artifacts** — removed ignored local build outputs `.next/` and `extension/dist/`.
 2. **Added DB migration for `jobs.source='portal'`** — `supabase/migrations/019_allow_portal_job_source.sql` updates the source check constraint to allow `github`, `portal`, and `manual`.
 3. **Updated source types/UI** — app job types now include `portal`, analytics source breakdown shows GitHub vs portal/search vs manual, and job details show a discovered badge for portal jobs.
 4. **Cleaned stale testing docs** — `TESTING-SUITE.md` now matches current relevance-filter expectations and includes Brave Search discovery tests.
-
-## Checks run
-
-- `npm run test -- src/tests/integration/jobs-feed.test.ts` — 12 tests passed
-- `cd worker && npm run test -- tests/unit/brave-search.test.ts tests/unit/relevance-filter.test.ts` — 44 tests passed
-- `npx tsc --noEmit` — passed
 
 ---
 

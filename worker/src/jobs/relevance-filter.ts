@@ -48,6 +48,7 @@ const BLOCKED_TITLE_PATTERNS: RegExp[] = [
 
   // Seniority ceiling — entry-level only (≤3 years experience)
   /\bsenior\b/,
+  /\bsr\.?\b/,
   /\bsr\.\s*(software|engineer|swe|developer|ml)\b/,
   /\blead\s+(software|engineer|swe|developer|ml|data|platform|security|mobile)\b/,
   /\b(software|engineer|swe|developer|ml|data|platform)\s+lead\b/,
@@ -118,6 +119,18 @@ const SOFTWARE_ENGINEERING_TITLE_PATTERNS: RegExp[] = [
   /\b(ai|artificial\s+intelligence|generative\s+ai|genai|llm)\b.*\b(software|swe|sde)\b/,
 ]
 
+// Normalized jobs come from broad company portals / search discovery, not a
+// new-grad-scoped repo. Require explicit early-career signals before writing.
+const ENTRY_LEVEL_TITLE_PATTERNS: RegExp[] = [
+  /\bnew\s+grad(uate)?\b/,
+  /\buniversity\s+grad(uate)?\b/,
+  /\bentry[-\s]?level\b/,
+  /\bearly\s+career\b/,
+  /\bjunior\b/,
+  /\bassociate\b/,
+  /\bfellow\b/,
+]
+
 // ─── Location blocklist ───────────────────────────────────────────────────────
 
 // Keywords that indicate a clearly non-US location when found in the location string.
@@ -171,6 +184,11 @@ function isSoftwareEngineeringTitle(title: string): boolean {
   return SOFTWARE_ENGINEERING_TITLE_PATTERNS.some(re => re.test(lower))
 }
 
+function isEntryLevelTitle(title: string): boolean {
+  const lower = title.toLowerCase()
+  return ENTRY_LEVEL_TITLE_PATTERNS.some(re => re.test(lower))
+}
+
 function isLocationNonUS(location: string): boolean {
   if (!location) return false
   // "Remote" or empty → assume US
@@ -205,8 +223,10 @@ export function filterRelevantJobs(jobs: NormalizedJob[]): NormalizedJob[] {
     if (isTitleBlocked(j.title)) return false
     if (!isSoftwareEngineeringTitle(j.title)) return false
     if (j.experience_level === 'mid' || j.experience_level === 'senior') return false
+    if (j.experience_level !== 'entry' && !isEntryLevelTitle(j.title)) return false
     // For normalized jobs prefer the country field; fall back to location string
     if (j.country && j.country !== 'United States') return false
+    if (isLocationNonUS(j.title)) return false
     if (!j.country && isLocationNonUS(j.location ?? '')) return false
     return true
   })

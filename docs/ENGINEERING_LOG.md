@@ -4,6 +4,33 @@ Reverse-chronological. One entry per meaningful session.
 
 ---
 
+## 2026-05-18 — Render log follow-up and discovery tuning (Codex)
+
+### Implemented
+
+- Added `docs/PRIORITY.md` with the current prioritized work list and Codex/Claude ownership.
+- Tuned Brave Search discovery after Render logs showed 0 web results:
+  - replaced strict quoted/exclusion queries with ATS/careers-oriented queries
+  - defaulted `BRAVE_SEARCH_QUERY_LIMIT` to `8`
+  - defaulted `BRAVE_SEARCH_FRESHNESS` to `pm`
+- Tightened normalized portal/search filtering:
+  - require explicit entry-level signal for normalized jobs
+  - block `Sr` titles without requiring a dot
+  - block non-US city signals embedded in titles
+- Added tests for the above cases.
+
+### Checks
+
+- `cd worker && npm run test -- tests/unit/brave-search.test.ts tests/unit/relevance-filter.test.ts` — 48 passed
+- `cd worker && npm run build` — passed
+
+### Gotchas
+
+- `jobs_source_check` log failures should be resolved by migration 19, which Kenny reported was applied successfully. Confirm on next Render run.
+- Brave Search was working at the API-call level, but the old queries were too restrictive. The new approach relies on broader search plus stricter downstream filtering.
+
+---
+
 ## 2026-05-18 — Source tracking cleanup (Codex)
 
 ### Implemented

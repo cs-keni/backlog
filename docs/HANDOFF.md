@@ -4,6 +4,44 @@
 
 ---
 
+## Session: 2026-05-18 — Render log follow-up and discovery tuning (Codex)
+
+### What changed
+
+- Added **`docs/PRIORITY.md`** with current priority order and owner split:
+  - Codex owns feed/source/discovery, cost, analytics, daily queue, feedback loop, docs/tests.
+  - Claude owns Workday extension observability/reliability unless redirected.
+- Render log diagnosis:
+  - `jobs_source_check` errors were from `source='portal'` inserts hitting a DB constraint that did not allow `portal` yet.
+  - Kenny applied migration 19 successfully after seeing the logs; next worker run should confirm the error is gone.
+- **`worker/src/jobs/relevance-filter.ts`**
+  - Blocks `Sr` without a dot, e.g. `Sr Fullstack Engineer`.
+  - For normalized portal/search jobs, requires an explicit entry-level signal before write (`new grad`, `junior`, `associate`, `entry-level`, `early career`, `fellow`, etc.).
+  - Blocks non-US city signals embedded in titles, e.g. Tokyo.
+- **`worker/src/search/brave.ts`**
+  - Brave queries were too strict and returned zero results.
+  - Replaced quoted + negative-term queries with ATS/careers-oriented queries.
+  - Default query limit is now `8`.
+  - Default freshness is now `pm` (past month) instead of `pw`.
+  - Downstream filters now prune senior/ML/non-SWE results instead of relying on Brave query exclusions.
+- **Tests**
+  - Added coverage for Greenhouse job-board URL detection, `Sr Fullstack`, generic normalized portal roles, and title-embedded Tokyo.
+
+### Checks run
+
+- `cd worker && npm run test -- tests/unit/brave-search.test.ts tests/unit/relevance-filter.test.ts` — passed, 48 tests
+- `cd worker && npm run build` — passed
+
+### Next production check
+
+- Watch the next Render worker run for:
+  - no `jobs_source_check` failures
+  - Brave result counts above zero
+  - portal fetched count much smaller after relevance filtering
+  - successful writes with source `portal`
+
+---
+
 ## Session: 2026-05-18 — Source tracking cleanup (Codex)
 
 ### What changed

@@ -29,6 +29,11 @@ describe('isLikelyJobUrl', () => {
     expect(isLikelyJobUrl('https://jobs.lever.co/acme/abc123', result)).toBe(true)
   })
 
+  it('allows direct Greenhouse job-board URLs', () => {
+    const result = { title: 'New Grad Software Engineer', description: 'Careers opening.' }
+    expect(isLikelyJobUrl('https://job-boards.greenhouse.io/acme/jobs/12345', result)).toBe(true)
+  })
+
   it('allows company careers job paths', () => {
     const result = { title: 'Junior Software Engineer', description: 'Entry level job opening.' }
     expect(isLikelyJobUrl('https://example.com/careers/software-engineer-new-grad', result)).toBe(true)
