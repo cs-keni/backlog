@@ -4,6 +4,31 @@
 
 ---
 
+## Session: 2026-05-18 — Feed/source test coverage (Codex)
+
+### What changed
+
+- **`worker/tests/deduplicator.test.ts`**
+  - Added `filterNewJobs()` coverage for portal/search-style normalized jobs.
+  - Covers new jobs, existing URL filtering, empty input without DB calls, DB fail-open behavior, and chunking over the 50 URL PostgREST limit.
+- **`src/tests/integration/analytics.test.ts`**
+  - Added `/api/analytics` route coverage for unauthorized access.
+  - Verifies `sourceBreakdown` counts `github`, `portal`, and `manual` separately, with unknown legacy sources still falling into GitHub/backfill behavior.
+
+### Checks run
+
+- `cd worker && npm run test -- tests/deduplicator.test.ts` — passed, 9 tests
+- `npm run test -- src/tests/integration/analytics.test.ts` — passed, 2 tests
+- `cd worker && npm run build` — passed
+- `npx tsc --noEmit` — passed
+
+### Remaining work
+
+- Production feed health still needs a real Render run check for migration 19: no `jobs_source_check` failures and portal/search writes with `source='portal'`.
+- The broader P5 docs/test cleanup still has stale roadmap docs to reconcile.
+
+---
+
 ## Session: 2026-05-18 — Priority list update (Codex)
 
 ### What changed

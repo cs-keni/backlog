@@ -154,6 +154,12 @@ For Workday, prioritize real DOM fixture/debug export work before more broad heu
 
 ---
 
+## 2026-05-18 — Feed/source test coverage (Codex)
+
+- Added direct worker coverage for `filterNewJobs()` so portal/search dedupe behavior is now tested alongside raw GitHub entry dedupe.
+- Added `/api/analytics` integration coverage for separate `github`, `portal`, and `manual` source breakdown counts.
+- Route handler tests can take ~30s locally because the root Vitest jsdom environment startup dominates runtime, even when the test body is fast.
+
 ## 2026-05-15 — Workday autofill Phase 10B implementation (Claude Code)
 
 **Commit:** (see git log for hash)

@@ -1,11 +1,26 @@
 # Current Task
 
 **Last updated:** 2026-05-18
-**Status:** Priority list updated; Portland SWE discovery not implemented yet
+**Status:** Feed/source test coverage updated; production feed log verification still pending
 
 ---
 
 ## Fixed in latest Codex session
+
+1. **Added missing source/feed tests**
+   - `worker/tests/deduplicator.test.ts` now covers `filterNewJobs()` for new jobs, existing URL filtering, empty input, DB fail-open behavior, and chunking over the 50 URL PostgREST limit.
+   - `src/tests/integration/analytics.test.ts` now verifies `/api/analytics` returns separate source breakdown counts for GitHub, portal/search, and manual jobs.
+
+## Checks run
+
+- `cd worker && npm run test -- tests/deduplicator.test.ts` — passed, 9 tests
+- `npm run test -- src/tests/integration/analytics.test.ts` — passed, 2 tests
+- `cd worker && npm run build` — passed
+- `npx tsc --noEmit` — passed
+
+---
+
+## Previous Codex session
 
 1. **Updated priority list only** — added a Codex-owned planned item for a more aggressive search path for software engineering jobs in Portland, Oregon. No implementation was started.
 

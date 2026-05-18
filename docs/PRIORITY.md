@@ -184,7 +184,9 @@ Expected work:
 
 Owner: Codex
 
+Status: in progress; added analytics source breakdown and `filterNewJobs` tests.
+
 Expected work:
 
 - Continue reconciling stale `TODOS.md`, `TESTING-SUITE.md`, and `PHASES.md` against actual code.
-- Add missing tests for analytics source breakdown and `filterNewJobs`.
+- Add missing tests for analytics source breakdown and `filterNewJobs`. Done 2026-05-18.
