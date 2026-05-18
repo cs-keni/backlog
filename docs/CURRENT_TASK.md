@@ -1,7 +1,25 @@
 # Current Task
 
-**Last updated:** 2026-05-15
-**Status:** Phase 10B smoke test bugs fixed — ready for second smoke test
+**Last updated:** 2026-05-18
+**Status:** Job feed relevance filtering tightened for entry-level software engineering
+
+---
+
+## Fixed in latest Codex session
+
+1. **Software-engineering-only feed gate** — `worker/src/jobs/relevance-filter.ts` now requires titles to match software engineering patterns before raw GitHub entries are sent to GPT normalization or portal jobs are sent to enrichment.
+2. **AI engineering allowed, ML/data/research blocked** — AI software/product engineering titles such as "AI Software Engineer" and "Applied AI Engineer" are allowed; "Machine Learning Engineer", data scientist, research scientist, NLP, computer vision, and similar ML/research roles are blocked.
+3. **Entry-level bias tightened** — PM/TPM roles are no longer allowlisted, common mid/senior title signals such as "Software Engineer II", "mid-level", architect, staff, principal, and lead are blocked, and normalized jobs with `experience_level` of `mid` or `senior` are dropped.
+
+## Checks run
+
+- `cd worker && npm run test -- tests/unit/relevance-filter.test.ts` — 35 tests passed
+- `cd worker && npm run build` — passed
+
+## Known filter tradeoffs
+
+- Generic "Software Engineer" titles are still allowed because SimplifyJobs/New-Grad is already scoped and many valid entry-level portal roles omit "junior" or "associate".
+- Titles containing "machine learning" or explicit "ML" are blocked even if they also contain "software engineer" to avoid drifting into ML-specific jobs.
 
 ---
 

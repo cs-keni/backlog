@@ -41,6 +41,10 @@ const BLOCKED_TITLE_PATTERNS: RegExp[] = [
   /\bsupply\s+chain\b/,
   /\boperations\s+analyst\b/,
   /\bbusiness\s+analyst\b/,   // not a CS role; distinct from "data analyst" or "software engineer"
+  /\bproduct\s+manager\b/,
+  /\bprogram\s+manager\b/,
+  /\btechnical\s+program\s+manager\b/,
+  /\btpm\b/,
 
   // Seniority ceiling — entry-level only (≤3 years experience)
   /\bsenior\b/,
@@ -51,6 +55,11 @@ const BLOCKED_TITLE_PATTERNS: RegExp[] = [
   /\bstaff\b/,
   /\bprincipal\b/,
   /\bengineering\s+manager\b/,
+  /\barchitect\b/,
+  /\bmid[-\s]?level\b/,
+  /\b(software|engineer|swe|sde|developer)\b.*\b(ii|iii|iv|v|2|3|4|5)\b/,
+  /\b(ii|iii|iv|v|2|3|4|5)\b.*\b(software|engineer|swe|sde|developer)\b/,
+  /\blevel\s*[2-9]\b/,
   /\bvp\s+of\b/,
   /\bvice\s+president\b/,
   /\bdirector\s+of\b/,
@@ -65,15 +74,48 @@ const BLOCKED_TITLE_PATTERNS: RegExp[] = [
   /\bintern(ship)?\b/,
   /\bco[-\s]?op\b/,
   /\bcooperative\s+education\b/,
+
+  // ML/data/research roles are intentionally excluded. AI software engineering
+  // titles are allowed below, but machine-learning roles tend to be a different
+  // search track with different requirements.
+  /\bmachine\s+learning\b/,
+  /\bml\s+(engineer|scientist|researcher|developer)\b/,
+  /\b(ml|machine\s+learning)\b.*\b(engineer|scientist|researcher)\b/,
+  /\bdeep\s+learning\b/,
+  /\bdata\s+scientist\b/,
+  /\bdata\s+science\b/,
+  /\bresearch\s+(scientist|engineer|researcher)\b/,
+  /\bscientist\b/,
+  /\bcomputer\s+vision\b/,
+  /\bnatural\s+language\s+processing\b/,
+  /\bnlp\b/,
+  /\bperception\b/,
 ]
 
-// These patterns in the title are always allowed, even if a broader pattern above
-// would match. Checked first — if a title matches an allowlist entry it is kept.
-const ALWAYS_ALLOW_TITLE_PATTERNS: RegExp[] = [
-  /\bproduct\s+manager\b/,   // CS grads do apply to APM / associate PM programs
-  /\bprogram\s+manager\b/,
-  /\btechnical\s+program\s+manager\b/,
-  /\btpm\b/,
+// Positive title gate: only software engineering tracks should enter the feed.
+// Generic SWE titles are kept because the New-Grad source is already scoped, and
+// many entry-level portals omit "junior" from otherwise valid titles.
+const SOFTWARE_ENGINEERING_TITLE_PATTERNS: RegExp[] = [
+  /\bsoftware\s+(engineer|developer)\b/,
+  /\b(swe|sde)\b/,
+  /\b(front[-\s]?end|frontend|back[-\s]?end|backend|full[-\s]?stack|fullstack|web)\s+(engineer|developer)\b/,
+  /\b(engineer|developer)\b.*\b(front[-\s]?end|frontend|back[-\s]?end|backend|full[-\s]?stack|fullstack|web)\b/,
+  /\bmobile\s+(engineer|developer)\b/,
+  /\b(ios|android)\s+(engineer|developer)\b/,
+  /\bplatform\s+engineer\b/,
+  /\binfrastructure\s+engineer\b/,
+  /\bdevops\s+engineer\b/,
+  /\bsite\s+reliability\s+engineer\b/,
+  /\bsre\b/,
+  /\bqa\s+automation\s+engineer\b/,
+  /\btest\s+automation\s+engineer\b/,
+
+  // AI engineering is in scope when it is framed as engineering/product
+  // software work, not ML research/science.
+  /\b(ai|artificial\s+intelligence|generative\s+ai|genai|llm)\s+(software\s+)?engineer\b/,
+  /\b(applied\s+ai|ai\s+product)\s+engineer\b/,
+  /\b(software|swe|sde)\b.*\b(ai|artificial\s+intelligence|generative\s+ai|genai|llm)\b/,
+  /\b(ai|artificial\s+intelligence|generative\s+ai|genai|llm)\b.*\b(software|swe|sde)\b/,
 ]
 
 // ─── Location blocklist ───────────────────────────────────────────────────────
@@ -121,11 +163,12 @@ const NON_US_LOCATION_PATTERNS: RegExp[] = [
 
 function isTitleBlocked(title: string): boolean {
   const lower = title.toLowerCase()
-
-  // Allowlist takes priority
-  if (ALWAYS_ALLOW_TITLE_PATTERNS.some(re => re.test(lower))) return false
-
   return BLOCKED_TITLE_PATTERNS.some(re => re.test(lower))
+}
+
+function isSoftwareEngineeringTitle(title: string): boolean {
+  const lower = title.toLowerCase()
+  return SOFTWARE_ENGINEERING_TITLE_PATTERNS.some(re => re.test(lower))
 }
 
 function isLocationNonUS(location: string): boolean {
@@ -143,6 +186,7 @@ export function filterRelevantEntries(entries: RawJobEntry[]): RawJobEntry[] {
   const before = entries.length
   const filtered = entries.filter(e => {
     if (isTitleBlocked(e.title)) return false
+    if (!isSoftwareEngineeringTitle(e.title)) return false
     if (isLocationNonUS(e.location)) return false
     return true
   })
@@ -159,6 +203,8 @@ export function filterRelevantJobs(jobs: NormalizedJob[]): NormalizedJob[] {
   const before = jobs.length
   const filtered = jobs.filter(j => {
     if (isTitleBlocked(j.title)) return false
+    if (!isSoftwareEngineeringTitle(j.title)) return false
+    if (j.experience_level === 'mid' || j.experience_level === 'senior') return false
     // For normalized jobs prefer the country field; fall back to location string
     if (j.country && j.country !== 'United States') return false
     if (!j.country && isLocationNonUS(j.location ?? '')) return false

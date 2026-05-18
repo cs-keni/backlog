@@ -4,6 +4,33 @@
 
 ---
 
+## Session: 2026-05-18 — Job relevance filtering tightened (Codex)
+
+### What changed
+
+- **`worker/src/jobs/relevance-filter.ts`**
+  - Replaced broad "block only bad titles" behavior with a positive software-engineering title gate.
+  - Removed PM/TPM allowlist behavior; product/program roles are now filtered out.
+  - Blocks ML/data/research tracks: Machine Learning Engineer, Data Scientist, Research Scientist, NLP, computer vision, deep learning, etc.
+  - Allows AI software engineering titles such as "AI Software Engineer", "Applied AI Engineer", GenAI/LLM software roles.
+  - Blocks more mid/senior signals, including "Software Engineer II", `mid-level`, architect, staff/principal/lead, and normalized `experience_level` of `mid` or `senior`.
+- **`worker/tests/unit/relevance-filter.test.ts`**
+  - Added coverage for PM/TPM blocks, ML/data/research blocks, AI engineering allows, associate/junior SWE allows, non-software title blocks, and normalized mid-level filtering.
+- **`docs/CURRENT_TASK.md` / `docs/ENGINEERING_LOG.md`**
+  - Updated shared context for Claude/Codex handoff.
+
+### Checks run
+
+- `cd worker && npm run test -- tests/unit/relevance-filter.test.ts` — passed, 35 tests
+- `cd worker && npm run build` — passed
+
+### Notes / risks
+
+- Generic "Software Engineer" is intentionally still allowed to avoid dropping valid new-grad roles where the source or portal omits junior/associate wording.
+- Titles containing explicit ML wording are blocked even when paired with software engineering wording, per current user preference to avoid machine-learning jobs.
+
+---
+
 ## Session: 2026-05-15 — Phase 10B complete (Claude Code)
 
 ### What was done

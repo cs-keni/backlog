@@ -4,6 +4,28 @@ Reverse-chronological. One entry per meaningful session.
 
 ---
 
+## 2026-05-18 — Entry-level SWE relevance filter (Codex)
+
+### Implemented
+
+- Tightened `worker/src/jobs/relevance-filter.ts` so raw GitHub jobs are filtered before GPT normalization and portal jobs are filtered before enrichment using a positive software-engineering title gate.
+- Removed previous PM/TPM allow behavior; the feed now targets software engineering only.
+- Added blocks for ML/data/research tracks, including Machine Learning Engineer, Data Scientist, Research Scientist, NLP, computer vision, and deep learning.
+- Kept AI engineering in scope for product/software titles such as AI Software Engineer, Applied AI Engineer, GenAI/LLM software roles.
+- Added mid-level filtering for title signals like Software Engineer II and normalized `experience_level` values of `mid` / `senior`.
+- Expanded `worker/tests/unit/relevance-filter.test.ts` to cover allowed and blocked edge cases.
+
+### Checks
+
+- `cd worker && npm run test -- tests/unit/relevance-filter.test.ts` — 35 passed
+- `cd worker && npm run build` — passed
+
+### Gotcha
+
+`cd worker && npm run build` emits `worker/dist/`; it is untracked build output and was removed after the check.
+
+---
+
 ## 2026-05-15 — Workday autofill Phase 10B implementation (Claude Code)
 
 **Commit:** (see git log for hash)

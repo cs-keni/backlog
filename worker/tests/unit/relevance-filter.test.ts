@@ -43,6 +43,16 @@ describe('filterRelevantEntries — title blocklist', () => {
     expect(result).toHaveLength(0)
   })
 
+  it('blocks "Product Manager"', () => {
+    const result = filterRelevantEntries([makeRawEntry({ title: 'Product Manager' })])
+    expect(result).toHaveLength(0)
+  })
+
+  it('blocks "Technical Program Manager"', () => {
+    const result = filterRelevantEntries([makeRawEntry({ title: 'Technical Program Manager' })])
+    expect(result).toHaveLength(0)
+  })
+
   it('blocks title containing "Intern"', () => {
     const result = filterRelevantEntries([makeRawEntry({ title: 'Software Engineer Intern' })])
     expect(result).toHaveLength(0)
@@ -50,6 +60,26 @@ describe('filterRelevantEntries — title blocklist', () => {
 
   it('blocks title containing "Co-op"', () => {
     const result = filterRelevantEntries([makeRawEntry({ title: 'Software Co-op' })])
+    expect(result).toHaveLength(0)
+  })
+
+  it('blocks "Machine Learning Engineer"', () => {
+    const result = filterRelevantEntries([makeRawEntry({ title: 'Machine Learning Engineer' })])
+    expect(result).toHaveLength(0)
+  })
+
+  it('blocks "Data Scientist"', () => {
+    const result = filterRelevantEntries([makeRawEntry({ title: 'Data Scientist' })])
+    expect(result).toHaveLength(0)
+  })
+
+  it('blocks "Research Scientist, AI"', () => {
+    const result = filterRelevantEntries([makeRawEntry({ title: 'Research Scientist, AI' })])
+    expect(result).toHaveLength(0)
+  })
+
+  it('blocks "Software Engineer II"', () => {
+    const result = filterRelevantEntries([makeRawEntry({ title: 'Software Engineer II' })])
     expect(result).toHaveLength(0)
   })
 })
@@ -72,19 +102,34 @@ describe('filterRelevantEntries — allowlist', () => {
     expect(result).toHaveLength(1)
   })
 
-  it('allows "Product Manager"', () => {
-    const result = filterRelevantEntries([makeRawEntry({ title: 'Product Manager' })])
+  it('allows "Associate Software Engineer"', () => {
+    const result = filterRelevantEntries([makeRawEntry({ title: 'Associate Software Engineer' })])
     expect(result).toHaveLength(1)
   })
 
-  it('allows "Technical Program Manager"', () => {
-    const result = filterRelevantEntries([makeRawEntry({ title: 'Technical Program Manager' })])
+  it('allows "Junior Backend Engineer"', () => {
+    const result = filterRelevantEntries([makeRawEntry({ title: 'Junior Backend Engineer' })])
     expect(result).toHaveLength(1)
   })
 
   it('allows "New Grad Software Engineer"', () => {
     const result = filterRelevantEntries([makeRawEntry({ title: 'New Grad Software Engineer' })])
     expect(result).toHaveLength(1)
+  })
+
+  it('allows "AI Software Engineer"', () => {
+    const result = filterRelevantEntries([makeRawEntry({ title: 'AI Software Engineer' })])
+    expect(result).toHaveLength(1)
+  })
+
+  it('allows "Applied AI Engineer"', () => {
+    const result = filterRelevantEntries([makeRawEntry({ title: 'Applied AI Engineer' })])
+    expect(result).toHaveLength(1)
+  })
+
+  it('blocks titles outside software engineering', () => {
+    const result = filterRelevantEntries([makeRawEntry({ title: 'Solutions Consultant' })])
+    expect(result).toHaveLength(0)
   })
 
   it('allows location "Remote"', () => {
@@ -123,6 +168,18 @@ describe('filterRelevantEntries — log output', () => {
 describe('filterRelevantJobs', () => {
   it('blocks Senior from normalized jobs', () => {
     const result = filterRelevantJobs([makeNormalizedJob({ title: 'Senior Backend Engineer' })])
+    expect(result).toHaveLength(0)
+  })
+
+  it('blocks normalized mid-level jobs by experience_level', () => {
+    const result = filterRelevantJobs([
+      makeNormalizedJob({ title: 'Software Engineer', experience_level: 'mid' }),
+    ])
+    expect(result).toHaveLength(0)
+  })
+
+  it('blocks normalized non-software roles', () => {
+    const result = filterRelevantJobs([makeNormalizedJob({ title: 'Data Analyst' })])
     expect(result).toHaveLength(0)
   })
 
