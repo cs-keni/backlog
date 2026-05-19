@@ -14,6 +14,7 @@ export default async function DSAPage() {
     .select('*, lc_reviews(*)')
     .eq('user_id', user.id)
     .order('solved_at', { ascending: false })
+    .order('created_at', { ascending: false })
 
   return (
     <div className="h-full flex flex-col overflow-hidden">

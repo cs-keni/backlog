@@ -21,10 +21,15 @@ const MOBILE_TABS: { id: MobileTab; label: string }[] = [
 ]
 
 export function DSAClient({ initialSolves }: DSAClientProps) {
+  const today = getTodayLocal()
+
   const [solves, setSolves] = useState<LcSolveWithReviews[]>(initialSolves)
   const [mobileTab, setMobileTab] = useState<MobileTab>('today')
-
-  const today = getTodayLocal()
+  const [newSolvesToday, setNewSolvesToday] = useState(() =>
+    initialSolves.filter(s =>
+      s.solved_at === today && new Date(s.created_at).toLocaleDateString('en-CA') === today
+    ).length
+  )
 
   const dueCount = useMemo(() => {
     let n = 0
@@ -53,10 +58,25 @@ export function DSAClient({ initialSolves }: DSAClientProps) {
   }, [])
 
   const handleSolveLogged = useCallback((newSolve: LcSolveWithReviews) => {
+    let isNew = false
     setSolves((prev) => {
+      isNew = !prev.some(s => s.problem_slug === newSolve.problem_slug)
       const without = prev.filter((s) => s.problem_slug !== newSolve.problem_slug)
       return [newSolve, ...without]
     })
+    if (isNew) setNewSolvesToday(n => n + 1)
+  }, [])
+
+  const handleReschedule = useCallback(() => {
+    const t = getTodayLocal()
+    setSolves(prev => prev.map(s => ({
+      ...s,
+      lc_reviews: s.lc_reviews.map(r =>
+        !r.completed_at && r.scheduled_for < t
+          ? { ...r, scheduled_for: t }
+          : r
+      ),
+    })))
   }, [])
 
   return (
@@ -67,7 +87,10 @@ export function DSAClient({ initialSolves }: DSAClientProps) {
           <TodayPanel
             solves={solves}
             today={today}
+            newSolvesToday={newSolvesToday}
             onReviewComplete={handleReviewComplete}
+            onSolveLogged={handleSolveLogged}
+            onRescheduleComplete={handleReschedule}
           />
         </div>
         <div className="flex-1 flex flex-col overflow-hidden">
@@ -115,7 +138,10 @@ export function DSAClient({ initialSolves }: DSAClientProps) {
             <TodayPanel
               solves={solves}
               today={today}
+              newSolvesToday={newSolvesToday}
               onReviewComplete={handleReviewComplete}
+              onSolveLogged={handleSolveLogged}
+              onRescheduleComplete={handleReschedule}
             />
           )}
           {mobileTab === 'calendar' && (

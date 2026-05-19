@@ -3,6 +3,13 @@
 import { useMemo, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import type { LcSolveWithReviews, LcReview } from '@/lib/dsa/types'
+import type { NeetcodeProblem } from '@/lib/dsa/neetcode150'
+import {
+  getActiveCategory,
+  getRecommendations,
+  getCategoryProgress,
+  DAILY_NEW_TARGET,
+} from '@/lib/dsa/recommend'
 
 interface ReviewItem {
   review: LcReview
@@ -13,7 +20,10 @@ interface ReviewItem {
 interface TodayPanelProps {
   solves: LcSolveWithReviews[]
   today: string
+  newSolvesToday: number
   onReviewComplete: (reviewId: string, solveId: string) => void
+  onSolveLogged: (solve: LcSolveWithReviews) => void
+  onRescheduleComplete: () => void
 }
 
 const DIFFICULTY_COLOR = {
@@ -22,8 +32,45 @@ const DIFFICULTY_COLOR = {
   hard: 'text-red-400',
 }
 
-export function TodayPanel({ solves, today, onReviewComplete }: TodayPanelProps) {
+const DIFFICULTY_BADGE = {
+  easy: 'text-emerald-400 bg-emerald-500/10',
+  medium: 'text-yellow-400 bg-yellow-500/10',
+  hard: 'text-red-400 bg-red-500/10',
+}
+
+function ExternalLinkIcon() {
+  return (
+    <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+    </svg>
+  )
+}
+
+export function TodayPanel({
+  solves,
+  today,
+  newSolvesToday,
+  onReviewComplete,
+  onSolveLogged,
+  onRescheduleComplete,
+}: TodayPanelProps) {
   const [completing, setCompleting] = useState<Set<string>>(new Set())
+  const [solvingSlug, setSolvingSlug] = useState<string | null>(null)
+  const [rescheduling, setRescheduling] = useState(false)
+
+  const activeCategory = useMemo(() => getActiveCategory(solves), [solves])
+
+  const recommendations = useMemo(() => getRecommendations(solves), [solves])
+
+  const categoryProgress = useMemo(
+    () => (activeCategory ? getCategoryProgress(solves, activeCategory) : null),
+    [solves, activeCategory]
+  )
+
+  const nextProblemPreview = useMemo(() => {
+    const extended = getRecommendations(solves, DAILY_NEW_TARGET + 1)
+    return extended.length > DAILY_NEW_TARGET ? extended[DAILY_NEW_TARGET] : null
+  }, [solves])
 
   const dueItems = useMemo<ReviewItem[]>(() => {
     const items: ReviewItem[] = []
@@ -31,14 +78,9 @@ export function TodayPanel({ solves, today, onReviewComplete }: TodayPanelProps)
       for (const review of solve.lc_reviews) {
         if (review.completed_at) continue
         if (review.scheduled_for > today) continue
-        items.push({
-          review,
-          solve,
-          isOverdue: review.scheduled_for < today,
-        })
+        items.push({ review, solve, isOverdue: review.scheduled_for < today })
       }
     }
-    // Overdue first, then by scheduled date
     items.sort((a, b) => {
       if (a.isOverdue !== b.isOverdue) return a.isOverdue ? -1 : 1
       return a.review.scheduled_for.localeCompare(b.review.scheduled_for)
@@ -46,14 +88,54 @@ export function TodayPanel({ solves, today, onReviewComplete }: TodayPanelProps)
     return items
   }, [solves, today])
 
+  const overdueCount = useMemo(() => dueItems.filter(i => i.isOverdue).length, [dueItems])
+
+  async function handleInlineSolve(problem: NeetcodeProblem) {
+    if (solvingSlug) return
+    setSolvingSlug(problem.slug)
+    try {
+      const res = await fetch('/api/dsa/solves', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          problem_slug: problem.slug,
+          problem_title: problem.title,
+          pattern: problem.pattern,
+          difficulty: problem.difficulty,
+          solved_at: today,
+        }),
+      })
+      if (!res.ok) return
+      const { id } = await res.json()
+      const solveRes = await fetch('/api/dsa/solves')
+      if (solveRes.ok) {
+        const allSolves: LcSolveWithReviews[] = await solveRes.json()
+        const updated = allSolves.find(s => s.id === id)
+        if (updated) onSolveLogged(updated)
+      }
+    } finally {
+      setSolvingSlug(null)
+    }
+  }
+
+  async function handleRescheduleClick() {
+    setRescheduling(true)
+    try {
+      const res = await fetch('/api/dsa/reviews/reschedule', { method: 'POST' })
+      if (res.ok) onRescheduleComplete()
+    } finally {
+      setRescheduling(false)
+    }
+  }
+
   async function markDone(item: ReviewItem) {
     if (completing.has(item.review.id)) return
-    setCompleting((prev) => new Set(prev).add(item.review.id))
+    setCompleting(prev => new Set(prev).add(item.review.id))
     try {
       await fetch(`/api/dsa/reviews/${item.review.id}`, { method: 'PATCH' })
       onReviewComplete(item.review.id, item.solve.id)
     } finally {
-      setCompleting((prev) => {
+      setCompleting(prev => {
         const next = new Set(prev)
         next.delete(item.review.id)
         return next
@@ -61,28 +143,127 @@ export function TodayPanel({ solves, today, onReviewComplete }: TodayPanelProps)
     }
   }
 
+  const allSolved = activeCategory === null
+  const isDoneToday = !allSolved && newSolvesToday >= DAILY_NEW_TARGET
+
   return (
-    <div className="flex flex-col h-full">
-      <div className="px-5 py-4 border-b border-zinc-800">
+    <div className="flex flex-col h-full overflow-hidden">
+      {/* ── Do Today ─────────────────────────────────────────────────────────── */}
+      <div className="shrink-0 border-b border-zinc-800 px-5 py-4">
+        <div className="flex items-center justify-between mb-3">
+          <p className="text-xs font-medium text-zinc-400">Do Today</p>
+          {activeCategory && categoryProgress && (
+            <span className="text-[10px] font-medium text-zinc-500 tabular-nums truncate ml-2 max-w-[60%] text-right">
+              {activeCategory} · {categoryProgress.solved}/{categoryProgress.total}
+            </span>
+          )}
+        </div>
+
+        {allSolved ? (
+          <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/5 px-4 py-3 text-center">
+            <p className="text-sm font-medium text-emerald-400">All 150 solved!</p>
+            <p className="text-xs text-zinc-500 mt-0.5">Consider re-solving to reset your chains</p>
+          </div>
+        ) : isDoneToday ? (
+          <motion.div
+            initial={{ opacity: 0, y: 4 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="rounded-lg border border-emerald-500/20 bg-emerald-500/5 px-4 py-3"
+          >
+            <p className="text-sm font-medium text-emerald-400">✓ New problems done for today</p>
+            {nextProblemPreview && (
+              <p className="text-xs text-zinc-500 mt-1">
+                Next up tomorrow: {nextProblemPreview.title}
+              </p>
+            )}
+          </motion.div>
+        ) : (
+          <div className="space-y-2">
+            {recommendations.map(problem => (
+              <div
+                key={problem.slug}
+                className="flex items-center gap-3 rounded-lg border border-zinc-800 bg-zinc-900/60 px-3.5 py-2.5 hover:border-zinc-700 transition-colors"
+              >
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-1.5 mb-1">
+                    <span className="text-sm font-medium text-zinc-100 truncate">{problem.title}</span>
+                    <a
+                      href={problem.leetcodeUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="shrink-0 text-zinc-600 hover:text-blue-400 transition-colors"
+                      title="Open problem"
+                    >
+                      <ExternalLinkIcon />
+                    </a>
+                  </div>
+                  <span className={`text-[10px] font-medium px-1 py-0.5 rounded ${DIFFICULTY_BADGE[problem.difficulty]}`}>
+                    {problem.difficulty}
+                  </span>
+                </div>
+                <button
+                  onClick={() => handleInlineSolve(problem)}
+                  disabled={!!solvingSlug}
+                  className="shrink-0 flex items-center gap-1.5 rounded-md border border-zinc-700 px-2.5 py-1 text-[11px] font-medium text-zinc-400 hover:border-emerald-500/60 hover:text-emerald-400 hover:bg-emerald-500/10 disabled:opacity-40 transition-all"
+                >
+                  {solvingSlug === problem.slug ? (
+                    <svg className="h-3 w-3 animate-spin" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                    </svg>
+                  ) : (
+                    'Solved ✓'
+                  )}
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* ── Catch-up banner ───────────────────────────────────────────────────── */}
+      <AnimatePresence>
+        {overdueCount > 3 && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            className="shrink-0 overflow-hidden"
+          >
+            <div className="mx-5 mt-3 rounded-lg border border-orange-500/20 bg-orange-500/5 px-4 py-2.5 flex items-center justify-between gap-3">
+              <p className="text-xs text-orange-400 font-medium">{overdueCount} reviews overdue</p>
+              <button
+                onClick={handleRescheduleClick}
+                disabled={rescheduling}
+                className="shrink-0 text-[11px] px-2.5 py-1 rounded-md border border-orange-500/40 text-orange-400 hover:bg-orange-500/15 disabled:opacity-50 transition-colors"
+              >
+                {rescheduling ? 'Pushing...' : 'Push all to today'}
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ── Review Today ──────────────────────────────────────────────────────── */}
+      <div className="shrink-0 px-5 pt-4 pb-2">
         <div className="flex items-center justify-between">
-          <p className="text-xs font-medium text-zinc-400">Today&apos;s Reviews</p>
+          <p className="text-xs font-medium text-zinc-400">Review Today</p>
           {dueItems.length > 0 && (
             <span className="text-xs font-medium text-zinc-500">{dueItems.length} due</span>
           )}
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-3 py-3">
+      <div className="flex-1 overflow-y-auto px-3 pb-3">
         <AnimatePresence initial={false}>
           {dueItems.length === 0 ? (
             <motion.div
               key="empty"
               initial={{ opacity: 0, y: 6 }}
               animate={{ opacity: 1, y: 0 }}
-              className="flex flex-col items-center justify-center h-40 gap-2"
+              className="flex flex-col items-center justify-center h-24 gap-2"
             >
-              <div className="text-2xl">✓</div>
-              <p className="text-sm text-zinc-500">All caught up for today</p>
+              <p className="text-sm text-zinc-500">All caught up</p>
             </motion.div>
           ) : (
             dueItems.map((item, i) => (

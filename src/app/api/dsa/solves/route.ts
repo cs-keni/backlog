@@ -1,5 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { computeReviewDates } from '@/lib/dsa/schedule'
+import { PATTERNS } from '@/lib/dsa/neetcode150'
+import type { Pattern } from '@/lib/dsa/neetcode150'
 
 export async function GET() {
   const supabase = await createClient()
@@ -51,6 +53,10 @@ export async function POST(request: Request) {
   const validDifficulties = ['easy', 'medium', 'hard']
   if (!validDifficulties.includes(body.difficulty)) {
     return Response.json({ error: 'Invalid difficulty' }, { status: 400 })
+  }
+
+  if (!PATTERNS.includes(body.pattern as Pattern)) {
+    return Response.json({ error: 'Invalid pattern' }, { status: 400 })
   }
 
   // Delete all pending (uncompleted) reviews for this problem to reset the chain
@@ -106,5 +112,5 @@ export async function POST(request: Request) {
     return Response.json({ error: 'Failed to schedule reviews' }, { status: 500 })
   }
 
-  return Response.json({ id: solve.id }, { status: 201 })
+  return Response.json({ id: solve.id, isNewSolve: !existingSolve }, { status: 201 })
 }
