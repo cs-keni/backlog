@@ -117,6 +117,7 @@ export function ApplicationCard({ app, index, isSelected, isBulkSelected = false
   return (
     <motion.div
       ref={setNodeRef}
+      data-testid={`application-card-${app.id}`}
       style={style}
       initial={isDragOverlay ? false : { opacity: 0, y: 6 }}
       animate={{ opacity: isDragging ? 0 : 1, y: 0 }}

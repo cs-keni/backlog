@@ -2,8 +2,18 @@ export const maxDuration = 60
 
 import { createClient } from '@/lib/supabase/server'
 import { generateCoverLetter, type CoverLetterTemplate } from '@/lib/llm/cover-letter'
+import { hasE2EAuthCookie } from '@/lib/e2e/server'
 
 export async function POST(request: Request) {
+  if (hasE2EAuthCookie(request)) {
+    return Response.json({
+      id: 'e2e-cover-letter-1',
+      template_type: 'formal',
+      content: 'Mocked E2E cover letter.',
+      application_id: 'e2e-app-1',
+    })
+  }
+
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 })
@@ -165,6 +175,10 @@ export async function POST(request: Request) {
 }
 
 export async function GET(request: Request) {
+  if (hasE2EAuthCookie(request)) {
+    return Response.json(null)
+  }
+
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 })

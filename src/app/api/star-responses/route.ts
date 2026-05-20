@@ -2,8 +2,14 @@ export const maxDuration = 30
 
 import { createClient } from '@/lib/supabase/server'
 import { buildStarResponse } from '@/lib/llm/star-builder'
+import { hasE2EAuthCookie } from '@/lib/e2e/server'
+import { e2eStarResponse } from '@/lib/e2e/fixtures'
 
 export async function GET(request: Request) {
+  if (hasE2EAuthCookie(request)) {
+    return Response.json([])
+  }
+
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 })
@@ -32,6 +38,11 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+  if (hasE2EAuthCookie(request)) {
+    const body = await request.json().catch(() => null) as { question?: string } | null
+    return Response.json(e2eStarResponse(body?.question ?? 'Tell me about a frontend systems project.'))
+  }
+
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 })

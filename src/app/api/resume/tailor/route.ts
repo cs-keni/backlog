@@ -4,8 +4,16 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { tailorResume } from '@/lib/llm/resume-tailor'
 import { generateResumePDF } from '@/lib/pdf/resume-generator'
+import { hasE2EAuthCookie } from '@/lib/e2e/server'
 
 export async function POST(request: Request) {
+  if (hasE2EAuthCookie(request)) {
+    return Response.json({
+      id: 'e2e-resume-version-1',
+      pdf_url: 'https://example.com/e2e-resume.pdf',
+    })
+  }
+
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 })
@@ -148,6 +156,10 @@ export async function POST(request: Request) {
 }
 
 export async function GET(request: Request) {
+  if (hasE2EAuthCookie(request)) {
+    return Response.json(null)
+  }
+
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 })

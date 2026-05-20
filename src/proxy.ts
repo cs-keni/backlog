@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from 'next/server'
 import { updateSession } from '@/lib/supabase/middleware'
+import { hasE2EAuthCookie, isE2ETestMode } from '@/lib/e2e/server'
 
 // Routes that don't require authentication
 const PUBLIC_ROUTES = ['/login', '/signup']
@@ -13,6 +14,9 @@ const CORS_HEADERS = {
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
+  const isPublicRoute = PUBLIC_ROUTES.some((route) =>
+    pathname.startsWith(route)
+  )
 
   // Extension API routes use API-key auth — skip session checks, just add CORS
   if (pathname.startsWith('/api/extension/')) {
@@ -24,12 +28,27 @@ export async function proxy(request: NextRequest) {
     return response
   }
 
-  const { supabaseResponse, user } = await updateSession(request)
+  if (isE2ETestMode()) {
+    const hasE2EUser = hasE2EAuthCookie(request)
 
-  // Allow public routes through without redirect
-  const isPublicRoute = PUBLIC_ROUTES.some((route) =>
-    pathname.startsWith(route)
-  )
+    if (!hasE2EUser && !isPublicRoute) {
+      const loginUrl = request.nextUrl.clone()
+      loginUrl.pathname = '/login'
+      loginUrl.searchParams.set('redirectedFrom', pathname + request.nextUrl.search)
+      return NextResponse.redirect(loginUrl)
+    }
+
+    if (hasE2EUser && pathname === '/login') {
+      const dashboardUrl = request.nextUrl.clone()
+      dashboardUrl.pathname = '/dashboard'
+      dashboardUrl.searchParams.delete('redirectedFrom')
+      return NextResponse.redirect(dashboardUrl)
+    }
+
+    return NextResponse.next()
+  }
+
+  const { supabaseResponse, user } = await updateSession(request)
 
   if (!user && !isPublicRoute) {
     const loginUrl = request.nextUrl.clone()

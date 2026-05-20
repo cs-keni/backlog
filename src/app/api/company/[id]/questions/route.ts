@@ -4,16 +4,22 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { generateInterviewGuide } from '@/lib/llm/question-generator'
 import type { InterviewGuide } from '@/lib/llm/question-generator'
+import { hasE2EAuthCookie } from '@/lib/e2e/server'
+import { e2eCompany, e2eGuide } from '@/lib/e2e/fixtures'
 
 export async function GET(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params
+  if (hasE2EAuthCookie(request)) {
+    if (id !== e2eCompany.id) return Response.json({ error: 'Company not found' }, { status: 404 })
+    return Response.json({ guide: e2eGuide })
+  }
+
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 })
-
-  const { id } = await params
 
   const { data: company } = await supabase
     .from('company_profiles')

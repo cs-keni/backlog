@@ -1,9 +1,22 @@
 import { createClient } from '@/lib/supabase/server'
+import { hasE2EAuthCookie } from '@/lib/e2e/server'
+import { e2eStarResponse } from '@/lib/e2e/fixtures'
 
 export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  if (hasE2EAuthCookie(request)) {
+    const body = await request.json().catch(() => ({})) as {
+      situation?: string
+      task?: string
+      action?: string
+      result?: string
+    }
+    const response = e2eStarResponse('Tell me about a time you improved a shared frontend system without slowing product delivery.')
+    return Response.json({ ...response, ...body, updated_at: new Date().toISOString() })
+  }
+
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 })
@@ -53,9 +66,13 @@ export async function PATCH(
 }
 
 export async function DELETE(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  if (hasE2EAuthCookie(request)) {
+    return new Response(null, { status: 204 })
+  }
+
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 })

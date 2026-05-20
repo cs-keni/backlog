@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { FeedFilters } from '@/lib/jobs/types'
+import { hasE2EAuthCookie } from '@/lib/e2e/server'
 
 const MAX_PRESETS = 20
 const MAX_NAME_LENGTH = 50
@@ -45,7 +46,11 @@ function parsePresetFilters(value: unknown): PresetFilters | null {
   }
 }
 
-export async function GET() {
+export async function GET(request: Request) {
+  if (hasE2EAuthCookie(request)) {
+    return Response.json({ presets: [] })
+  }
+
   const supabase = await createClient()
   const {
     data: { user },
@@ -67,6 +72,26 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  if (hasE2EAuthCookie(request)) {
+    return Response.json({
+      id: 'e2e-preset-1',
+      user_id: 'e2e-user-1',
+      name: 'Remote React',
+      filters: {
+        version: 1,
+        search: '',
+        location: 'Remote',
+        isRemote: 'remote',
+        country: 'all',
+        salaryMin: '',
+        experienceLevel: '',
+        roleType: '',
+        dateRange: '',
+      },
+      created_at: new Date().toISOString(),
+    }, { status: 201 })
+  }
+
   const supabase = await createClient()
   const {
     data: { user },

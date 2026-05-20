@@ -441,6 +441,7 @@ function KanbanColumn({ column, apps, selectedId, selectMode, selectedIds, onCar
       {/* Drop zone */}
       <div
         ref={setNodeRef}
+        data-testid={`tracker-column-${column.id}`}
         className={`
           flex-1 rounded-xl min-h-[120px] p-2 transition-colors space-y-2
           ${isOver ? 'bg-zinc-800/60 ring-1 ring-zinc-700' : 'bg-zinc-900/40'}

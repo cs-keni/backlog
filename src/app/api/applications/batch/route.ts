@@ -1,11 +1,18 @@
 import { createClient } from '@/lib/supabase/server'
 import type { ApplicationStatus } from '@/lib/jobs/types'
+import { hasE2EAuthCookie } from '@/lib/e2e/server'
 
 const VALID_STATUSES: ApplicationStatus[] = [
   'saved', 'applied', 'phone_screen', 'technical', 'final', 'offer', 'rejected',
 ]
 
 export async function POST(request: Request) {
+  if (hasE2EAuthCookie(request)) {
+    const body = await request.json().catch(() => null) as { ids?: unknown } | null
+    const count = Array.isArray(body?.ids) ? body.ids.length : 0
+    return Response.json({ updated: count })
+  }
+
   const supabase = await createClient()
   const {
     data: { user },

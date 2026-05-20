@@ -4,6 +4,39 @@ Reverse-chronological. One entry per meaningful session.
 
 ---
 
+## 2026-05-20 — Phase 9 E2E and CI hardening (Codex)
+
+### Implemented
+
+- Added E2E fixture mode guarded by both `NEXT_PUBLIC_E2E_TEST_MODE=1` and the `backlog_e2e_user=1` cookie.
+- Added fixture APIs/data for Playwright coverage of feed, tracker drag, prep STAR generation/save, and tracker bulk archive.
+- Added `e2e/global-setup.ts`, `src/tests/e2e/fixtures/llm-mock.ts`, and four Phase 9 Playwright specs.
+- Updated Playwright to invoke `node node_modules/next/dist/bin/next dev` directly and to optionally load `extension/dist`.
+- Updated GitHub E2E workflow to install/build the extension and run with deterministic local fixture env vars.
+- Scoped root Vitest to app tests so worker/extension suites are not duplicated in the root app job.
+- Added missing `@vitest/coverage-v8`, removed stale 80% coverage thresholds, and refreshed `extension/package-lock.json` so CI `npm ci` works.
+
+### Checks
+
+- `node node_modules/typescript/bin/tsc --noEmit` — passed
+- `npm run test` — 115 passed
+- `node node_modules/vitest/vitest.mjs run --coverage --reporter=json` — passed
+- `cd worker && node ../node_modules/typescript/bin/tsc --noEmit` — passed
+- `cd worker && node node_modules/vitest/vitest.mjs run` — 115 passed
+- `cd extension && npm ci` — passed
+- `cd extension && node node_modules/vitest/vitest.mjs run` — 84 passed
+- `cd extension && npm run build` — passed
+- `NEXT_PUBLIC_E2E_TEST_MODE=1 ... npx playwright test --reporter=line` — 6 passed
+- `node node_modules/next/dist/bin/next build` — passed
+
+### Gotchas
+
+- The root `vitest` wrapper was fixed after root `npm install`, but direct entrypoints remain more reliable in this WSL checkout.
+- The extension has pre-existing standalone typecheck failures; CI only runs extension tests and build.
+- Playwright requires elevated execution locally because the sandbox blocks binding the Next dev server port.
+
+---
+
 ## 2026-05-20 — Phase 3b: Bulk action bar (Claude Code)
 
 ### What happened

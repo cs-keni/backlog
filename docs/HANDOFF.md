@@ -4,6 +4,43 @@
 
 ---
 
+## Session: 2026-05-20 — Phase 9 E2E + CI hardening (Codex)
+
+### What changed
+
+- Added cookie-gated E2E fixture mode (`NEXT_PUBLIC_E2E_TEST_MODE=1` + `backlog_e2e_user=1`) that bypasses Supabase only for Playwright-authenticated sessions.
+- Added deterministic fixture data and mock responses for feed, tracker, prep questions, STAR responses, materials, and filter preset reads.
+- Added Playwright global setup and Phase 9 specs:
+  - `login-feed.spec.ts`
+  - `tracker-drag.spec.ts`
+  - `prep-star.spec.ts`
+  - `bulk-tracker.spec.ts`
+- Updated Playwright config to use the direct Next entrypoint, extend first-compile timeouts, and support optional extension loading from `extension/dist`.
+- Updated GitHub E2E workflow to build/load the extension and use fixture-mode env vars instead of live Supabase/LLM secrets.
+- Scoped root Vitest to app tests only; worker and extension tests remain in their dedicated CI steps.
+- Added `@vitest/coverage-v8`, removed stale global 80% thresholds, and refreshed the extension lockfile so `npm ci` passes.
+
+### Checks run
+
+- `node node_modules/typescript/bin/tsc --noEmit` — passed
+- `npm run test` — 115 passed
+- `node node_modules/vitest/vitest.mjs run --coverage --reporter=json` — passed, coverage artifact generated
+- `cd worker && node ../node_modules/typescript/bin/tsc --noEmit` — passed
+- `cd worker && node node_modules/vitest/vitest.mjs run` — 115 passed
+- `cd extension && npm ci` — passed
+- `cd extension && node node_modules/vitest/vitest.mjs run` — 84 passed
+- `cd extension && npm run build` — passed
+- `NEXT_PUBLIC_E2E_TEST_MODE=1 ... npx playwright test --reporter=line` — 6 passed
+- `node node_modules/next/dist/bin/next build` — passed
+
+### Notes / risks
+
+- Local standalone `cd extension && node node_modules/typescript/bin/tsc --noEmit` still reports pre-existing extension type errors; the GitHub workflow does not run that command.
+- Local sandbox cannot bind the Next dev server port, so Playwright was run with elevated execution.
+- GitHub Actions still needs to be watched after push.
+
+---
+
 ## Session: 2026-05-20 — Phase 8b Easy/Hard SR buttons (Claude Code)
 
 ### What changed

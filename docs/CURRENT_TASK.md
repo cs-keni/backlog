@@ -1,7 +1,7 @@
 # Current Task
 
 **Last updated:** 2026-05-21
-**Status:** All P1 + P2 phases complete. Starting P3 (quality + maintainability). Phase 2f/g decomposition intentionally deferred into P3.
+**Status:** All P1, P2, and P3 phases complete. Phase 9 E2E coverage is implemented and CI has deterministic fixture-mode tests.
 
 ---
 
@@ -56,7 +56,7 @@ Suggested order: 3a → 3b → 4 → 5 → 6 → 2f/g → 8b → 9
 | **Phase 6** — Profile security (scoped SELECT + ownership tests) | Codex | implemented |
 | **Phase 2f/g** — fill.ts + Sidebar.tsx decomposition | Codex | implemented |
 | **Phase 8b** — Easy/Hard SR buttons (300ms flash state machine, migration 023) | **Claude Code** | implemented |
-| **Phase 9** — E2E tests (Playwright global setup) | Codex | not started |
+| **Phase 9** — E2E tests (Playwright global setup) | Codex | implemented |
 
 ---
 
@@ -92,10 +92,12 @@ cd extension && npm run test -- <relevant test file>
 cd extension && npm run build
 ```
 
-Note: on 2026-05-20 the npm binary wrappers for `vitest` and worker `tsc` were broken in this workspace. Direct entrypoints worked:
+Note: on 2026-05-20 the npm binary wrappers for `vitest`, `next`, and worker `tsc` were broken in this workspace. Direct entrypoints worked:
 
 ```bash
-node node_modules/typescript/lib/tsc.js --noEmit
-cd worker && node ../node_modules/typescript/lib/tsc.js -p tsconfig.json
-cd worker && node node_modules/vitest/dist/cli.js run tests/unit/dispatcher.test.ts --pool=threads
+node node_modules/typescript/bin/tsc --noEmit
+node node_modules/vitest/vitest.mjs run
+node node_modules/next/dist/bin/next build
+cd worker && node node_modules/vitest/vitest.mjs run
+cd extension && node node_modules/vitest/vitest.mjs run
 ```

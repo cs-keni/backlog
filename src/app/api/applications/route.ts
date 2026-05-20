@@ -1,8 +1,36 @@
 import { createClient } from '@/lib/supabase/server'
 import { verifyApiKeyFromRequest } from '@/lib/auth/api-key'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
+import { hasE2EAuthCookie } from '@/lib/e2e/server'
+import { e2eApplications } from '@/lib/e2e/fixtures'
 
 export async function GET(request: Request) {
+  if (hasE2EAuthCookie(request)) {
+    const { searchParams } = new URL(request.url)
+    const jobId = searchParams.get('jobId')
+    const search = searchParams.get('search')?.toLowerCase()
+
+    if (jobId) {
+      const app = e2eApplications.find((application) => application.job_id === jobId)
+      return Response.json(app ? { id: app.id, status: app.status, cover_letter_url: null } : null)
+    }
+
+    if (search) {
+      return Response.json({
+        applications: e2eApplications
+          .filter((app) => `${app.jobs.title} ${app.jobs.company}`.toLowerCase().includes(search))
+          .map((app) => ({
+            id: app.id,
+            status: app.status,
+            title: app.jobs.title,
+            company: app.jobs.company,
+          })),
+      })
+    }
+
+    return Response.json(e2eApplications)
+  }
+
   let supabase = await createClient()
   const {
     data: { user },
@@ -88,6 +116,14 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+  if (hasE2EAuthCookie(request)) {
+    const body = await request.json().catch(() => null) as { job_id?: string; status?: string } | null
+    return Response.json({
+      id: body?.job_id === 'e2e-job-1' ? 'e2e-app-1' : 'e2e-app-new',
+      status: body?.status ?? 'applied',
+    }, { status: 201 })
+  }
+
   const supabase = await createClient()
 
   const {

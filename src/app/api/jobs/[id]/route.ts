@@ -1,11 +1,20 @@
 import { createClient } from '@/lib/supabase/server'
 import { verifyApiKeyFromRequest } from '@/lib/auth/api-key'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
+import { hasE2EAuthCookie } from '@/lib/e2e/server'
+import { e2eJobById } from '@/lib/e2e/fixtures'
 
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params
+  if (hasE2EAuthCookie(request)) {
+    const job = e2eJobById(id)
+    if (!job) return Response.json({ error: 'Job not found' }, { status: 404 })
+    return Response.json(job)
+  }
+
   let supabase = await createClient()
   let userId: string | null = null
   const { data: { user } } = await supabase.auth.getUser()
@@ -20,8 +29,6 @@ export async function GET(
       process.env.SUPABASE_SERVICE_ROLE_KEY!
     ) as unknown as Awaited<ReturnType<typeof createClient>>
   }
-
-  const { id } = await params
 
   const { data, error } = await supabase
     .from('jobs')

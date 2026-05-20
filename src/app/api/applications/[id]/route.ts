@@ -1,11 +1,22 @@
 import { createClient } from '@/lib/supabase/server'
+import { hasE2EAuthCookie } from '@/lib/e2e/server'
+import { e2eApplicationById, e2eTimeline } from '@/lib/e2e/fixtures'
 
 // GET /api/applications/[id] — returns application + timeline for detail panel
 export async function GET(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params
+  if (hasE2EAuthCookie(request)) {
+    const application = e2eApplicationById(id)
+    if (!application) return Response.json({ error: 'Not found' }, { status: 404 })
+    return Response.json({
+      application,
+      timeline: e2eTimeline.filter((entry) => entry.application_id === id),
+    })
+  }
+
   const supabase = await createClient()
   const {
     data: { user },
@@ -45,6 +56,21 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params
+  if (hasE2EAuthCookie(request)) {
+    const current = e2eApplicationById(id)
+    if (!current) return Response.json({ error: 'Not found' }, { status: 404 })
+    const body = await request.json().catch(() => ({})) as Record<string, unknown>
+    return Response.json({
+      id,
+      status: typeof body.status === 'string' ? body.status : current.status,
+      applied_at: current.applied_at,
+      last_updated: new Date().toISOString(),
+      notes: body.notes ?? current.notes,
+      recruiter_name: body.recruiter_name ?? current.recruiter_name,
+      recruiter_email: body.recruiter_email ?? current.recruiter_email,
+    })
+  }
+
   const supabase = await createClient()
   const {
     data: { user },
@@ -114,10 +140,14 @@ export async function PATCH(
 
 // DELETE /api/applications/[id] — remove application entirely
 export async function DELETE(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params
+  if (hasE2EAuthCookie(request)) {
+    return new Response(null, { status: 204 })
+  }
+
   const supabase = await createClient()
   const {
     data: { user },

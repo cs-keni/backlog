@@ -1,10 +1,27 @@
 import { createClient } from '@/lib/supabase/server'
 import { TrackerBoard } from '@/components/tracker/TrackerBoard'
 import type { ApplicationWithJob } from '@/lib/jobs/types'
+import { cookies } from 'next/headers'
+import { E2E_AUTH_COOKIE, isE2ETestMode } from '@/lib/e2e/server'
+import { e2eApplications } from '@/lib/e2e/fixtures'
 
 export const dynamic = 'force-dynamic'
 
 export default async function TrackerPage() {
+  const cookieStore = await cookies()
+  if (isE2ETestMode() && cookieStore.get(E2E_AUTH_COOKIE)?.value === '1') {
+    return (
+      <div className="h-full flex flex-col overflow-hidden">
+        <div className="shrink-0 px-5 py-4 border-b border-zinc-800">
+          <h1 className="text-sm font-semibold text-zinc-100">Tracker</h1>
+        </div>
+        <div className="flex-1 overflow-hidden">
+          <TrackerBoard initialApplications={e2eApplications} />
+        </div>
+      </div>
+    )
+  }
+
   const supabase = await createClient()
   const {
     data: { user },

@@ -1,9 +1,25 @@
 import { NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { hasE2EAuthCookie } from '@/lib/e2e/server'
+import { e2eJobs } from '@/lib/e2e/fixtures'
 
 export const dynamic = 'force-dynamic'
 
 export async function GET(request: NextRequest) {
+  if (hasE2EAuthCookie(request)) {
+    const { searchParams } = request.nextUrl
+    const search = searchParams.get('search')?.toLowerCase()
+    const isRemote = searchParams.get('is_remote')
+    const jobs = e2eJobs.filter((job) => {
+      if (search && !`${job.title} ${job.company}`.toLowerCase().includes(search)) return false
+      if (isRemote === 'true' && !job.is_remote) return false
+      if (isRemote === 'false' && job.is_remote) return false
+      return true
+    })
+
+    return Response.json({ jobs, nextCursor: null })
+  }
+
   const supabase = await createClient()
 
   // Auth check
