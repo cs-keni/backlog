@@ -1,7 +1,7 @@
 # Current Task
 
 **Last updated:** 2026-05-20
-**Status:** Phase 1, Phase 2a-2e, and Phase 7 are implemented. Phase 8a is currently Claude-owned. Phase 2f/g decomposition is intentionally deferred to P3.
+**Status:** Phase 1, Phase 2a-2e, Phase 7, and Phase 8a are implemented. Phase 2f/g decomposition is intentionally deferred to P3.
 
 ---
 
@@ -23,7 +23,6 @@ Some phases are reserved for Claude Code due to animation sequencing, subtle DOM
 |-------|-------|--------|
 | Phase 2a — Workday comboboxes | **Claude Code** | MutationObserver timing + country→state cascade only surfaces bugs on real Workday pages, not unit tests |
 | Phase 3b — Bulk action bar UI | **Claude Code** | Framer Motion spring + DnD interaction with select mode + portal need to feel right in motion |
-| Phase 8a — DSA counter drift fix | **Claude Code** | Latest user routing assigns this section to Claude Code |
 | Phase 8b — Easy/Hard SR buttons | **Claude Code** | 300ms Hard flash sequence is a tight state machine; wrong sequencing causes double-fires or broken feel |
 | Everything else | **Codex** | Specs are complete; API routes, migrations, tests, decompositions are mechanical |
 
@@ -43,7 +42,7 @@ Some phases are reserved for Claude Code due to animation sequencing, subtle DOM
 - **Phase 2d** — Initiate from Backlog (URL param + background fetch + sidebar badge) — **implemented**
 - **Phase 2e** — Extension debug export button — **implemented**
 - **Phase 7** — Abort controller + saved filter presets — **implemented**
-- **Phase 8a** — DSA counter drift fix (daily_activity table, migration 024) — **Claude Code**
+- **Phase 8a** — DSA counter drift fix (daily_activity table, migration 024) — **implemented**
 
 ### P3 — Quality + maintainability
 - **Phase 3** — Tracker integration tests + bulk ops (floating action bar)
@@ -72,9 +71,9 @@ Full visual specs for all UI elements are in `docs/GRADE_BOOST_PLAN.md` under `*
 
 - `020_add_structured_address_fields.sql` — adds street_address, city, state, postal_code
 - `021_extension_answer_cache.sql` — adds extension_answer_cache table
-- `022_add_filter_presets.sql` — written; apply in Supabase before relying on saved filter presets
+- `022_add_filter_presets.sql` — applied; adds saved job-feed filter presets
 - `023_add_review_difficulty.sql` (to be written — Phase 8b)
-- `024_add_daily_activity.sql` (to be written — Phase 8a)
+- `024_add_daily_activity.sql` — written; apply in Supabase before relying on DSA new-today counts
 - `025_notification_log_schema.sql` — applied; adds notification status/error and sent-only dedupe index
 
 ---

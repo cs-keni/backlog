@@ -10,7 +10,7 @@ import type { NeetcodeProblem } from '@/lib/dsa/neetcode150'
 interface ProblemLoggerProps {
   solves: LcSolveWithReviews[]
   today: string
-  onSolveLogged: (solve: LcSolveWithReviews) => void
+  onSolveLogged: (solve: LcSolveWithReviews, isNewSolve: boolean) => void
 }
 
 const DIFFICULTY_COLOR = {
@@ -104,13 +104,13 @@ export function ProblemLogger({ solves, today, onSolveLogged }: ProblemLoggerPro
     })
     if (!res.ok) throw new Error('Failed to log solve')
 
-    const { id } = await res.json()
+    const { id, isNewSolve } = await res.json() as { id: string; isNewSolve: boolean }
 
     const solveRes = await fetch('/api/dsa/solves')
     if (solveRes.ok) {
       const allSolves: LcSolveWithReviews[] = await solveRes.json()
       const updated = allSolves.find((s) => s.id === id)
-      if (updated) onSolveLogged(updated)
+      if (updated) onSolveLogged(updated, isNewSolve)
     }
   }
 

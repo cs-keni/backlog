@@ -418,5 +418,25 @@ See `docs/CURRENT_TASK.md`. Implementation of fill.ts, types.ts, Sidebar.tsx, fi
 ### Gotchas
 
 - `npm run build` still fails because `node_modules/.bin/next` cannot resolve `../server/require-hook`; direct `node node_modules/next/dist/bin/next build` works.
-- Migration 022 is written but still needs to be applied in Supabase.
-- Phase 8a ownership changed by user routing to Claude Code for the next handoff.
+- User confirmed migration 022 is applied in Supabase.
+
+## 2026-05-21 — Phase 8a DSA counter drift fix (Codex)
+
+### Implemented
+
+- Added `supabase/migrations/024_add_daily_activity.sql` with `daily_activity`, own-row RLS, `(user_id, problem_slug, date)` uniqueness, and an index for new-solve counts.
+- Updated `POST /api/dsa/solves` to write a daily activity row based on whether the `lc_solves` row existed before the upsert.
+- Used duplicate-ignore activity upserts so a same-day re-solve cannot downgrade an earlier `is_new_solve = true` first-solve row.
+- Updated `/dsa` server page to derive `newSolvesToday` from `daily_activity` count for today instead of `lc_solves` timestamps.
+- Updated DSA client solve logging so the UI count increments only when the API returns `isNewSolve: true` for today.
+
+### Checks
+
+- `node node_modules/typescript/lib/tsc.js --noEmit` — passed
+- `node node_modules/vitest/dist/cli.js run --pool=threads src/tests/integration/dsa-solves.test.ts src/tests/unit/dsa-schedule.test.ts src/tests/unit/dsa-recommend.test.ts` — 23 passed
+- `node node_modules/next/dist/bin/next build` — passed
+
+### Gotchas
+
+- Migration 024 is written but still needs to be applied in Supabase.
+- Phase 8b remains Claude-reserved.

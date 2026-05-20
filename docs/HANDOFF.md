@@ -4,6 +4,32 @@
 
 ---
 
+## Session: 2026-05-21 — Phase 8a DSA counter drift fix (Codex)
+
+### What changed
+
+- Added `supabase/migrations/024_add_daily_activity.sql` with `daily_activity`, own-row RLS, and a `(user_id, problem_slug, date)` uniqueness guard.
+- `POST /api/dsa/solves` now records a daily activity row after the `lc_solves` upsert:
+  - first-time problem solve for that date gets `is_new_solve = true`
+  - re-solve gets `is_new_solve = false`
+  - duplicate same-day writes use `ignoreDuplicates` so a true first-solve row is not downgraded by a later re-solve.
+- `/dsa` now derives `newSolvesToday` from `daily_activity` instead of `lc_solves.solved_at` / `created_at`.
+- DSA solve logging passes API-returned `isNewSolve` through to the client count update.
+- User confirmed `022_add_filter_presets.sql` has been applied in Supabase.
+
+### Checks run
+
+- `node node_modules/typescript/lib/tsc.js --noEmit` — passed
+- `node node_modules/vitest/dist/cli.js run --pool=threads src/tests/integration/dsa-solves.test.ts src/tests/unit/dsa-schedule.test.ts src/tests/unit/dsa-recommend.test.ts` — 23 passed
+- `node node_modules/next/dist/bin/next build` — passed
+
+### Known residuals
+
+- Apply `supabase/migrations/024_add_daily_activity.sql` in Supabase before relying on DSA new-today counts in production.
+- Phase 8b remains Claude-reserved.
+
+---
+
 ## Session: 2026-05-20 — Phase 7 job feed presets + abortable fetches (Codex)
 
 ### What changed
@@ -27,8 +53,8 @@
 ### Known residuals
 
 - `npm run build` still fails because the local `node_modules/.bin/next` wrapper cannot resolve `../server/require-hook`; the direct Next entrypoint works.
-- Apply `supabase/migrations/022_add_filter_presets.sql` in Supabase before using saved filter presets in production.
-- Phase 8a is currently Claude-owned per latest routing. Phase 2f/g remains deferred to P3.
+- User confirmed `supabase/migrations/022_add_filter_presets.sql` is applied in Supabase.
+- Phase 2f/g remains deferred to P3.
 
 ---
 

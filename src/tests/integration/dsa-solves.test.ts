@@ -78,12 +78,29 @@ describe('POST /api/dsa/solves', () => {
         }),
       }),
     })
+    // Upsert daily activity
+    const upsertActivity = vi.fn().mockResolvedValue({ error: null })
+    mockFrom.mockReturnValueOnce({ upsert: upsertActivity })
     // Insert reviews
     const insertReviews = vi.fn().mockResolvedValue({ error: null })
     mockFrom.mockReturnValueOnce({ insert: insertReviews })
 
     const res = await POST(makeRequest('POST', VALID_BODY))
     expect(res.status).toBe(201)
+    await expect(res.json()).resolves.toEqual({ id: TEST_SOLVE_ID, isNewSolve: true })
+
+    expect(upsertActivity).toHaveBeenCalledWith(
+      {
+        user_id: TEST_USER.id,
+        problem_slug: VALID_BODY.problem_slug,
+        date: VALID_BODY.solved_at,
+        is_new_solve: true,
+      },
+      {
+        onConflict: 'user_id,problem_slug,date',
+        ignoreDuplicates: true,
+      }
+    )
 
     const insertedRows: { scheduled_for: string }[] = insertReviews.mock.calls[0][0]
     expect(insertedRows).toHaveLength(5)
@@ -122,13 +139,29 @@ describe('POST /api/dsa/solves', () => {
         }),
       }),
     })
+    // Upsert daily activity
+    const upsertActivity = vi.fn().mockResolvedValue({ error: null })
+    mockFrom.mockReturnValueOnce({ upsert: upsertActivity })
     // Insert new reviews
     const insertReviews = vi.fn().mockResolvedValue({ error: null })
     mockFrom.mockReturnValueOnce({ insert: insertReviews })
 
     const res = await POST(makeRequest('POST', VALID_BODY))
     expect(res.status).toBe(201)
+    await expect(res.json()).resolves.toEqual({ id: TEST_SOLVE_ID, isNewSolve: false })
     expect(deletePending).toHaveBeenCalledTimes(1)
+    expect(upsertActivity).toHaveBeenCalledWith(
+      {
+        user_id: TEST_USER.id,
+        problem_slug: VALID_BODY.problem_slug,
+        date: VALID_BODY.solved_at,
+        is_new_solve: false,
+      },
+      {
+        onConflict: 'user_id,problem_slug,date',
+        ignoreDuplicates: true,
+      }
+    )
     expect(insertReviews.mock.calls[0][0]).toHaveLength(5)
   })
 })

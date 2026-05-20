@@ -10,6 +10,7 @@ import { ProblemLogger } from './ProblemLogger'
 
 interface DSAClientProps {
   initialSolves: LcSolveWithReviews[]
+  initialNewSolvesToday: number
 }
 
 type MobileTab = 'today' | 'calendar' | 'problems'
@@ -20,16 +21,12 @@ const MOBILE_TABS: { id: MobileTab; label: string }[] = [
   { id: 'problems', label: 'Problems' },
 ]
 
-export function DSAClient({ initialSolves }: DSAClientProps) {
+export function DSAClient({ initialSolves, initialNewSolvesToday }: DSAClientProps) {
   const today = getTodayLocal()
 
   const [solves, setSolves] = useState<LcSolveWithReviews[]>(initialSolves)
   const [mobileTab, setMobileTab] = useState<MobileTab>('today')
-  const [newSolvesToday, setNewSolvesToday] = useState(() =>
-    initialSolves.filter(s =>
-      s.solved_at === today && new Date(s.created_at).toLocaleDateString('en-CA') === today
-    ).length
-  )
+  const [newSolvesToday, setNewSolvesToday] = useState(initialNewSolvesToday)
 
   const dueCount = useMemo(() => {
     let n = 0
@@ -57,15 +54,13 @@ export function DSAClient({ initialSolves }: DSAClientProps) {
     )
   }, [])
 
-  const handleSolveLogged = useCallback((newSolve: LcSolveWithReviews) => {
-    let isNew = false
+  const handleSolveLogged = useCallback((newSolve: LcSolveWithReviews, isNewSolve: boolean) => {
     setSolves((prev) => {
-      isNew = !prev.some(s => s.problem_slug === newSolve.problem_slug)
       const without = prev.filter((s) => s.problem_slug !== newSolve.problem_slug)
       return [newSolve, ...without]
     })
-    if (isNew) setNewSolvesToday(n => n + 1)
-  }, [])
+    if (isNewSolve && newSolve.solved_at === today) setNewSolvesToday(n => n + 1)
+  }, [today])
 
   const handleReschedule = useCallback(() => {
     const t = getTodayLocal()

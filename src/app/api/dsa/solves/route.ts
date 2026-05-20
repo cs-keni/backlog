@@ -97,6 +97,27 @@ export async function POST(request: Request) {
     return Response.json({ error: 'Failed to save solve' }, { status: 500 })
   }
 
+  const isNewSolve = !existingSolve
+  const { error: activityError } = await supabase
+    .from('daily_activity')
+    .upsert(
+      {
+        user_id: user.id,
+        problem_slug: body.problem_slug,
+        date: body.solved_at,
+        is_new_solve: isNewSolve,
+      },
+      {
+        onConflict: 'user_id,problem_slug,date',
+        ignoreDuplicates: true,
+      }
+    )
+
+  if (activityError) {
+    console.error('[POST /api/dsa/solves] daily activity upsert', activityError)
+    return Response.json({ error: 'Failed to record daily activity' }, { status: 500 })
+  }
+
   // Insert 5 review rows
   const reviewDates = computeReviewDates(body.solved_at)
   const reviews = reviewDates.map((scheduled_for) => ({
@@ -112,5 +133,5 @@ export async function POST(request: Request) {
     return Response.json({ error: 'Failed to schedule reviews' }, { status: 500 })
   }
 
-  return Response.json({ id: solve.id, isNewSolve: !existingSolve }, { status: 201 })
+  return Response.json({ id: solve.id, isNewSolve }, { status: 201 })
 }

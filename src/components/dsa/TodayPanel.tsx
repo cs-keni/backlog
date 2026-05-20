@@ -22,7 +22,7 @@ interface TodayPanelProps {
   today: string
   newSolvesToday: number
   onReviewComplete: (reviewId: string, solveId: string) => void
-  onSolveLogged: (solve: LcSolveWithReviews) => void
+  onSolveLogged: (solve: LcSolveWithReviews, isNewSolve: boolean) => void
   onRescheduleComplete: () => void
 }
 
@@ -106,12 +106,12 @@ export function TodayPanel({
         }),
       })
       if (!res.ok) return
-      const { id } = await res.json()
+      const { id, isNewSolve } = await res.json() as { id: string; isNewSolve: boolean }
       const solveRes = await fetch('/api/dsa/solves')
       if (solveRes.ok) {
         const allSolves: LcSolveWithReviews[] = await solveRes.json()
         const updated = allSolves.find(s => s.id === id)
-        if (updated) onSolveLogged(updated)
+        if (updated) onSolveLogged(updated, isNewSolve)
       }
     } finally {
       setSolvingSlug(null)
