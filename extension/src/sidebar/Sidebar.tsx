@@ -9,24 +9,12 @@ import type {
   FieldAnalysisResult, PageFill, TabSessionState, ScannedField, JobContext,
 } from '../shared/types'
 import { BACKLOG_URL } from '../shared/config'
+import { FillingState, type FillStage } from './FillingState'
+import { ScanPreviewState } from './ScanPreview'
+import { ReviewState } from './ReviewState'
+import { ErrorState, type DebugExport, type DebugField } from './ErrorState'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-
-type FillStage = 'tier1' | 'tier2' | 'answering'
-
-interface DebugField {
-  selector: string
-  label: string
-  fillResult: string
-}
-
-interface DebugExport {
-  ats: string | null
-  pageIndex: number
-  pageUrl: string
-  fields: DebugField[]
-  error?: string
-}
 
 type SidebarState =
   | { status: 'loading' }
@@ -44,12 +32,6 @@ const ATS_LABELS: Record<string, string> = {
   lever: 'Lever',
   workday: 'Workday',
   generic: 'Job page',
-}
-
-const STAGE_LABELS: Record<FillStage, string> = {
-  tier1: 'Filling standard fields…',
-  tier2: 'Enhancing with AI…',
-  answering: 'Drafting answers…',
 }
 
 // ─── Session helpers ──────────────────────────────────────────────────────────
@@ -139,16 +121,6 @@ function buildDebugExport(
     fields,
     ...(error ? { error } : {}),
   }
-}
-
-function downloadDebugExport(debug: DebugExport) {
-  const blob = new Blob([JSON.stringify(debug, null, 2)], { type: 'application/json' })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = `backlog-debug-${new Date().toISOString().replace(/[:.]/g, '-')}.json`
-  a.click()
-  setTimeout(() => URL.revokeObjectURL(url), 1000)
 }
 
 // ─── Sidebar component ────────────────────────────────────────────────────────
@@ -885,228 +857,6 @@ function ScanningState() {
   )
 }
 
-const SOURCE_LABEL: Record<ScannedField['source'], string> = {
-  'automation-id': 'WD',
-  'label': 'label',
-  'aria': 'aria',
-}
-
-const SOURCE_COLOR: Record<ScannedField['source'], string> = {
-  'automation-id': '#6366f1',
-  'label': '#52525b',
-  'aria': '#52525b',
-}
-
-function ScanPreviewState({
-  fields, page, onApply, onCancel,
-}: {
-  fields: ScannedField[]
-  page: PageInfo
-  onApply: () => void
-  onCancel: () => void
-}) {
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <span style={{ fontSize: '12px', fontWeight: 500, color: '#f4f4f5' }}>
-          {fields.length} field{fields.length !== 1 ? 's' : ''} detected
-          {page.ats === 'workday' && (
-            <span style={{ marginLeft: '6px', fontSize: '10px', color: '#6366f1', fontWeight: 400 }}>· Workday</span>
-          )}
-        </span>
-        <button
-          onClick={onCancel}
-          style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '11px', color: '#52525b', padding: 0 }}
-        >
-          ← Back
-        </button>
-      </div>
-
-      {fields.length === 0 ? (
-        <div style={{ background: '#18181b', border: '1px solid #27272a', borderRadius: '6px', padding: '10px 12px' }}>
-          <p style={{ fontSize: '11px', color: '#71717a', margin: 0 }}>
-            No fillable fields detected. The form may still be loading, or this page uses a format we don't recognize yet.
-          </p>
-        </div>
-      ) : (
-        <>
-          <div className="sidebar-scroll" style={{ maxHeight: '240px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '2px' }}>
-            {fields.map((f, i) => (
-              <div key={i} style={{ display: 'flex', gap: '8px', padding: '4px 0', alignItems: 'flex-start', borderBottom: '1px solid #18181b' }}>
-                <span style={{
-                  fontSize: '9px', fontWeight: 600, padding: '1px 4px', borderRadius: '3px',
-                  background: SOURCE_COLOR[f.source] + '22',
-                  color: SOURCE_COLOR[f.source],
-                  flexShrink: 0, marginTop: '1px', letterSpacing: '0.03em',
-                }}>
-                  {SOURCE_LABEL[f.source]}
-                </span>
-                <div style={{ minWidth: 0, flex: 1 }}>
-                  <span style={{ fontSize: '11px', color: '#71717a', textTransform: 'capitalize' }}>{f.label}</span>
-                  <span style={{ fontSize: '11px', color: '#71717a' }}> → </span>
-                  <span style={{ fontSize: '11px', color: '#e4e4e7', wordBreak: 'break-all' }}>{f.value}</span>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          <button
-            onClick={onApply}
-            style={{
-              width: '100%', padding: '10px',
-              background: '#4f46e5', color: '#fff',
-              border: 'none', borderRadius: '8px',
-              fontSize: '13px', fontWeight: 500, cursor: 'pointer',
-              transition: 'background 0.15s',
-            }}
-          >
-            Apply {fields.length} field{fields.length !== 1 ? 's' : ''}
-          </button>
-        </>
-      )}
-
-      <p style={{ fontSize: '10px', color: '#3f3f46', margin: 0 }}>
-        Review values above — click Apply to write to the form.
-        {page.ats === 'workday' && ' Workday dropdown fields are filled after text fields.'}
-      </p>
-    </div>
-  )
-}
-
-function FillingState({ stage, onCancel }: { stage: FillStage; onCancel: () => void }) {
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px', padding: '20px 0' }}>
-      <span className="bl-spin" style={{
-        display: 'inline-block', width: '20px', height: '20px',
-        border: '2px solid #27272a', borderTopColor: '#6366f1', borderRadius: '50%',
-      }} />
-      <p style={{ fontSize: '12px', color: '#71717a', margin: 0, textAlign: 'center' }}>
-        {STAGE_LABELS[stage]}
-      </p>
-      {stage === 'tier2' && (
-        <p style={{ fontSize: '11px', color: '#52525b', margin: 0, textAlign: 'center', maxWidth: '220px' }}>
-          Analyzing fields that couldn't be matched automatically…
-        </p>
-      )}
-      <button
-        onClick={onCancel}
-        style={{
-          marginTop: '4px',
-          background: 'none', border: '1px solid #3f3f46',
-          borderRadius: '6px', padding: '4px 12px',
-          fontSize: '11px', color: '#71717a', cursor: 'pointer',
-        }}
-      >
-        Cancel
-      </button>
-    </div>
-  )
-}
-
-function ReviewState({
-  filled, skipped, aiUnavailable, debug, onDone,
-}: {
-  filled: FilledField[]
-  skipped: SkippedField[]
-  aiUnavailable: boolean
-  debug: DebugExport | null
-  onDone: () => void
-}) {
-  // Detect the next/continue button once when the review panel mounts.
-  // useState initializer runs once — safe to call DOM APIs here.
-  const [pageType] = useState(() => detectPageType())
-
-  const handleContinue = () => {
-    if (pageType.hasNextButton) {
-      detectNextButton()?.click()
-    }
-    onDone()
-  }
-
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <span style={{ fontSize: '12px', fontWeight: 500, color: '#f4f4f5' }}>
-          {filled.length} field{filled.length !== 1 ? 's' : ''} filled
-        </span>
-        <button
-          onClick={onDone}
-          style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '11px', color: '#52525b', padding: 0 }}
-        >
-          ← Back
-        </button>
-      </div>
-
-      {aiUnavailable && (
-        <div style={{ background: '#18181b', border: '1px solid #27272a', borderRadius: '6px', padding: '8px 10px' }}>
-          <p style={{ fontSize: '11px', color: '#71717a', margin: 0 }}>
-            AI analysis unavailable — filled with profile data only.
-          </p>
-        </div>
-      )}
-
-      {filled.length > 0 && (
-        <div className="sidebar-scroll" style={{ maxHeight: '200px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '2px' }}>
-          {filled.map((f, i) => (
-            <div key={i} style={{ display: 'flex', gap: '8px', padding: '3px 0', alignItems: 'flex-start' }}>
-              <span style={{ color: '#34d399', fontSize: '11px', flexShrink: 0, marginTop: '1px' }}>✓</span>
-              <div style={{ minWidth: 0 }}>
-                <span style={{ fontSize: '11px', color: '#71717a' }}>{f.label}: </span>
-                <span style={{ fontSize: '11px', color: '#e4e4e7', wordBreak: 'break-all' }}>{f.value}</span>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {skipped.length > 0 && (
-        <div style={{ background: '#18181b', border: '1px solid #27272a', borderRadius: '6px', padding: '8px 10px' }}>
-          <p style={{ fontSize: '10px', fontWeight: 600, color: '#52525b', textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 6px' }}>
-            Needs manual input
-          </p>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
-            {skipped.map((f, i) => (
-              <div key={i} style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
-                <span style={{ color: '#52525b', fontSize: '11px', flexShrink: 0 }}>○</span>
-                <div>
-                  <span style={{ fontSize: '11px', color: '#71717a' }}>{f.label}: </span>
-                  <span style={{ fontSize: '11px', color: '#52525b' }}>{f.reason}</span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {pageType.hasNextButton ? (
-        <button
-          onClick={handleContinue}
-          style={{
-            width: '100%',
-            padding: '8px 0',
-            background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
-            border: 'none',
-            borderRadius: '6px',
-            color: '#fff',
-            fontSize: '12px',
-            fontWeight: 600,
-            cursor: 'pointer',
-            letterSpacing: '0.01em',
-          }}
-        >
-          {pageType.nextButtonText ?? 'Continue'} →
-        </button>
-      ) : (
-        <p style={{ fontSize: '11px', color: '#52525b', margin: 0 }}>
-          Review the form, then submit when ready.
-        </p>
-      )}
-
-      {debug && <DebugExportButton debug={debug} />}
-    </div>
-  )
-}
-
 function AddedState({ duplicate }: { duplicate: boolean }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', padding: '24px 0', textAlign: 'center' }}>
@@ -1188,41 +938,6 @@ function NoKeyState({ onConnected }: { onConnected: () => void }) {
         }}
       >
         {saving ? 'Connecting…' : 'Connect'}
-      </button>
-    </div>
-  )
-}
-
-function DebugExportButton({ debug }: { debug: DebugExport }) {
-  return (
-    <button
-      onClick={() => downloadDebugExport(debug)}
-      style={{
-        width: '100%',
-        padding: '7px 0',
-        background: 'transparent',
-        border: '1px solid #27272a',
-        borderRadius: '6px',
-        color: '#71717a',
-        fontSize: '11px',
-        cursor: 'pointer',
-      }}
-    >
-      Export debug JSON
-    </button>
-  )
-}
-
-function ErrorState({ message, debug, onRetry }: { message: string; debug: DebugExport | null; onRetry: () => void }) {
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '4px 0' }}>
-      <p style={{ fontSize: '12px', color: '#f87171', margin: 0 }}>{message}</p>
-      {debug && <DebugExportButton debug={debug} />}
-      <button
-        onClick={onRetry}
-        style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '11px', color: '#71717a', padding: 0, textDecoration: 'underline', textAlign: 'left' }}
-      >
-        Try again
       </button>
     </div>
   )

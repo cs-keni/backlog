@@ -4,6 +4,10 @@ import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import type { StarResponse } from '@/lib/jobs/types'
 import type { InterviewGuide, InterviewQuestion } from '@/lib/llm/question-generator'
+import { CulturalSignals } from './CulturalSignals'
+import { QuestionList } from './QuestionList'
+import { QuestionsToAsk } from './QuestionsToAsk'
+import type { StoryMatch } from './StoryMatch'
 
 interface QuestionBankProps {
   companyId: string
@@ -11,15 +15,6 @@ interface QuestionBankProps {
   savedResponses: StarResponse[]
   storyMatches?: StoryMatch[] // stories from story bank, pre-filtered by theme
   onResponseSaved: (response: StarResponse) => void
-}
-
-export interface StoryMatch {
-  id: string
-  title: string
-  theme: string
-  situation: string | null
-  action: string | null
-  result: string | null
 }
 
 interface LegacyResponse {
@@ -208,25 +203,18 @@ export function QuestionBank({
         {allEmpty ? (
           <p className="text-xs text-zinc-600">No questions available — this company may not have enough job data yet.</p>
         ) : (
-          <>
-            {legacyBehavioral.length > 0 && (
-              <div className="space-y-2">
-                <p className="text-xs font-medium text-zinc-500">Behavioral</p>
-                {legacyBehavioral.map((q, i) => (
-                  <LegacyQuestionRow key={i} question={q} hasSaved={hasSaved(q)} isActive={draft?.question === q} onDraft={() => draft?.question === q ? setDraft(null) : openDraft(q)} />
-                ))}
-              </div>
-            )}
-            {legacyTechnical.length > 0 && (
-              <div className="space-y-2">
-                <p className="text-xs font-medium text-zinc-500">Technical</p>
-                {legacyTechnical.map((q, i) => (
-                  <LegacyQuestionRow key={i} question={q} hasSaved={hasSaved(q)} isActive={draft?.question === q} onDraft={() => draft?.question === q ? setDraft(null) : openDraft(q)} />
-                ))}
-              </div>
-            )}
-            <StarDraftPanel draft={draft} onGenerate={handleGenerate} onSave={handleSave} onChange={setDraft} onClose={() => setDraft(null)} />
-          </>
+          <QuestionList
+            guide={null}
+            legacyBehavioral={legacyBehavioral}
+            legacyTechnical={legacyTechnical}
+            draft={draft}
+            storyMatches={storyMatches}
+            hasSaved={hasSaved}
+            openDraft={openDraft}
+            setDraft={setDraft}
+            onGenerate={handleGenerate}
+            onSave={handleSave}
+          />
         )}
       </section>
     )
@@ -272,130 +260,27 @@ export function QuestionBank({
             transition={{ duration: 0.15 }}
             className="space-y-4"
           >
-            {guide.behavioral_questions.length > 0 && (
-              <div className="space-y-2">
-                <p className="text-xs font-medium text-zinc-500">Behavioral</p>
-                {guide.behavioral_questions.map((q, i) => (
-                  <RichQuestionRow
-                    key={i}
-                    q={q}
-                    hasSaved={hasSaved(q.question)}
-                    isActive={draft?.question === q.question}
-                    storyMatches={storyMatches}
-                    onDraft={() => draft?.question === q.question ? setDraft(null) : openDraft(q.question)}
-                  />
-                ))}
-              </div>
-            )}
-
-            {guide.technical_questions.length > 0 && (
-              <div className="space-y-2">
-                <p className="text-xs font-medium text-zinc-500">Technical</p>
-                {guide.technical_questions.map((q, i) => (
-                  <RichQuestionRow
-                    key={i}
-                    q={q}
-                    hasSaved={hasSaved(q.question)}
-                    isActive={draft?.question === q.question}
-                    storyMatches={[]} // story bank is behavioral only
-                    onDraft={() => draft?.question === q.question ? setDraft(null) : openDraft(q.question)}
-                  />
-                ))}
-              </div>
-            )}
-
-            <StarDraftPanel draft={draft} onGenerate={handleGenerate} onSave={handleSave} onChange={setDraft} onClose={() => setDraft(null)} />
+            <QuestionList
+              guide={guide}
+              legacyBehavioral={[]}
+              legacyTechnical={[]}
+              draft={draft}
+              storyMatches={storyMatches}
+              hasSaved={hasSaved}
+              openDraft={openDraft}
+              setDraft={setDraft}
+              onGenerate={handleGenerate}
+              onSave={handleSave}
+            />
           </motion.div>
         )}
 
         {activeTab === 'overview' && (
-          <motion.div
-            key="overview"
-            initial={{ opacity: 0, y: 4 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.15 }}
-            className="space-y-4"
-          >
-            {guide.overview && (
-              <p className="text-xs text-zinc-400 leading-relaxed">{guide.overview}</p>
-            )}
-
-            {guide.rounds.length > 0 && (
-              <div className="space-y-2">
-                <p className="text-xs font-medium text-zinc-500 uppercase tracking-wide">Rounds</p>
-                {guide.rounds.map((round, i) => (
-                  <div key={i} className="flex gap-3 rounded-lg border border-zinc-800 bg-zinc-900/50 px-3 py-2.5">
-                    <span className="text-xs text-zinc-600 shrink-0 w-4 mt-0.5">{i + 1}.</span>
-                    <div>
-                      <p className="text-xs font-medium text-zinc-300">{round.name}</p>
-                      <p className="text-xs text-zinc-500 mt-0.5">{round.focus}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {guide.questions_to_ask.length > 0 && (
-              <div className="space-y-2">
-                <p className="text-xs font-medium text-zinc-500 uppercase tracking-wide">Ask Your Interviewer</p>
-                {guide.questions_to_ask.map((q, i) => (
-                  <div key={i} className="rounded-lg border border-zinc-800/60 bg-zinc-900/30 px-3 py-2.5">
-                    <p className="text-xs text-zinc-400 leading-relaxed">{q}</p>
-                  </div>
-                ))}
-              </div>
-            )}
-          </motion.div>
+          <QuestionsToAsk guide={guide} />
         )}
 
         {activeTab === 'culture' && (
-          <motion.div
-            key="culture"
-            initial={{ opacity: 0, y: 4 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.15 }}
-            className="space-y-4"
-          >
-            {guide.cultural_signals.values.length > 0 && (
-              <div className="space-y-2">
-                <p className="text-xs font-medium text-zinc-500 uppercase tracking-wide">Core Values They Screen For</p>
-                <div className="flex flex-wrap gap-1.5">
-                  {guide.cultural_signals.values.map((v, i) => (
-                    <span key={i} className="px-2 py-0.5 rounded-full bg-zinc-800 text-xs text-zinc-300 border border-zinc-700">
-                      {v}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {guide.cultural_signals.terminology.length > 0 && (
-              <div className="space-y-2">
-                <p className="text-xs font-medium text-zinc-500 uppercase tracking-wide">Know These Terms</p>
-                <div className="flex flex-wrap gap-1.5">
-                  {guide.cultural_signals.terminology.map((t, i) => (
-                    <span key={i} className="px-2 py-0.5 rounded-full bg-zinc-900 border border-zinc-800 text-xs text-zinc-400">
-                      {t}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {guide.cultural_signals.avoid.length > 0 && (
-              <div className="space-y-2">
-                <p className="text-xs font-medium text-zinc-500 uppercase tracking-wide">Anti-Patterns to Avoid</p>
-                {guide.cultural_signals.avoid.map((a, i) => (
-                  <div key={i} className="flex gap-2 rounded-lg border border-red-900/30 bg-red-950/20 px-3 py-2">
-                    <span className="text-red-500 text-xs shrink-0 mt-0.5">✕</span>
-                    <p className="text-xs text-zinc-400 leading-relaxed">{a}</p>
-                  </div>
-                ))}
-              </div>
-            )}
-          </motion.div>
+          <CulturalSignals guide={guide} />
         )}
       </AnimatePresence>
     </section>

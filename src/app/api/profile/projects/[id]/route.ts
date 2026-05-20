@@ -27,11 +27,18 @@ export async function PATCH(
   if ('end_date' in body) updates.end_date = typeof body.end_date === 'string' ? body.end_date || null : null
   if ('is_current' in body) updates.is_current = body.is_current === true
 
+  const { data: ownerRow, error: ownerError } = await supabase
+    .from('projects')
+    .select('user_id')
+    .eq('id', id)
+    .single()
+  if (ownerError || !ownerRow) return Response.json({ error: 'Not found' }, { status: 404 })
+  if (ownerRow.user_id !== user.id) return Response.json({ error: 'Forbidden' }, { status: 403 })
+
   const { data, error } = await supabase
     .from('projects')
     .update(updates)
     .eq('id', id)
-    .eq('user_id', user.id)
     .select('*')
     .single()
 
@@ -52,11 +59,18 @@ export async function DELETE(
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 })
 
+  const { data: ownerRow, error: ownerError } = await supabase
+    .from('projects')
+    .select('user_id')
+    .eq('id', id)
+    .single()
+  if (ownerError || !ownerRow) return Response.json({ error: 'Not found' }, { status: 404 })
+  if (ownerRow.user_id !== user.id) return Response.json({ error: 'Forbidden' }, { status: 403 })
+
   const { error } = await supabase
     .from('projects')
     .delete()
     .eq('id', id)
-    .eq('user_id', user.id)
 
   if (error) {
     console.error('[DELETE /api/profile/projects/[id]]', error)

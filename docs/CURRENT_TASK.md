@@ -51,10 +51,10 @@ Suggested order: 3a → 3b → 4 → 5 → 6 → 2f/g → 8b → 9
 |-------|-------|--------|
 | **Phase 3a** — Tracker integration tests | Codex | implemented |
 | **Phase 3b** — Bulk action bar UI (floating action bar, portal, Framer Motion) | **Claude Code** | implemented |
-| **Phase 4** — Analytics decomposition + company graph skeleton | Codex | not started |
-| **Phase 5** — Prep decomposition + re-enrich button | Codex | not started |
-| **Phase 6** — Profile security (scoped SELECT + ownership tests) | Codex | not started |
-| **Phase 2f/g** — fill.ts + Sidebar.tsx decomposition | Codex | not started |
+| **Phase 4** — Analytics decomposition + company graph skeleton | Codex | implemented |
+| **Phase 5** — Prep decomposition + re-enrich button | Codex | implemented |
+| **Phase 6** — Profile security (scoped SELECT + ownership tests) | Codex | implemented |
+| **Phase 2f/g** — fill.ts + Sidebar.tsx decomposition | Codex | implemented |
 | **Phase 8b** — Easy/Hard SR buttons (300ms flash state machine, migration 023) | **Claude Code** | not started |
 | **Phase 9** — E2E tests (Playwright global setup) | Codex | not started |
 

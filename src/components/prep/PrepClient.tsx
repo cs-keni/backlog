@@ -126,6 +126,8 @@ function PrepView({ jobId }: PrepViewProps) {
   const [starResponses, setStarResponses] = useState<StarResponse[]>([])
   const [enriching, setEnriching] = useState(false)
   const [companyProfile, setCompanyProfile] = useState<CompanyProfile | null>(null)
+  const [refreshingCompany, setRefreshingCompany] = useState(false)
+  const [refreshError, setRefreshError] = useState<string | null>(null)
 
   useEffect(() => {
     fetch(`/api/jobs/${jobId}`)
@@ -148,6 +150,29 @@ function PrepView({ jobId }: PrepViewProps) {
       .catch(() => {})
       .finally(() => setLoading(false))
   }, [jobId])
+
+  async function handleRefreshCompany() {
+    if (!job?.company_id) return
+    setRefreshingCompany(true)
+    setRefreshError(null)
+    try {
+      const res = await fetch(`/api/company/${job.company_id}/enrich`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ force: true }),
+      })
+      const payload = await res.json().catch(() => null) as CompanyProfile | { error?: string } | null
+      if (!res.ok) {
+        setRefreshError((payload && 'error' in payload && payload.error) || 'Refresh failed - try again later')
+        return
+      }
+      setCompanyProfile(payload as CompanyProfile)
+    } catch {
+      setRefreshError('Refresh failed - try again later')
+    } finally {
+      setRefreshingCompany(false)
+    }
+  }
 
   useEffect(() => {
     if (!job?.company_id) return
@@ -191,7 +216,13 @@ function PrepView({ jobId }: PrepViewProps) {
 
       {/* Company intelligence */}
       {companyProfile && (
-        <CompanyIntelligence company={companyProfile} enriching={enriching} />
+        <CompanyIntelligence
+          company={companyProfile}
+          enriching={enriching}
+          refreshState={refreshingCompany ? 'refreshing' : 'idle'}
+          refreshError={refreshError}
+          onRefresh={handleRefreshCompany}
+        />
       )}
 
       {/* Materials */}

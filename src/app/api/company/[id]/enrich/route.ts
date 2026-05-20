@@ -7,7 +7,7 @@ import { enrichCompany } from '@/lib/llm/company-enricher'
 const FULL_SELECT = 'id, name, description, mission, notable_products, website_url, headcount_range, funding_stage, tech_stack, enriched_at'
 
 export async function POST(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const supabase = await createClient()
@@ -15,6 +15,13 @@ export async function POST(
   if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 })
 
   const { id } = await params
+  let force = false
+  try {
+    const body = await request.json() as { force?: unknown }
+    force = body.force === true
+  } catch {
+    force = false
+  }
 
   const { data: company } = await supabase
     .from('company_profiles')
@@ -24,8 +31,18 @@ export async function POST(
 
   if (!company) return Response.json({ error: 'Company not found' }, { status: 404 })
 
-  if (company.enriched_at) {
+  if (company.enriched_at && !force) {
     return Response.json(company)
+  }
+  if (company.enriched_at && force) {
+    const enrichedAt = new Date(company.enriched_at).getTime()
+    const cooldownMs = 24 * 60 * 60 * 1000
+    if (Date.now() - enrichedAt < cooldownMs) {
+      return Response.json(
+        { error: 'Company data was refreshed recently - try again tomorrow' },
+        { status: 429 }
+      )
+    }
   }
 
   // Fetch up to 5 recent jobs — include URL for website extraction

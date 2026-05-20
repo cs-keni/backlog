@@ -26,6 +26,42 @@
 
 ---
 
+## Session: 2026-05-20 — Phases 4, 5, 6, 2f/g (Codex)
+
+### What changed
+
+- Phase 4:
+  - Split analytics UI out of `src/app/(app)/analytics/page.tsx` into focused components under `src/components/analytics`.
+  - Moved company graph data fetch into the analytics page and made `CompanyGraph` render from provided data.
+  - Added graph ghost-node loading/simulation-settling skeleton and fade-in after `onEngineStop`.
+  - Added company graph Jaccard integration coverage.
+- Phase 5:
+  - Split question-bank UI into `QuestionList`, `CulturalSignals`, `QuestionsToAsk`, and `StoryMatch` components.
+  - Added force re-enrich support to `POST /api/company/[id]/enrich` with a 24-hour cooldown.
+  - Added “Refresh company data” UI in Prep with loading and cooldown/error messaging.
+- Phase 6:
+  - Replaced extension profile `select('*')` with an explicit profile column list.
+  - Added explicit owner SELECT checks before PATCH/DELETE for work history, education, projects, and saved answers.
+  - Added profile mutation integration tests, including resume upload text persistence and match-score invalidation.
+- Phase 2f/g:
+  - Extracted extension fill helpers into `fill-address.ts` and `fill-fields.ts`.
+  - Extracted sidebar scan preview, filling, review, and error/debug export states into separate sidebar modules.
+
+### Checks run
+
+- `node node_modules/typescript/lib/tsc.js --noEmit` — passed
+- `node node_modules/vitest/dist/cli.js run --pool=threads src/tests/integration/analytics.test.ts src/tests/integration/profile.test.ts src/tests/integration/applications.test.ts` — 28 passed
+- `cd extension && node ../node_modules/vitest/dist/cli.js run src/content/fill.test.ts src/content/fill-workday.test.ts src/background/fill-proxy.test.ts --pool=threads` — 59 passed
+- `cd extension && node node_modules/vite/dist/node/cli.js build && node node_modules/vite/dist/node/cli.js build --config vite.sidebar.config.ts` — passed
+- `node node_modules/next/dist/bin/next build` — passed
+
+### Known residuals
+
+- Phase 8b remains Claude-reserved.
+- Phase 9 E2E infrastructure/tests remain for Codex.
+
+---
+
 ## End-of-day wrap — 2026-05-21 (Claude Code)
 
 ### State check

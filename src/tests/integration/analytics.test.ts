@@ -17,6 +17,7 @@ vi.mock('@/lib/supabase/server', () => ({
 
 import { createClient } from '@/lib/supabase/server'
 import { GET } from '@/app/api/analytics/route'
+import { GET as companyGraphGET } from '@/app/api/analytics/company-graph/route'
 
 const TEST_USER = { id: 'user-1', email: 'test@example.com' }
 
@@ -157,6 +158,62 @@ describe('GET /api/analytics', () => {
         responseRate: 100,
         interviewRate: 100,
       },
+    ])
+  })
+})
+
+describe('GET /api/analytics/company-graph', () => {
+  beforeEach(() => {
+    vi.resetAllMocks()
+    mockFrom.mockReset()
+    mockGetUser.mockReset()
+    vi.mocked(createClient).mockResolvedValue(mockSupabase as never)
+    mockGetUser.mockResolvedValue({ data: { user: TEST_USER } })
+  })
+
+  it('returns company nodes and Jaccard edges', async () => {
+    const jobs = [
+      { company: 'Alpha', company_id: 'co-alpha', tags: ['react', 'typescript', 'node'] },
+      { company: 'Alpha', company_id: 'co-alpha', tags: ['react'] },
+      { company: 'Beta', company_id: 'co-beta', tags: ['react', 'typescript', 'python'] },
+      { company: 'Gamma', company_id: 'co-gamma', tags: ['go'] },
+    ]
+    const apps = [
+      { status: 'technical', jobs: { company: 'Alpha' } },
+      { status: 'saved', jobs: { company: 'Beta' } },
+    ]
+
+    mockFrom.mockImplementation((table: string) => {
+      if (table === 'jobs') {
+        return {
+          select: vi.fn().mockReturnValue({
+            eq: vi.fn().mockReturnValue({
+              gte: vi.fn().mockResolvedValue({ data: jobs, error: null }),
+            }),
+          }),
+        }
+      }
+      if (table === 'applications') {
+        return {
+          select: vi.fn().mockReturnValue({
+            eq: vi.fn().mockResolvedValue({ data: apps, error: null }),
+          }),
+        }
+      }
+      throw new Error(`Unexpected table: ${table}`)
+    })
+
+    const res = await companyGraphGET()
+    expect(res.status).toBe(200)
+    const json = await res.json()
+
+    expect(json.nodes).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: 'co-alpha', name: 'Alpha', roleCount: 2, applicationStatus: 'technical' }),
+      expect.objectContaining({ id: 'co-beta', name: 'Beta', roleCount: 1, applicationStatus: 'saved' }),
+      expect.objectContaining({ id: 'co-gamma', name: 'Gamma', roleCount: 1, applicationStatus: null }),
+    ]))
+    expect(json.edges).toEqual([
+      { source: 'co-alpha', target: 'co-beta', weight: 0.5 },
     ])
   })
 })

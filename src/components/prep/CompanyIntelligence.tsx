@@ -5,9 +5,18 @@ import type { CompanyProfile } from '@/lib/jobs/types'
 interface CompanyIntelligenceProps {
   company: CompanyProfile
   enriching?: boolean
+  refreshState?: 'idle' | 'refreshing'
+  refreshError?: string | null
+  onRefresh?: () => void
 }
 
-export function CompanyIntelligence({ company, enriching = false }: CompanyIntelligenceProps) {
+export function CompanyIntelligence({
+  company,
+  enriching = false,
+  refreshState = 'idle',
+  refreshError = null,
+  onRefresh,
+}: CompanyIntelligenceProps) {
   const glassdoorUrl = `https://www.glassdoor.com/Search/Results.htm?keyword=${encodeURIComponent(company.name)}`
   const linkedinUrl = `https://www.linkedin.com/search/results/companies/?keywords=${encodeURIComponent(company.name)}`
 
@@ -22,6 +31,21 @@ export function CompanyIntelligence({ company, enriching = false }: CompanyIntel
         <div className="flex items-center justify-between gap-3 px-4 py-3">
           <p className="text-sm font-semibold text-zinc-100">{company.name}</p>
           <div className="flex items-center gap-3 shrink-0">
+            {onRefresh && (
+              <button
+                onClick={onRefresh}
+                disabled={refreshState === 'refreshing'}
+                className="inline-flex items-center gap-1.5 text-xs text-zinc-500 hover:text-zinc-300 transition-colors disabled:opacity-50"
+              >
+                {refreshState === 'refreshing' && (
+                  <svg className="animate-spin h-3 w-3" viewBox="0 0 24 24" fill="none">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                  </svg>
+                )}
+                Refresh company data
+              </button>
+            )}
             {company.website_url && (
               <a
                 href={company.website_url}
@@ -50,6 +74,11 @@ export function CompanyIntelligence({ company, enriching = false }: CompanyIntel
             </a>
           </div>
         </div>
+        {refreshError && (
+          <div className="px-4 py-2 border-t border-zinc-800">
+            <p className="text-xs text-amber-400">{refreshError}</p>
+          </div>
+        )}
 
         {/* Intelligence body */}
         {enriching && !hasContent ? (

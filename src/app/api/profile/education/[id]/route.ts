@@ -22,11 +22,18 @@ export async function PATCH(
     if (key in body) updates[key] = body[key]
   }
 
+  const { data: ownerRow, error: ownerError } = await supabase
+    .from('education')
+    .select('user_id')
+    .eq('id', id)
+    .single()
+  if (ownerError || !ownerRow) return Response.json({ error: 'Not found' }, { status: 404 })
+  if (ownerRow.user_id !== user.id) return Response.json({ error: 'Forbidden' }, { status: 403 })
+
   const { data, error } = await supabase
     .from('education')
     .update(updates)
     .eq('id', id)
-    .eq('user_id', user.id)
     .select('*')
     .single()
 
@@ -43,11 +50,18 @@ export async function DELETE(
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 })
 
+  const { data: ownerRow, error: ownerError } = await supabase
+    .from('education')
+    .select('user_id')
+    .eq('id', id)
+    .single()
+  if (ownerError || !ownerRow) return Response.json({ error: 'Not found' }, { status: 404 })
+  if (ownerRow.user_id !== user.id) return Response.json({ error: 'Forbidden' }, { status: 403 })
+
   const { error } = await supabase
     .from('education')
     .delete()
     .eq('id', id)
-    .eq('user_id', user.id)
 
   if (error) return Response.json({ error: 'Delete failed' }, { status: 500 })
   return new Response(null, { status: 204 })

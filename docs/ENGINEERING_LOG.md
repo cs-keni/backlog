@@ -504,3 +504,29 @@ See `docs/CURRENT_TASK.md`. Implementation of fill.ts, types.ts, Sidebar.tsx, fi
 
 - Extension-created job stubs still use `source: 'manual'` because migration 019 and the app type union only allow `github | portal | manual`; analytics already presents manual as pasted URLs or extension.
 - Playwright rollback coverage remains for the later E2E phase.
+
+## 2026-05-20 — Phases 4, 5, 6, 2f/g (Codex)
+
+### Implemented
+
+- Analytics UI split into focused `src/components/analytics/*` modules; analytics page now owns both analytics and company graph fetches.
+- `CompanyGraph` now renders a graph-specific ghost-node skeleton during data load/simulation settle and fades the canvas in after `onEngineStop`.
+- Prep question bank split into `QuestionList`, `CulturalSignals`, `QuestionsToAsk`, and `StoryMatch` modules.
+- Company enrich endpoint accepts `{ force: true }`, bypasses the stale-data short circuit, and returns 429 when refreshed within the last 24 hours.
+- Prep company panel has a refresh button with loading and inline cooldown/error states.
+- Extension profile endpoint no longer uses `select('*')`; it selects only the fields needed by the extension.
+- Work history, education, projects, and saved answers PATCH/DELETE routes explicitly read `user_id` before mutation and return 403 for foreign rows.
+- Extension fill helpers split into `fill-address.ts` and `fill-fields.ts`; sidebar scan/fill/review/error states split into separate modules.
+
+### Checks
+
+- `node node_modules/typescript/lib/tsc.js --noEmit` — passed
+- `node node_modules/vitest/dist/cli.js run --pool=threads src/tests/integration/analytics.test.ts src/tests/integration/profile.test.ts src/tests/integration/applications.test.ts` — 28 passed
+- `cd extension && node ../node_modules/vitest/dist/cli.js run src/content/fill.test.ts src/content/fill-workday.test.ts src/background/fill-proxy.test.ts --pool=threads` — 59 passed
+- `cd extension && node node_modules/vite/dist/node/cli.js build && node node_modules/vite/dist/node/cli.js build --config vite.sidebar.config.ts` — passed
+- `node node_modules/next/dist/bin/next build` — passed
+
+### Gotchas
+
+- The profile ownership checks intentionally query by raw row id before mutation instead of relying on `.eq('user_id', user.id)` filtering, so foreign-row attempts return 403 rather than RLS-style 404.
+- The resume route test uses a mocked Request-like object for `formData()` because jsdom/FormData can produce a different Blob realm than the route’s `instanceof Blob` check.

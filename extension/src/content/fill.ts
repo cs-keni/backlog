@@ -2,101 +2,15 @@ import type { FullProfile, FilledField, SkippedField, FillResult, AtsType, Unfil
 import { queryShadowAll, queryShadowScoped } from '../shared/domUtils'
 import { fillWorkdayCombobox, waitForChildListChange } from './fill-workday'
 import { fetchApplicationForJob } from '../shared/api'
+import { getFullAddress, getProfileAddress, parseAddress } from './fill-address'
+import { getLabelForInput, setNativeValue, setSelectValue } from './fill-fields'
+export { parseAddress } from './fill-address'
+export { getLabelForInput } from './fill-fields'
 
 // ─── Input value setter ───────────────────────────────────────────────────────
 // Works for standard inputs and React/Angular controlled inputs by dispatching
 // the native input + change + blur events that frameworks listen to.
 // blur is required for ATS platforms (Lever, AshbyHQ) that validate on focus loss.
-
-function setNativeValue(input: HTMLInputElement | HTMLTextAreaElement, value: string) {
-  const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
-    input instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype,
-    'value'
-  )?.set
-  nativeInputValueSetter?.call(input, value)
-  input.dispatchEvent(new Event('input', { bubbles: true }))
-  input.dispatchEvent(new Event('change', { bubbles: true }))
-  input.dispatchEvent(new Event('blur', { bubbles: true }))
-}
-
-function setSelectValue(select: HTMLSelectElement, value: string) {
-  const normalized = value.trim().toLowerCase()
-  const option =
-    // Exact text or value match
-    Array.from(select.options).find((o) => o.text.trim() === value || o.value === value) ??
-    // Case-insensitive exact
-    Array.from(select.options).find((o) => o.text.trim().toLowerCase() === normalized) ??
-    // Case-insensitive starts-with (avoids "OR" matching "Oregon")
-    Array.from(select.options).find((o) => o.text.trim().toLowerCase().startsWith(normalized)) ??
-    // Case-insensitive contains (last resort)
-    Array.from(select.options).find((o) => o.text.trim().toLowerCase().includes(normalized) && normalized.length > 2)
-  if (option) {
-    select.value = option.value
-    select.dispatchEvent(new Event('change', { bubbles: true }))
-    select.dispatchEvent(new Event('blur', { bubbles: true }))
-  }
-}
-
-// ─── Address parser ───────────────────────────────────────────────────────────
-// Handles the two common US formats stored in profile.user.address:
-//   "6925 SE 152nd Ave., Portland, OR 97236"  (3-part: street, city, ST ZIP)
-//   "Portland, OR 97236"                       (2-part: city, ST ZIP)
-// Falls back gracefully when format doesn't match (international addresses, etc.)
-
-interface ParsedAddress {
-  street: string | null
-  city: string | null
-  state: string | null
-  zip: string | null
-}
-
-export function parseAddress(address: string): ParsedAddress {
-  const parts = address.split(',').map((s) => s.trim()).filter(Boolean)
-  const parseStateZip = (s: string) => {
-    const m = s.match(/^([A-Z]{2})\s+(\d{5}(?:-\d{4})?)$/)
-    return m ? { state: m[1], zip: m[2] } : null
-  }
-
-  if (parts.length >= 3) {
-    // "Street, City, ST ZIP" — the last part may be "ST ZIP" or just "ZIP" after a separate state
-    const stateZip = parseStateZip(parts[parts.length - 1])
-    if (stateZip) {
-      return { street: parts[0], city: parts[1], ...stateZip }
-    }
-    // "Street, City, State, ZIP" — 4 explicit parts
-    if (parts.length >= 4) {
-      return { street: parts[0], city: parts[1], state: parts[2], zip: parts[3] }
-    }
-    return { street: parts[0], city: parts[1], state: parts[2], zip: null }
-  }
-
-  if (parts.length === 2) {
-    // "City, ST ZIP"
-    const stateZip = parseStateZip(parts[1])
-    if (stateZip) return { street: null, city: parts[0], ...stateZip }
-    return { street: null, city: parts[0], state: parts[1], zip: null }
-  }
-
-  return { street: null, city: parts[0] ?? null, state: null, zip: null }
-}
-
-function getProfileAddress(profile: FullProfile): ParsedAddress {
-  const fallback = parseAddress(profile.user.address ?? '')
-  return {
-    street: profile.user.street_address || fallback.street,
-    city: profile.user.city || fallback.city,
-    state: profile.user.state || fallback.state,
-    zip: profile.user.postal_code || fallback.zip,
-  }
-}
-
-function getFullAddress(profile: FullProfile): string | null {
-  const { street, city, state, zip } = getProfileAddress(profile)
-  if (street && city && state && zip) return `${street}, ${city}, ${state} ${zip}`
-  if (city && state && zip) return `${city}, ${state} ${zip}`
-  if (city && state) return `${city}, ${state}`
-  return profile.user.address
-}
 
 // ─── Visibility check ─────────────────────────────────────────────────────────
 // Skips hidden, disabled, readonly, or zero-size inputs to avoid filling
@@ -119,76 +33,6 @@ export function isElementFillable(el: HTMLElement): boolean {
 }
 
 // ─── Label extraction ─────────────────────────────────────────────────────────
-
-export function getLabelForInput(input: Element): string {
-  // 1. <label for="id">
-  if (input.id) {
-    const label = document.querySelector(`label[for="${input.id}"]`)
-    if (label) return label.textContent?.trim().toLowerCase() ?? ''
-  }
-  // 2. aria-labelledby
-  const labelledBy = input.getAttribute('aria-labelledby')
-  if (labelledBy) {
-    const el = document.getElementById(labelledBy)
-    if (el) return el.textContent?.trim().toLowerCase() ?? ''
-  }
-  // 3. Wrapping <label>
-  const parentLabel = input.closest('label')
-  if (parentLabel) return parentLabel.textContent?.trim().toLowerCase() ?? ''
-  // 4. Previous sibling label
-  const prev = input.previousElementSibling
-  if (prev?.tagName === 'LABEL') return prev.textContent?.trim().toLowerCase() ?? ''
-  // 5. aria-label
-  const aria = input.getAttribute('aria-label')
-  if (aria) return aria.toLowerCase()
-  // 6. Walk up ancestor containers looking for a <label> child.
-  //    Greenhouse compliance questions use unlabeled <select> inside a wrapper div
-  //    where the <label> is a sibling of the wrapper, not the select itself.
-  let ancestor = input.parentElement
-  while (ancestor && ancestor !== document.body) {
-    // Prefer a direct child label (sibling to input's immediate parent)
-    const siblingLabel = ancestor.querySelector(':scope > label, :scope > .label')
-    if (siblingLabel) return siblingLabel.textContent?.trim().toLowerCase() ?? ''
-    // Stop climbing at form/fieldset boundaries to avoid grabbing unrelated labels
-    if (ancestor.tagName === 'FORM' || ancestor.tagName === 'FIELDSET') break
-    ancestor = ancestor.parentElement
-  }
-  // 7. Shadow DOM boundary crossing.
-  //    Workday inputs live inside nested shadow roots while their labels are in
-  //    the parent shadow scope. Climb via .getRootNode().host up to 3 levels.
-  let shadowHops = 0
-  let root = input.getRootNode()
-  while (root instanceof ShadowRoot && shadowHops < 3) {
-    shadowHops++
-    const host = root.host
-    // Check for a label in the host's immediate parent scope
-    if (host.id) {
-      const hostRoot = host.getRootNode()
-      if (hostRoot instanceof ShadowRoot || hostRoot instanceof Document) {
-        const labelForHost = (hostRoot as Document | ShadowRoot).querySelector(`label[for="${host.id}"]`)
-        if (labelForHost) return labelForHost.textContent?.trim().toLowerCase() ?? ''
-      }
-    }
-    // Look at siblings of the host or its parent container
-    let hostAncestor = host.parentElement
-    while (hostAncestor && hostAncestor.tagName !== 'FORM' && hostAncestor.tagName !== 'FIELDSET') {
-      const sibLabel = hostAncestor.querySelector(':scope > label, :scope > [class*="label"]')
-      if (sibLabel) {
-        const txt = sibLabel.textContent?.trim().toLowerCase() ?? ''
-        // Guard: only accept if the label text looks like a real field label (has content, not a section heading)
-        if (txt.length > 0 && txt.length < 80 && !txt.includes('\n')) return txt
-      }
-      if (hostAncestor === document.body) break
-      hostAncestor = hostAncestor.parentElement
-    }
-    root = host.getRootNode()
-  }
-  // 8. placeholder
-  const placeholder = (input as HTMLInputElement).placeholder
-  if (placeholder) return placeholder.toLowerCase()
-  // 9. name attribute
-  return (input.getAttribute('name') ?? '').toLowerCase().replace(/[_-]/g, ' ')
-}
 
 // ─── Field → profile value mapping ───────────────────────────────────────────
 
