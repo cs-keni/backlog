@@ -134,37 +134,24 @@ export function JobDetail({ job, onClose, onApplicationChange }: JobDetailProps)
 
   async function handleApply() {
     if (!job) return
-    // Open job URL in new tab; status change tracked by extension or manually
-    window.open(job.url, '_blank', 'noopener,noreferrer')
-
-    // Only update status if not already applied or further along
-    const alreadyApplied = application && application.status !== 'saved'
-    if (alreadyApplied) return
-
     setActionState('loading')
     try {
-      let res: Response
-      if (application?.id) {
-        // Existing saved application — promote to applied
-        res = await fetch(`/api/applications/${application.id}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ status: 'applied' }),
-        })
-      } else {
-        // No application yet — create one
-        res = await fetch('/api/applications', {
+      if (!application?.id) {
+        const res = await fetch('/api/applications', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ job_id: job.id, status: 'applied' }),
+          body: JSON.stringify({ job_id: job.id, status: 'saved' }),
         })
+        if (res.ok) {
+          const data = await res.json() as { id: string; status: string }
+          onApplicationChange(job.id, data.status, data.id)
+          router.refresh()
+        }
       }
-      if (res.ok) {
-        const data = await res.json() as { id: string; status: string }
-        onApplicationChange(job.id, data.status, data.id)
-        // Invalidate router cache so /tracker shows the new entry immediately
-        router.refresh()
-      }
+
+      const u = new URL(job.url)
+      u.searchParams.set('backlog_job_id', job.id)
+      window.open(u.toString(), '_blank', 'noopener,noreferrer')
     } finally {
       setActionState('idle')
     }
@@ -426,7 +413,7 @@ export function JobDetail({ job, onClose, onApplicationChange }: JobDetailProps)
                     disabled={actionState === 'loading'}
                     className="flex-1 py-2 rounded-lg bg-zinc-100 text-zinc-900 text-sm font-medium hover:bg-white transition-colors disabled:opacity-50"
                   >
-                    Apply →
+                    Auto-Apply →
                   </button>
                 </>
               ) : (

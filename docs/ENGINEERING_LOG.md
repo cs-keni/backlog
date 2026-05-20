@@ -365,3 +365,31 @@ See `docs/CURRENT_TASK.md`. Implementation of fill.ts, types.ts, Sidebar.tsx, fi
 - The plan mentioned `src/lib/notifications/*`, but Resend/Web Push are worker dependencies, so the implementation stays in `worker/src/notifications/*`.
 - A full unique constraint on `(user_id, job_id, channel)` conflicts with failed-row retry. Migration 025 uses a partial unique index where `status = 'sent'` instead.
 - Local npm binary wrappers for `vitest` and worker `tsc` are broken in this checkout; direct package entrypoints worked.
+
+## 2026-05-20 — Phase 2b-2e extension core gaps (Codex)
+
+### Implemented
+
+- Added extension `FETCH_FILE` background proxy and content-side file upload helpers for resume and job-specific cover letter inputs.
+- Added extension API-key support to `/api/jobs/:id`, `/api/applications?jobId=...`, and `/api/cover-letter/:id/pdf` so the extension can hydrate job context and fetch generated cover-letter PDFs.
+- Changed Backlog feed apply action to open ATS URLs with `backlog_job_id` using `URL.searchParams`; background stores job context and strips the param.
+- Replaced immediate submit-click applied marking with a submit-attempt → confirmation-detection flow:
+  - Greenhouse `/applications/confirmation`
+  - Lever `/apply/confirmation`
+  - Workday `/applied`
+  - Generic navigation followed by no remaining `<form>`
+- Added sidebar job context badge and debug JSON export in review/error states.
+
+### Checks
+
+- `cd extension && node ../node_modules/vitest/dist/cli.js run src/content/fill.test.ts src/content/detect.test.ts src/background/fill-proxy.test.ts --pool=threads` — 75 passed
+- `node node_modules/vitest/dist/cli.js run --pool=threads src/tests/integration/applications.test.ts src/tests/integration/jobs-feed.test.ts` — 22 passed
+- `node node_modules/typescript/lib/tsc.js --noEmit` — passed
+- `cd extension && node node_modules/vite/dist/node/cli.js build && node node_modules/vite/dist/node/cli.js build --config vite.sidebar.config.ts` — passed
+- `git diff --check` — passed
+
+### Gotchas
+
+- Extension `tsc --noEmit` still reports the same pre-existing WeakRef/sidebar-css/popup diagnostics from Phase 2a; production Vite builds pass.
+- Cover letter upload depends on an existing generated cover letter for the Backlog job; otherwise it is skipped and included in debug export/manual-input review.
+- Phase 2f/g decomposition is still not done and should remain P3.

@@ -1,7 +1,7 @@
 import { extractPageInfo } from './detect'
-import { fillForm, applyFieldValues, fillWorkdayComboboxes } from './fill'
+import { fillForm, applyFieldValues, fillWorkdayComboboxes, fillFileInputs } from './fill'
 import { detectNextButton, detectPageType } from './detect'
-import type { ExtensionMessage, FillResult, PageInfo, PageTypeInfo } from '../shared/types'
+import type { ExtensionMessage, FillResult, PageInfo, PageTypeInfo, JobContext } from '../shared/types'
 
 // Cache detection result so the popup always gets the latest known state.
 // Greenhouse and other ATS forms often render asynchronously via JS, so the
@@ -70,15 +70,26 @@ chrome.runtime.onMessage.addListener((message: ExtensionMessage, _sender, sendRe
     waitForInputs(() => {
       const { ats } = cachedPageInfo
       const result: FillResult = fillForm(message.payload, ats)
+      const finishWithFiles = async () => {
+        try {
+          const contextResponse = await new Promise<{ jobContext?: JobContext | null }>((resolve) => {
+            chrome.runtime.sendMessage({ type: 'GET_JOB_CONTEXT' }, (res) => resolve(res ?? { jobContext: null }))
+          })
+          const fileResult = await fillFileInputs(message.payload, contextResponse.jobContext ?? null)
+          result.filled.push(...fileResult.filled)
+          result.skipped.push(...fileResult.skipped)
+        } catch { /* file upload is best-effort */ }
+        sendResponse(result)
+      }
       if (ats === 'workday') {
         fillWorkdayComboboxes(message.payload)
           .then((comboboxFilled) => {
             result.filled.push(...comboboxFilled)
-            sendResponse(result)
+            void finishWithFiles()
           })
-          .catch(() => sendResponse(result))
+          .catch(() => { void finishWithFiles() })
       } else {
-        sendResponse(result)
+        void finishWithFiles()
       }
     })
     return true
@@ -133,11 +144,12 @@ function watchForSubmission() {
     submitted = true
     try {
       chrome.runtime.sendMessage({
-        type: 'MARK_APPLIED',
+        type: 'SUBMIT_ATTEMPTED',
         payload: {
-          jobUrl: window.location.href,
+          url: window.location.href,
           jobTitle: info.jobTitle,
           company: info.company,
+          ats: info.ats,
         },
       } as ExtensionMessage)
     } catch { /* context invalidated */ }

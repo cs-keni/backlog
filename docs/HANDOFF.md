@@ -4,6 +4,44 @@
 
 ---
 
+## Session: 2026-05-20 — Phase 2b-2e extension core gaps (Codex)
+
+### What changed
+
+- **Phase 2b — File upload**
+  - Added `FETCH_FILE` background proxy and focused proxy tests.
+  - Added `fillFileInput()` / `fillFileInputs()` for resume and job-specific cover letter uploads.
+  - Background fetch adds the extension API key for Backlog URLs, so generated cover-letter PDFs can be fetched through `/api/cover-letter/:id/pdf`.
+  - `/api/applications?jobId=...` now supports extension API-key auth and returns a latest `cover_letter_url`.
+  - `/api/cover-letter/:id/pdf` now accepts extension API-key auth.
+- **Phase 2c — Post-submit detection**
+  - Content script now reports `SUBMIT_ATTEMPTED` instead of immediately marking applied.
+  - Background confirms Greenhouse, Lever, and Workday completion URL patterns before marking applied.
+  - Generic submissions mark applied only after navigation to a page with no form.
+  - `/api/extension/apply` accepts `jobId` / `applicationId` for Backlog-initiated applications.
+- **Phase 2d — Initiate from Backlog**
+  - Job detail action opens the job URL with `backlog_job_id` via `URL.searchParams`.
+  - Background extracts/stores job context, strips the query param, and sidebar shows the job context badge.
+  - `/api/jobs/:id` supports extension API-key auth and returns job URL/app context.
+- **Phase 2e — Debug export**
+  - Sidebar review/error states can download `backlog-debug-{timestamp}.json`.
+  - Debug export redacts values to `[FILLED]`, `[SKIPPED]`, or `[SKIPPED: reason]`.
+
+### Checks run
+
+- `cd extension && node ../node_modules/vitest/dist/cli.js run src/content/fill.test.ts src/content/detect.test.ts src/background/fill-proxy.test.ts --pool=threads` — passed, 75 tests
+- `node node_modules/vitest/dist/cli.js run --pool=threads src/tests/integration/applications.test.ts src/tests/integration/jobs-feed.test.ts` — passed, 22 tests
+- `node node_modules/typescript/lib/tsc.js --noEmit` — passed
+- `cd extension && node node_modules/vite/dist/node/cli.js build && node node_modules/vite/dist/node/cli.js build --config vite.sidebar.config.ts` — passed
+- `git diff --check` — passed
+
+### Known residuals
+
+- `cd extension && node node_modules/typescript/lib/tsc.js -p tsconfig.json --noEmit` still reports the pre-existing WeakRef/sidebar-css/popup issues noted by Claude during Phase 2a. No new Phase 2b-2e type errors appeared beyond those existing diagnostics.
+- Phase 2f/g decomposition remains deferred to P3.
+
+---
+
 ## Session: 2026-05-20 — Phase 2a: Workday async comboboxes (Claude Code)
 
 ### What changed
@@ -25,9 +63,8 @@
 
 ### Required follow-up
 
-- Phase 1 migration `025_notification_log_schema.sql` still needs to be applied in Supabase before deploying the dispatcher.
-- Phase 2b (file upload FETCH_FILE protocol) → Codex
-- Phase 2c–2g → Codex per ownership table in CURRENT_TASK.md
+- Phase 2b-2e are now implemented by Codex.
+- Phase 2f/g decomposition remains deferred to P3.
 
 ---
 

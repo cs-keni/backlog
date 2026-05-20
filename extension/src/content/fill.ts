@@ -1,6 +1,7 @@
-import type { FullProfile, FilledField, SkippedField, FillResult, AtsType, UnfilledField, ScannedField, WorkHistory, Education } from '../shared/types'
+import type { FullProfile, FilledField, SkippedField, FillResult, AtsType, UnfilledField, ScannedField, WorkHistory, Education, JobContext } from '../shared/types'
 import { queryShadowAll, queryShadowScoped } from '../shared/domUtils'
 import { fillWorkdayCombobox, waitForChildListChange } from './fill-workday'
+import { fetchApplicationForJob } from '../shared/api'
 
 // ─── Input value setter ───────────────────────────────────────────────────────
 // Works for standard inputs and React/Angular controlled inputs by dispatching
@@ -535,6 +536,133 @@ function flashFill(el: HTMLElement) {
   el.style.outline = '2px solid #6366f1'
   el.style.transition = 'outline 0.15s ease'
   setTimeout(() => { el.style.outline = ''; el.style.transition = '' }, 700)
+}
+
+function sendRuntimeMessage<T>(message: unknown): Promise<T> {
+  return new Promise((resolve, reject) => {
+    try {
+      chrome.runtime.sendMessage(message, (response: T) => {
+        if (chrome.runtime.lastError) {
+          reject(new Error(chrome.runtime.lastError.message))
+          return
+        }
+        resolve(response)
+      })
+    } catch (err) {
+      reject(err)
+    }
+  })
+}
+
+function fileNameFromUrl(url: string, fallback: string): string {
+  try {
+    const path = new URL(url).pathname
+    const last = path.split('/').filter(Boolean).pop()
+    return last ? decodeURIComponent(last) : fallback
+  } catch {
+    return fallback
+  }
+}
+
+export async function fillFileInput(
+  input: HTMLInputElement,
+  fileUrl: string,
+  fileName: string
+): Promise<boolean> {
+  try {
+    const response = await sendRuntimeMessage<{ ok: true; buffer: ArrayBuffer } | { ok: false; error: string }>({
+      type: 'FETCH_FILE',
+      url: fileUrl,
+      fileName,
+    })
+
+    if (!response?.ok) return false
+
+    const file = new File([response.buffer], fileName, { type: 'application/pdf' })
+    const dataTransfer = new DataTransfer()
+    dataTransfer.items.add(file)
+    input.files = dataTransfer.files
+    input.dispatchEvent(new Event('input', { bubbles: true }))
+    input.dispatchEvent(new Event('change', { bubbles: true }))
+    flashFill(input)
+    return input.files.length > 0
+  } catch {
+    return false
+  }
+}
+
+async function getCoverLetterUrl(jobContext?: JobContext | null): Promise<{ url: string; applicationId: string } | null> {
+  if (!jobContext?.jobId) return null
+  try {
+    const app = await fetchApplicationForJob(jobContext.jobId)
+    if (!app?.cover_letter_url) return null
+    return { url: app.cover_letter_url, applicationId: app.id }
+  } catch {
+    return null
+  }
+}
+
+function getFileLabel(input: HTMLInputElement): string {
+  return (
+    getLabelForInput(input) ||
+    input.getAttribute('aria-label') ||
+    input.name ||
+    input.id ||
+    'File upload'
+  ).toLowerCase()
+}
+
+function fileInputSelector(input: HTMLInputElement): string {
+  if (input.id) return `#${CSS.escape(input.id)}`
+  if (input.name) return `input[type="file"][name="${input.name}"]`
+  return 'input[type="file"]'
+}
+
+export async function fillFileInputs(
+  profile: FullProfile,
+  jobContext?: JobContext | null
+): Promise<{ filled: FilledField[]; skipped: SkippedField[] }> {
+  const filled: FilledField[] = []
+  const skipped: SkippedField[] = []
+  const coverLetter = await getCoverLetterUrl(jobContext)
+
+  for (const input of Array.from(document.querySelectorAll<HTMLInputElement>('input[type="file"]'))) {
+    if (input.disabled) continue
+    const label = getFileLabel(input)
+    const selector = fileInputSelector(input)
+    const acceptsPdf = !input.accept || /pdf|\*/i.test(input.accept)
+
+    if (/cover\s*letter/i.test(label)) {
+      if (!coverLetter) {
+        skipped.push({ label: 'Cover letter', reason: 'No job-specific cover letter found' })
+        continue
+      }
+      if (!acceptsPdf) {
+        skipped.push({ label: 'Cover letter', reason: 'Upload manually — this site does not accept PDFs here' })
+        continue
+      }
+      const ok = await fillFileInput(input, coverLetter.url, 'cover-letter.pdf')
+      if (ok) filled.push({ label: 'Cover letter', value: '[FILE]', selector })
+      else skipped.push({ label: 'Cover letter', reason: 'Attach cover letter manually — file upload blocked by this site' })
+      continue
+    }
+
+    if (/\b(resume|cv|curriculum vitae)\b/i.test(label)) {
+      if (!profile.user.resume_url) {
+        skipped.push({ label: 'Resume', reason: 'Upload resume in Backlog first' })
+        continue
+      }
+      if (!acceptsPdf) {
+        skipped.push({ label: 'Resume', reason: 'Attach resume manually — this site does not accept PDFs here' })
+        continue
+      }
+      const ok = await fillFileInput(input, profile.user.resume_url, fileNameFromUrl(profile.user.resume_url, 'resume.pdf'))
+      if (ok) filled.push({ label: 'Resume', value: '[FILE]', selector })
+      else skipped.push({ label: 'Resume', reason: 'Attach resume manually — file upload blocked by this site' })
+    }
+  }
+
+  return { filled, skipped }
 }
 
 export function applyFills(fields: ScannedField[]): FilledField[] {

@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { detectAts, detectNextButton } from './detect'
+import { isGenericPostSubmitPage, isPostSubmitConfirmationUrl } from '../shared/postSubmit'
 
 // hasJobForm is not exported — we test it indirectly through detectAts('') on a generic page
 // by checking the full extractPageInfo behavior via the DOM it reads.
@@ -39,6 +40,29 @@ describe('detectAts — known ATS URL patterns', () => {
 
   it('returns null for a gaming client URL', () => {
     expect(detectAts('https://authenticate.riotgames.com')).toBeNull()
+  })
+})
+
+describe('post-submit detection helpers', () => {
+  it('matches Greenhouse confirmation URLs', () => {
+    expect(isPostSubmitConfirmationUrl('https://boards.greenhouse.io/acme/applications/confirmation', 'greenhouse')).toBe(true)
+  })
+
+  it('matches Lever confirmation URLs', () => {
+    expect(isPostSubmitConfirmationUrl('https://jobs.lever.co/acme/apply/confirmation', 'lever')).toBe(true)
+  })
+
+  it('matches Workday applied URLs', () => {
+    expect(isPostSubmitConfirmationUrl('https://acme.myworkdayjobs.com/jobs/applied', 'workday')).toBe(true)
+  })
+
+  it('does not match generic URLs as known ATS confirmations', () => {
+    expect(isPostSubmitConfirmationUrl('https://example.com/thank-you', 'generic')).toBe(false)
+  })
+
+  it('treats generic form-free destination as submitted', () => {
+    expect(isGenericPostSubmitPage(false)).toBe(true)
+    expect(isGenericPostSubmitPage(true)).toBe(false)
   })
 })
 

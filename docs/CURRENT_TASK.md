@@ -1,7 +1,7 @@
 # Current Task
 
 **Last updated:** 2026-05-20
-**Status:** Phase 1 notifications implemented by Codex. Grade-boost implementation should continue with Claude-reserved Phase 2a, then Codex-owned follow-ups.
+**Status:** Phase 1 and Phase 2a-2e are implemented. Phase 2f/g decomposition is intentionally deferred to P3.
 
 ---
 
@@ -31,16 +31,16 @@ Some phases are reserved for Claude Code due to animation sequencing, subtle DOM
 ## Implementation priority
 
 ### P1 — Core loop broken (do these first)
-- **Phase 1** — Notification dispatcher (email + push + dedup + quiet hours) — **implemented; migration pending in Supabase**
+- **Phase 1** — Notification dispatcher (email + push + dedup + quiet hours) — **implemented; migration applied in Supabase**
   - Implemented in worker notification modules: `worker/src/notifications/dispatcher.ts`, `email.ts`, `push.ts`
   - Migration written: `supabase/migrations/025_notification_log_schema.sql`
 - **Phase 2a** — Workday async comboboxes — **implemented** (`extension/src/content/fill-workday.ts`, commit `cf60859`)
-- **Phase 2b** — File upload FETCH_FILE protocol (content → background → ArrayBuffer)
+- **Phase 2b** — File upload FETCH_FILE protocol — **implemented**
 
 ### P2 — High leverage, low risk
-- **Phase 2c** — Post-submit detection → mark Applied
-- **Phase 2d** — Initiate from Backlog (URL param + background fetch + sidebar badge)
-- **Phase 2e** — Extension debug export button
+- **Phase 2c** — Post-submit detection → mark Applied — **implemented**
+- **Phase 2d** — Initiate from Backlog (URL param + background fetch + sidebar badge) — **implemented**
+- **Phase 2e** — Extension debug export button — **implemented**
 - **Phase 7** — Abort controller + saved filter presets
 - **Phase 8a** — DSA counter drift fix (daily_activity table, migration 024)
 
@@ -74,7 +74,7 @@ Full visual specs for all UI elements are in `docs/GRADE_BOOST_PLAN.md` under `*
 - `022_add_filter_presets.sql` (to be written — Phase 7b)
 - `023_add_review_difficulty.sql` (to be written — Phase 8b)
 - `024_add_daily_activity.sql` (to be written — Phase 8a)
-- `025_notification_log_schema.sql` — adds notification status/error and sent-only dedupe index
+- `025_notification_log_schema.sql` — applied; adds notification status/error and sent-only dedupe index
 
 ---
 

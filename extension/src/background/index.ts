@@ -1,5 +1,7 @@
-import { markApplied, addJob, analyzePage, answerQuestion } from '../shared/api'
-import type { ExtensionMessage, TabSessionState, PageFill, FillResult, FieldAnalysisResult } from '../shared/types'
+import { BACKLOG_URL } from '../shared/config'
+import { markApplied, addJob, analyzePage, answerQuestion, getApiKey, fetchJobContext } from '../shared/api'
+import type { ExtensionMessage, TabSessionState, PageFill, FillResult, FieldAnalysisResult, JobContext } from '../shared/types'
+import { isGenericPostSubmitPage, isPostSubmitConfirmationUrl } from '../shared/postSubmit'
 
 // ─── Session state helpers ────────────────────────────────────────────────────
 // chrome.storage.session persists for the entire browser session (not per-tab).
@@ -20,6 +22,21 @@ async function setTabState(tabId: number, state: TabSessionState): Promise<void>
 
 async function clearTabState(tabId: number): Promise<void> {
   await chrome.storage.session.remove(sessionKey(tabId))
+}
+
+async function updateTabState(tabId: number, patch: Partial<TabSessionState>): Promise<TabSessionState> {
+  const current = await getTabState(tabId)
+  const next: TabSessionState = {
+    autoAdvance: current?.autoAdvance ?? false,
+    profile: current?.profile ?? null,
+    pages: current?.pages ?? [],
+    currentPageIndex: current?.currentPageIndex ?? -1,
+    jobContext: current?.jobContext ?? null,
+    pendingSubmission: current?.pendingSubmission ?? null,
+    ...patch,
+  }
+  await setTabState(tabId, next)
+  return next
 }
 
 // ─── Orchestrated fill (Tier 1 + Tier 2) ─────────────────────────────────────
@@ -93,6 +110,122 @@ async function fillTabPage(tabId: number): Promise<void> {
   })
 }
 
+// ─── Initiate from Backlog / file proxy / submit confirmation ────────────────
+
+function stripBacklogJobId(rawUrl: string): string {
+  const clean = new URL(rawUrl)
+  clean.searchParams.delete('backlog_job_id')
+  return clean.toString()
+}
+
+async function storeInitiatedJob(tabId: number, rawUrl: string): Promise<void> {
+  const url = new URL(rawUrl)
+  const jobId = url.searchParams.get('backlog_job_id')
+  if (!jobId) return
+
+  let context: JobContext = {
+    jobId,
+    jobTitle: 'Unknown role',
+    jobCompany: 'Unknown company',
+    applicationId: null,
+  }
+
+  try {
+    const job = await fetchJobContext(jobId)
+    context = {
+      jobId: job.id,
+      jobTitle: job.title,
+      jobCompany: job.company,
+      applicationId: job.applications?.[0]?.id ?? null,
+    }
+  } catch (err) {
+    console.warn('[Backlog] Could not fetch initiated job context:', err)
+  }
+
+  await updateTabState(tabId, { jobContext: context })
+
+  const cleanUrl = stripBacklogJobId(rawUrl)
+  if (cleanUrl !== rawUrl) {
+    try { await chrome.tabs.update(tabId, { url: cleanUrl }) } catch { /* tab may have moved on */ }
+  }
+}
+
+async function fetchFile(url: string): Promise<ArrayBuffer> {
+  const headers: Record<string, string> = {}
+  if (url.startsWith(BACKLOG_URL)) {
+    const key = await getApiKey()
+    if (key) headers.Authorization = `Bearer ${key}`
+  }
+
+  const res = await fetch(url, { credentials: 'omit', headers })
+  if (!res.ok) throw new Error(`File fetch failed: ${res.status}`)
+  return res.arrayBuffer()
+}
+
+export async function handleFetchFileMessage(
+  message: Extract<ExtensionMessage, { type: 'FETCH_FILE' }>
+): Promise<{ ok: true; buffer: ArrayBuffer } | { ok: false; error: string }> {
+  try {
+    if (!message.url || !/^https?:\/\//i.test(message.url)) {
+      throw new Error('Invalid file URL')
+    }
+    const buffer = await fetchFile(message.url)
+    return { ok: true, buffer }
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) }
+  }
+}
+
+async function pageHasForm(tabId: number): Promise<boolean> {
+  const results = await chrome.scripting.executeScript({
+    target: { tabId },
+    func: () => document.querySelector('form') !== null,
+  })
+  return Boolean(results[0]?.result)
+}
+
+async function markTabApplied(tabId: number, url: string): Promise<void> {
+  const state = await getTabState(tabId)
+  const pending = state?.pendingSubmission
+  if (!pending) return
+
+  await markApplied({
+    jobUrl: url,
+    jobTitle: state.jobContext?.jobTitle ?? pending.jobTitle,
+    company: state.jobContext?.jobCompany ?? pending.company,
+    jobId: state.jobContext?.jobId,
+    applicationId: state.jobContext?.applicationId,
+  })
+
+  await updateTabState(tabId, { pendingSubmission: null })
+}
+
+async function maybeDetectSubmitted(tabId: number, url: string): Promise<void> {
+  const state = await getTabState(tabId)
+  const pending = state?.pendingSubmission
+  if (!pending) return
+
+  if (Date.now() - pending.submittedAt > 5 * 60 * 1000) {
+    await updateTabState(tabId, { pendingSubmission: null })
+    return
+  }
+
+  if (isPostSubmitConfirmationUrl(url, pending.ats)) {
+    await markTabApplied(tabId, url)
+    return
+  }
+
+  if (pending.ats === 'generic') {
+    setTimeout(() => {
+      pageHasForm(tabId)
+        .then((hasForm) => {
+          if (isGenericPostSubmitPage(hasForm)) return markTabApplied(tabId, url)
+        })
+        .catch(() => {})
+    }, 500)
+  }
+}
+
 // ─── Message handlers ─────────────────────────────────────────────────────────
 
 // ─── Toolbar click → toggle sidebar ──────────────────────────────────────────
@@ -127,12 +260,46 @@ chrome.runtime.onMessage.addListener((message: ExtensionMessage, sender, sendRes
     return true
   }
 
+  if (message.type === 'GET_JOB_CONTEXT') {
+    const tabId = sender.tab?.id
+    if (!tabId) {
+      sendResponse({ jobContext: null })
+      return true
+    }
+    getTabState(tabId)
+      .then((state) => sendResponse({ jobContext: state?.jobContext ?? null }))
+      .catch(() => sendResponse({ jobContext: null }))
+    return true
+  }
+
+  if (message.type === 'FETCH_FILE') {
+    handleFetchFileMessage(message)
+      .then(sendResponse)
+      .catch((err) => sendResponse({ ok: false, error: String(err) }))
+    return true
+  }
+
   if (message.type === 'MARK_APPLIED') {
-    const { jobUrl, jobTitle, company } = message.payload
-    markApplied({ jobUrl, jobTitle, company })
+    const { jobUrl, jobTitle, company, jobId, applicationId } = message.payload
+    markApplied({ jobUrl, jobTitle, company, jobId, applicationId })
       .then((result) => sendResponse({ ok: true, ...result }))
       .catch((err) => sendResponse({ ok: false, error: String(err) }))
     return true
+  }
+
+  if (message.type === 'SUBMIT_ATTEMPTED') {
+    const tabId = sender.tab?.id
+    if (!tabId) return false
+    updateTabState(tabId, {
+      pendingSubmission: {
+        url: message.payload.url,
+        jobTitle: message.payload.jobTitle,
+        company: message.payload.company,
+        ats: message.payload.ats,
+        submittedAt: Date.now(),
+      },
+    }).catch(() => {})
+    return false
   }
 
   if (message.type === 'ADD_TO_BACKLOG') {
@@ -163,8 +330,18 @@ chrome.tabs.onRemoved.addListener((tabId) => {
 
 // Trigger auto-advance fill on full-page navigation (non-SPA)
 chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
+  if (changeInfo.url?.includes('backlog_job_id=')) {
+    void storeInitiatedJob(tabId, changeInfo.url)
+  }
+
+  if (changeInfo.url) {
+    void maybeDetectSubmitted(tabId, changeInfo.url)
+  }
+
   if (changeInfo.status !== 'complete') return
   getTabState(tabId).then((state) => {
+    const currentUrlPromise = chrome.tabs.get(tabId).then((tab) => tab.url ?? changeInfo.url ?? '')
+    currentUrlPromise.then((url) => { void maybeDetectSubmitted(tabId, url) }).catch(() => {})
     if (state?.autoAdvance && state.profile) {
       setTimeout(() => { void fillTabPage(tabId) }, 1000)
     }

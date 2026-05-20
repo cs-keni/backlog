@@ -38,6 +38,8 @@ export async function markApplied(payload: {
   jobUrl: string
   jobTitle?: string | null
   company?: string | null
+  jobId?: string
+  applicationId?: string | null
 }): Promise<{ applicationId: string }> {
   const res = await apiFetch('/api/extension/apply', {
     method: 'POST',
@@ -45,10 +47,43 @@ export async function markApplied(payload: {
       jobUrl: payload.jobUrl,
       jobTitle: payload.jobTitle ?? undefined,
       company: payload.company ?? undefined,
+      jobId: payload.jobId,
+      applicationId: payload.applicationId ?? undefined,
     }),
   })
   if (!res.ok) throw new Error(`Apply failed: ${res.status}`)
   return res.json() as Promise<{ applicationId: string }>
+}
+
+export async function fetchJobContext(jobId: string): Promise<{
+  id: string
+  title: string
+  company: string
+  applications?: Array<{ id: string; status: string }>
+}> {
+  const res = await apiFetch(`/api/jobs/${encodeURIComponent(jobId)}`)
+  if (!res.ok) throw new Error(`Job fetch failed: ${res.status}`)
+  return res.json() as Promise<{
+    id: string
+    title: string
+    company: string
+    applications?: Array<{ id: string; status: string }>
+  }>
+}
+
+export async function fetchApplicationForJob(jobId: string): Promise<{
+  id: string
+  status: string
+  cover_letter_url: string | null
+} | null> {
+  const res = await apiFetch(`/api/applications?jobId=${encodeURIComponent(jobId)}`)
+  if (res.status === 404) return null
+  if (!res.ok) throw new Error(`Application fetch failed: ${res.status}`)
+  const json = await res.json() as { id: string; status: string; cover_letter_url: string | null } | null
+  if (json?.cover_letter_url?.startsWith('/')) {
+    json.cover_letter_url = `${BACKLOG_URL}${json.cover_letter_url}`
+  }
+  return json
 }
 
 export async function analyzePage(fields: Array<{

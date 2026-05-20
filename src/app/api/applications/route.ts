@@ -1,16 +1,58 @@
 import { createClient } from '@/lib/supabase/server'
+import { verifyApiKeyFromRequest } from '@/lib/auth/api-key'
+import { createClient as createServiceClient } from '@supabase/supabase-js'
 
 export async function GET(request: Request) {
-  const supabase = await createClient()
+  let supabase = await createClient()
   const {
     data: { user },
   } = await supabase.auth.getUser()
-  if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 })
+  let userId = user?.id ?? null
+  if (!userId) {
+    const apiAuth = await verifyApiKeyFromRequest(request)
+    if (!apiAuth) return Response.json({ error: 'Unauthorized' }, { status: 401 })
+    userId = apiAuth.userId
+    supabase = createServiceClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    ) as unknown as Awaited<ReturnType<typeof createClient>>
+  }
 
   const { searchParams } = new URL(request.url)
+  const jobId = searchParams.get('jobId')
   const search = searchParams.get('search')
   const limitParam = searchParams.get('limit')
   const limit = limitParam ? Math.min(parseInt(limitParam, 10), 200) : 200
+
+  if (jobId) {
+    const { data: app, error: appError } = await supabase
+      .from('applications')
+      .select('id, status')
+      .eq('user_id', userId)
+      .eq('job_id', jobId)
+      .maybeSingle()
+
+    if (appError) {
+      console.error('[GET /api/applications?jobId]', appError)
+      return Response.json({ error: 'Failed to fetch application' }, { status: 500 })
+    }
+    if (!app) return Response.json(null)
+
+    const { data: coverLetter } = await supabase
+      .from('cover_letters')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('application_id', app.id)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    return Response.json({
+      id: app.id,
+      status: app.status,
+      cover_letter_url: coverLetter?.id ? `/api/cover-letter/${coverLetter.id}/pdf` : null,
+    })
+  }
 
   const { data, error } = await supabase
     .from('applications')
@@ -20,7 +62,7 @@ export async function GET(request: Request) {
         id, title, company, location, salary_min, salary_max, url, is_remote, tags
       )
     `)
-    .eq('user_id', user.id)
+    .eq('user_id', userId)
     .order('last_updated', { ascending: false })
     .limit(limit)
 

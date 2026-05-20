@@ -88,6 +88,13 @@ export interface SkippedField {
   reason: string
 }
 
+export interface JobContext {
+  jobId: string
+  jobTitle: string
+  jobCompany: string
+  applicationId?: string | null
+}
+
 // A form field that Tier 1 couldn't fill — sent to Haiku for Tier 2 analysis
 export interface UnfilledField {
   selector: string
@@ -133,6 +140,14 @@ export interface TabSessionState {
   profile: FullProfile | null
   pages: PageFill[]
   currentPageIndex: number
+  jobContext?: JobContext | null
+  pendingSubmission?: {
+    url: string
+    jobTitle: string | null
+    company: string | null
+    ats: AtsType
+    submittedAt: number
+  } | null
 }
 
 // DETECT_PAGE_TYPE response
@@ -155,8 +170,11 @@ export type ExtensionMessage =
   | { type: 'DETECT_PAGE_TYPE' }
   | { type: 'CLICK_NEXT_BUTTON' }
   | { type: 'ADD_TO_BACKLOG'; payload: { url: string; title: string; company: string; description: string | null } }
-  | { type: 'MARK_APPLIED'; payload: { jobUrl: string; jobTitle: string | null; company: string | null } }
+  | { type: 'MARK_APPLIED'; payload: { jobUrl: string; jobTitle: string | null; company: string | null; jobId?: string; applicationId?: string | null } }
   | { type: 'PAGE_NAVIGATED'; payload: { url: string } }
   | { type: 'GET_TAB_ID' }
+  | { type: 'GET_JOB_CONTEXT' }
+  | { type: 'FETCH_FILE'; url: string; fileName: string }
+  | { type: 'SUBMIT_ATTEMPTED'; payload: { url: string; jobTitle: string | null; company: string | null; ats: AtsType } }
   | { type: 'SCAN_FORM'; payload: FullProfile }
   | { type: 'APPLY_SCANNED'; payload: { fields: Array<{ selector: string; value: string }> } }

@@ -2,17 +2,31 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import {
   getApiKey, setApiKey, fetchProfile, analyzePage, answerQuestion, improveSkills, addJob,
 } from '../shared/api'
-import { computeFills, applyFills, applyFieldValues, getLabelForInput, fillWorkdayComboboxes } from '../content/fill'
+import { computeFills, applyFills, applyFieldValues, getLabelForInput, fillWorkdayComboboxes, fillFileInputs } from '../content/fill'
 import { detectNextButton, detectPageType } from '../content/detect'
 import type {
-  FullProfile, PageInfo, FilledField, SkippedField, FillResult,
-  FieldAnalysisResult, PageFill, TabSessionState, ScannedField,
+  FullProfile, PageInfo, FilledField, SkippedField,
+  FieldAnalysisResult, PageFill, TabSessionState, ScannedField, JobContext,
 } from '../shared/types'
 import { BACKLOG_URL } from '../shared/config'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type FillStage = 'tier1' | 'tier2' | 'answering'
+
+interface DebugField {
+  selector: string
+  label: string
+  fillResult: string
+}
+
+interface DebugExport {
+  ats: string | null
+  pageIndex: number
+  pageUrl: string
+  fields: DebugField[]
+  error?: string
+}
 
 type SidebarState =
   | { status: 'loading' }
@@ -92,6 +106,51 @@ function findSkillsField(): SkillsField | null {
   return null
 }
 
+function buildDebugExport(
+  page: PageInfo,
+  pageIndex: number,
+  scanned: ScannedField[],
+  filled: FilledField[],
+  skipped: SkippedField[],
+  error?: string
+): DebugExport {
+  const filledSelectors = new Set(filled.map((f) => f.selector).filter(Boolean))
+  const filledLabels = new Set(filled.map((f) => f.label.toLowerCase()))
+  const fields: DebugField[] = scanned.map((field) => ({
+    selector: field.selector,
+    label: field.label,
+    fillResult: filledSelectors.has(field.selector) || filledLabels.has(field.label.toLowerCase())
+      ? '[FILLED]'
+      : '[SKIPPED]',
+  }))
+
+  for (const item of skipped) {
+    fields.push({
+      selector: '',
+      label: item.label,
+      fillResult: `[SKIPPED: ${item.reason}]`,
+    })
+  }
+
+  return {
+    ats: page.ats,
+    pageIndex,
+    pageUrl: location.href,
+    fields,
+    ...(error ? { error } : {}),
+  }
+}
+
+function downloadDebugExport(debug: DebugExport) {
+  const blob = new Blob([JSON.stringify(debug, null, 2)], { type: 'application/json' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `backlog-debug-${new Date().toISOString().replace(/[:.]/g, '-')}.json`
+  a.click()
+  setTimeout(() => URL.revokeObjectURL(url), 1000)
+}
+
 // ─── Sidebar component ────────────────────────────────────────────────────────
 
 export function Sidebar({ initialPage }: { initialPage: PageInfo }) {
@@ -101,9 +160,12 @@ export function Sidebar({ initialPage }: { initialPage: PageInfo }) {
   const [skillsField, setSkillsField] = useState<SkillsField | null>(null)
   const [improvingSkills, setImprovingSkills] = useState(false)
   const [page, setPage] = useState<PageInfo>(initialPage)
+  const [jobContext, setJobContext] = useState<JobContext | null>(null)
   const tabIdRef = useRef<number>(0)
   const cancelledRef = useRef(false)
   const lastProfileRef = useRef<FullProfile | null>(null)
+  const lastScannedRef = useRef<ScannedField[]>([])
+  const lastDebugRef = useRef<DebugExport | null>(null)
 
   // When collapsed, the mount div (360×100vh, pointer-events:auto) would still eat
   // clicks on the underlying page even though visually only the 28px tab is visible.
@@ -120,6 +182,8 @@ export function Sidebar({ initialPage }: { initialPage: PageInfo }) {
       if (!key) { setState({ status: 'no-key' }); return }
 
       tabIdRef.current = await getTabId()
+      const tabState = await getTabState(tabIdRef.current)
+      setJobContext(tabState?.jobContext ?? null)
       const profile = await fetchProfile()
       setSkillsField(findSkillsField())
       setState({ status: 'ready', profile, page })
@@ -168,9 +232,11 @@ export function Sidebar({ initialPage }: { initialPage: PageInfo }) {
       // heavy shadow DOM traversal on Workday pages
       await new Promise<void>((r) => setTimeout(r, 50))
       const fields = computeFills(profile, page.ats)
+      lastScannedRef.current = fields
       setState({ status: 'scan-preview', fields, profile, page })
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
+      lastDebugRef.current = buildDebugExport(page, 0, lastScannedRef.current, [], [], msg)
       setState({ status: 'error', message: msg })
     }
   }
@@ -193,7 +259,9 @@ export function Sidebar({ initialPage }: { initialPage: PageInfo }) {
         filled = [...filled, ...comboboxFilled]
       }
     } catch {
-      setState({ status: 'error', message: 'Fill failed. Try refreshing the page.' })
+      const message = 'Fill failed. Try refreshing the page.'
+      lastDebugRef.current = buildDebugExport(page, 0, fields, [], [], message)
+      setState({ status: 'error', message })
       return
     }
 
@@ -213,13 +281,16 @@ export function Sidebar({ initialPage }: { initialPage: PageInfo }) {
     let tier1Filled: FilledField[]
     try {
       const scanned = computeFills(profile, page.ats)
+      lastScannedRef.current = scanned
       tier1Filled = applyFills(scanned)
       if (page.ats === 'workday') {
         const comboboxFilled = await fillWorkdayComboboxes(profile)
         tier1Filled = [...tier1Filled, ...comboboxFilled]
       }
     } catch {
-      setState({ status: 'error', message: 'Fill failed. Try refreshing the page.' })
+      const message = 'Fill failed. Try refreshing the page.'
+      lastDebugRef.current = buildDebugExport(page, 0, lastScannedRef.current, [], [], message)
+      setState({ status: 'error', message })
       return
     }
 
@@ -231,6 +302,7 @@ export function Sidebar({ initialPage }: { initialPage: PageInfo }) {
   async function runTier2AndFinish(profile: FullProfile, initialFilled: FilledField[]) {
     let aiUnavailable = false
     const allFilled = [...initialFilled]
+    const allSkipped: SkippedField[] = []
 
     if (cancelledRef.current) return
 
@@ -239,6 +311,14 @@ export function Sidebar({ initialPage }: { initialPage: PageInfo }) {
     // Import dynamically to avoid circular dependency in fill.ts
     const { getUnfilledFields } = await import('../content/fill')
     const unfilledFields = getUnfilledFields(filledSelectors)
+
+    try {
+      const fileResult = await fillFileInputs(profile, jobContext)
+      allFilled.push(...fileResult.filled)
+      allSkipped.push(...fileResult.skipped)
+    } catch {
+      allSkipped.push({ label: 'File upload', reason: 'Attach files manually — upload blocked by this site' })
+    }
 
     if (unfilledFields.length > 0) {
       setState({ status: 'filling', stage: 'tier2' })
@@ -284,6 +364,7 @@ export function Sidebar({ initialPage }: { initialPage: PageInfo }) {
     // Persist to session for background auto-advance
     // chrome.storage.session is blocked on some pages (e.g. Workday) — must not throw
     const tabId = tabIdRef.current
+    let debugPageIndex = 0
     if (tabId) {
       try {
         const current = await getTabState(tabId)
@@ -292,11 +373,14 @@ export function Sidebar({ initialPage }: { initialPage: PageInfo }) {
           pageIndex: current ? current.currentPageIndex + 1 : 0,
           filled: allFilled,
         }
+        debugPageIndex = pageFill.pageIndex
         await setTabState(tabId, {
           autoAdvance,
           profile,
           pages: [...(current?.pages ?? []), pageFill],
           currentPageIndex: pageFill.pageIndex,
+          jobContext: current?.jobContext ?? jobContext,
+          pendingSubmission: current?.pendingSubmission ?? null,
         })
       } catch { /* storage unavailable in this page context — skip persistence */ }
     }
@@ -318,6 +402,9 @@ export function Sidebar({ initialPage }: { initialPage: PageInfo }) {
     if (!profile.user.email) skipped.push({ label: 'Email', reason: 'Not set in profile' })
     if (!profile.user.phone) skipped.push({ label: 'Phone', reason: 'Not set in profile' })
     if (!profile.user.resume_url) skipped.push({ label: 'Resume', reason: 'Upload resume in Backlog first' })
+    skipped.push(...allSkipped)
+
+    lastDebugRef.current = buildDebugExport(page, debugPageIndex, lastScannedRef.current, allFilled, skipped)
 
     setState({ status: 'review', filled: allFilled, skipped, page, profile, aiUnavailable })
   }
@@ -450,13 +537,18 @@ export function Sidebar({ initialPage }: { initialPage: PageInfo }) {
 
       {/* ── Scrollable body ── */}
       <div className="sidebar-scroll" style={{ flex: 1, overflowY: 'auto', padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+        {jobContext && <JobContextBadge context={jobContext} />}
 
         {state.status === 'loading' && <LoadingState />}
 
         {state.status === 'no-key' && <NoKeyState onConnected={init} />}
 
         {state.status === 'error' && (
-          <ErrorState message={state.message} onRetry={() => { setState({ status: 'loading' }); void init() }} />
+          <ErrorState
+            message={state.message}
+            debug={lastDebugRef.current}
+            onRetry={() => { setState({ status: 'loading' }); void init() }}
+          />
         )}
 
         {(state.status === 'ready' || state.status === 'filling' || state.status === 'scanning' || state.status === 'scan-preview' || state.status === 'review' || state.status === 'added') && (
@@ -527,6 +619,7 @@ export function Sidebar({ initialPage }: { initialPage: PageInfo }) {
             filled={state.filled}
             skipped={state.skipped}
             aiUnavailable={state.aiUnavailable}
+            debug={lastDebugRef.current}
             onDone={() => setState({ status: 'ready', profile: state.profile, page: state.page })}
           />
         )}
@@ -540,6 +633,36 @@ export function Sidebar({ initialPage }: { initialPage: PageInfo }) {
 }
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
+
+function JobContextBadge({ context }: { context: JobContext }) {
+  return (
+    <div style={{
+      margin: '0 0 2px',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '8px',
+      borderRadius: '8px',
+      border: '1px solid rgba(59, 130, 246, 0.2)',
+      background: 'rgba(59, 130, 246, 0.05)',
+      padding: '8px 10px',
+      flexShrink: 0,
+    }}>
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" style={{ color: '#60a5fa', flexShrink: 0 }}>
+        <path d="M4.5 4V3.25C4.5 2.56 5.06 2 5.75 2h2.5c.69 0 1.25.56 1.25 1.25V4M2.75 4h8.5c.69 0 1.25.56 1.25 1.25v5.5c0 .69-.56 1.25-1.25 1.25h-8.5c-.69 0-1.25-.56-1.25-1.25v-5.5C1.5 4.56 2.06 4 2.75 4Z" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+      </svg>
+      <span style={{
+        fontSize: '12px',
+        color: '#93c5fd',
+        whiteSpace: 'nowrap',
+        overflow: 'hidden',
+        textOverflow: 'ellipsis',
+        maxWidth: '280px',
+      }}>
+        Applying to: {context.jobTitle} at {context.jobCompany}
+      </span>
+    </div>
+  )
+}
 
 function ProfileCard({ profile }: { profile: FullProfile }) {
   const name = profile.user.full_name ?? profile.user.email ?? 'Connected'
@@ -844,7 +967,7 @@ function ScanPreviewState({
 
       <p style={{ fontSize: '10px', color: '#3f3f46', margin: 0 }}>
         Review values above — click Apply to write to the form.
-        {page.ats === 'workday' && ' Dropdown fields (country, state) need manual input for now.'}
+        {page.ats === 'workday' && ' Workday dropdown fields are filled after text fields.'}
       </p>
     </div>
   )
@@ -881,11 +1004,12 @@ function FillingState({ stage, onCancel }: { stage: FillStage; onCancel: () => v
 }
 
 function ReviewState({
-  filled, skipped, aiUnavailable, onDone,
+  filled, skipped, aiUnavailable, debug, onDone,
 }: {
   filled: FilledField[]
   skipped: SkippedField[]
   aiUnavailable: boolean
+  debug: DebugExport | null
   onDone: () => void
 }) {
   // Detect the next/continue button once when the review panel mounts.
@@ -977,6 +1101,8 @@ function ReviewState({
           Review the form, then submit when ready.
         </p>
       )}
+
+      {debug && <DebugExportButton debug={debug} />}
     </div>
   )
 }
@@ -1067,10 +1193,31 @@ function NoKeyState({ onConnected }: { onConnected: () => void }) {
   )
 }
 
-function ErrorState({ message, onRetry }: { message: string; onRetry: () => void }) {
+function DebugExportButton({ debug }: { debug: DebugExport }) {
+  return (
+    <button
+      onClick={() => downloadDebugExport(debug)}
+      style={{
+        width: '100%',
+        padding: '7px 0',
+        background: 'transparent',
+        border: '1px solid #27272a',
+        borderRadius: '6px',
+        color: '#71717a',
+        fontSize: '11px',
+        cursor: 'pointer',
+      }}
+    >
+      Export debug JSON
+    </button>
+  )
+}
+
+function ErrorState({ message, debug, onRetry }: { message: string; debug: DebugExport | null; onRetry: () => void }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '4px 0' }}>
       <p style={{ fontSize: '12px', color: '#f87171', margin: 0 }}>{message}</p>
+      {debug && <DebugExportButton debug={debug} />}
       <button
         onClick={onRetry}
         style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '11px', color: '#71717a', padding: 0, textDecoration: 'underline', textAlign: 'left' }}

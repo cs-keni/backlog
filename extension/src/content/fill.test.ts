@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest'
-import { getLabelForInput, isElementFillable, computeFills, applyFills, parseAddress } from './fill'
+import { getLabelForInput, isElementFillable, computeFills, applyFills, parseAddress, fillFileInput } from './fill'
 import { queryShadowAll } from '../shared/domUtils'
 import type { FullProfile, ScannedField } from '../shared/types'
 
@@ -41,6 +41,19 @@ const PROFILE: FullProfile = {
 
 function setBody(html: string) {
   document.body.innerHTML = html
+}
+
+class TestDataTransfer {
+  private filesList: File[] = []
+  items = {
+    add: (file: File) => {
+      this.filesList.push(file)
+    },
+  }
+
+  get files(): File[] {
+    return this.filesList
+  }
 }
 
 // ─── getLabelForInput — regression tests ─────────────────────────────────────
@@ -262,6 +275,61 @@ describe('computeFills — Workday automation-id mapping', () => {
       return el === input
     })
     expect(field).toBeUndefined()
+  })
+})
+
+describe('fillFileInput', () => {
+  beforeEach(() => {
+    setBody('')
+    ;(chrome.runtime.sendMessage as ReturnType<typeof import('vitest').vi.fn>).mockReset()
+    Object.defineProperty(globalThis, 'DataTransfer', {
+      value: TestDataTransfer,
+      writable: true,
+      configurable: true,
+    })
+  })
+
+  it('sends FETCH_FILE message and assigns returned file', async () => {
+    setBody('<input type="file" id="resume" />')
+    const input = document.getElementById('resume') as HTMLInputElement
+    Object.defineProperty(input, 'files', { value: [], writable: true, configurable: true })
+    ;(chrome.runtime.sendMessage as ReturnType<typeof import('vitest').vi.fn>).mockImplementation((_message, cb) => {
+      cb({ ok: true, buffer: new ArrayBuffer(4) })
+    })
+
+    const ok = await fillFileInput(input, 'https://storage.example.com/resume.pdf', 'resume.pdf')
+
+    expect(ok).toBe(true)
+    expect(chrome.runtime.sendMessage).toHaveBeenCalledWith(
+      { type: 'FETCH_FILE', url: 'https://storage.example.com/resume.pdf', fileName: 'resume.pdf' },
+      expect.any(Function)
+    )
+    expect(input.files?.[0]?.name).toBe('resume.pdf')
+  })
+
+  it('returns false when background returns an error', async () => {
+    setBody('<input type="file" id="resume" />')
+    const input = document.getElementById('resume') as HTMLInputElement
+    ;(chrome.runtime.sendMessage as ReturnType<typeof import('vitest').vi.fn>).mockImplementation((_message, cb) => {
+      cb({ ok: false, error: 'bad url' })
+    })
+
+    await expect(fillFileInput(input, 'https://storage.example.com/resume.pdf', 'resume.pdf')).resolves.toBe(false)
+  })
+
+  it('returns false when the site blocks input.files assignment', async () => {
+    setBody('<input type="file" id="resume" />')
+    const input = document.getElementById('resume') as HTMLInputElement
+    Object.defineProperty(input, 'files', {
+      configurable: true,
+      get: () => [],
+      set: () => { throw new DOMException('blocked', 'SecurityError') },
+    })
+    ;(chrome.runtime.sendMessage as ReturnType<typeof import('vitest').vi.fn>).mockImplementation((_message, cb) => {
+      cb({ ok: true, buffer: new ArrayBuffer(4) })
+    })
+
+    await expect(fillFileInput(input, 'https://storage.example.com/resume.pdf', 'resume.pdf')).resolves.toBe(false)
   })
 })
 

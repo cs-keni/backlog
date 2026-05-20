@@ -21,9 +21,19 @@ const chromeMock = {
     sendMessage: vi.fn(),
     onMessage: { addListener: vi.fn() },
   },
+  action: {
+    onClicked: { addListener: vi.fn() },
+  },
+  scripting: {
+    executeScript: vi.fn(),
+  },
   tabs: {
     sendMessage: vi.fn(),
     query: vi.fn().mockResolvedValue([]),
+    get: vi.fn().mockResolvedValue({ url: 'https://example.com' }),
+    update: vi.fn().mockResolvedValue(undefined),
+    onRemoved: { addListener: vi.fn() },
+    onUpdated: { addListener: vi.fn() },
   },
 }
 
