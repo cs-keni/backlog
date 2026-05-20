@@ -4,6 +4,37 @@
 
 ---
 
+## Session: 2026-05-19 — Grade boost planning (Claude Code)
+
+### What changed
+
+No implementation this session — pure planning. Three review passes completed:
+
+- **CEO review** (scope + strategy): 22 accepted items, 5 cherry-picks, 2 adversarial rounds
+- **Eng review** (architecture + tests): 10 decisions, 17 implementation tasks, 9 test coverage gaps closed
+- **Design review** (UI/UX): 4 decisions made, 6 design specs added to plan
+
+Full plan committed to **`docs/GRADE_BOOST_PLAN.md`**. Read it before implementing any phase — it has exact code shapes, test specs, and design specs all inline.
+
+### Key design decisions made today
+
+| Decision | Chosen | Rejected |
+|----------|--------|---------|
+| Bulk select activation | Toolbar "Select" button (toggle mode) | Hover-to-reveal checkboxes (broken on touch) |
+| Filter preset apply | Replace all current filters | Merge with current filters |
+| Easy/Hard button style | Icon + short text ("✓ Easy" / "↺ Hard") | Emoji (🔁) or icon-only |
+| Hard button feedback | 300ms "Back tomorrow" flash before exit | Immediate silent exit |
+
+### Required follow-up (no code written yet)
+
+All of Phase 1–9 as described in `docs/GRADE_BOOST_PLAN.md`. Priority order in `docs/CURRENT_TASK.md`.
+
+### Checks run
+
+None — planning only.
+
+---
+
 ## Session: 2026-05-18 — Extension answer cache (Codex)
 
 ### What changed
