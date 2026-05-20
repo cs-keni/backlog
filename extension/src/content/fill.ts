@@ -1,5 +1,6 @@
 import type { FullProfile, FilledField, SkippedField, FillResult, AtsType, UnfilledField, ScannedField, WorkHistory, Education } from '../shared/types'
 import { queryShadowAll, queryShadowScoped } from '../shared/domUtils'
+import { fillWorkdayCombobox, waitForChildListChange } from './fill-workday'
 
 // ─── Input value setter ───────────────────────────────────────────────────────
 // Works for standard inputs and React/Angular controlled inputs by dispatching
@@ -577,11 +578,10 @@ export function applyFills(fields: ScannedField[]): FilledField[] {
 }
 
 // ─── Workday combobox (async) ────────────────────────────────────────────────
-// Workday uses custom combobox components (not native <select>) for fields like
-// State/Province. These require: click trigger → wait for options → click match.
-// The polling approach works because queryShadowAll traverses shadow roots each
-// call, unlike MutationObserver which can't observe cross-root mutations from
-// document.body.
+// Workday uses custom combobox components (not native <select>) for country,
+// state/province, work authorization, and phone country code.
+// fillWorkdayCombobox (fill-workday.ts) handles the DOM interaction via
+// MutationObserver; fillWorkdayComboboxes orchestrates the cascade below.
 
 const US_STATES: Record<string, string> = {
   AL: 'Alabama', AK: 'Alaska', AZ: 'Arizona', AR: 'Arkansas', CA: 'California',
@@ -597,22 +597,34 @@ const US_STATES: Record<string, string> = {
   DC: 'District of Columbia',
 }
 
-// Maps automation-id patterns (for scan preview) + direct button selectors (for fill).
-// The button selector comes from inspecting the live page: Workday renders state as
-// <button aria-haspopup="listbox" name="countryRegion" id="address--countryRegion">.
-const WORKDAY_COMBOBOX_MAP: Array<{ ids: RegExp; buttonSelector: string; resolve: Resolver; label: string }> = [
+// Country and State/Province are handled with cascade logic in fillWorkdayComboboxes
+// (country must be selected first so Workday re-renders state options for that country).
+const WORKDAY_COMBOBOX_MAP: Array<{ ids: RegExp; resolve: Resolver; label: string }> = [
+  {
+    ids: /^country$|^formField-country$|^addressSection_country$|^countryDropdown$/,
+    resolve: () => 'United States',
+    label: 'Country',
+  },
   {
     ids: /^countryRegion$|^formField-countryRegion$|^stateProvince$|^addressSection_stateProvince$|^countryRegionAbbreviation$/,
-    buttonSelector: 'button[name="countryRegion"], button[id*="countryRegion"][aria-haspopup]',
     resolve: (p) => getProfileAddress(p).state,
     label: 'State / Province',
   },
+  {
+    ids: /^workAuthorizationType$|^workAuthorization$|^usWorkAuthorization$/,
+    resolve: (p) => p.user.citizenship_status,
+    label: 'Work Authorization',
+  },
+  {
+    ids: /^phoneDeviceType$|^phone_deviceType$|^phonePrimary_deviceType$|^phoneCountryCode$/,
+    resolve: () => 'United States',
+    label: 'Phone Country Code',
+  },
 ]
 
-// Polls for a [role="listbox"] with multiple [role="option"] children.
-// Avoids [data-automation-id="menuItem"] which is used for tag/chip components
-// (e.g. the phone country-code selector chip shows a menuItem even when no
-// dropdown is open, causing false-positives in the old waitForMenuItems approach).
+// Polls for a [role="listbox"] containing multiple [role="option"] children.
+// Used by the education degree picker which finds its button directly rather than
+// via a container; will be removed when Phase 2f decomposes fillWorkdayEducationInternal.
 function waitForListboxOptions(timeoutMs = 2000): Promise<HTMLElement[]> {
   return new Promise((resolve) => {
     const deadline = Date.now() + timeoutMs
@@ -627,27 +639,6 @@ function waitForListboxOptions(timeoutMs = 2000): Promise<HTMLElement[]> {
     }
     setTimeout(check, 150)
   })
-}
-
-async function clickWorkdayCombobox(button: HTMLElement, targetValue: string): Promise<boolean> {
-  const fullName = US_STATES[targetValue.toUpperCase()] ?? targetValue
-  const normalized = fullName.toLowerCase()
-
-  button.click()
-
-  const options = await waitForListboxOptions(2000)
-  if (options.length === 0) return false
-
-  const match = options.find((opt) => {
-    const text = opt.textContent?.trim().toLowerCase() ?? ''
-    return text === normalized || text.includes(normalized)
-  })
-  if (!match) return false
-
-  match.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }))
-  match.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true }))
-  match.click()
-  return true
 }
 
 // Counts all [role="option"] elements visible in any listbox right now.
@@ -981,7 +972,7 @@ async function fillEducationEntry(
       degreeBtn.click()
       const opts = await waitForListboxOptions(2000)
       const normalized = edu.degree.toLowerCase()
-      const match = opts.find((o) => {
+      const match = opts.find((o: HTMLElement) => {
         const text = o.textContent?.trim().toLowerCase() ?? ''
         return text === normalized || text.includes(normalized) || normalized.includes(text.slice(0, 6))
       })
@@ -1099,32 +1090,73 @@ async function fillWorkdayEducationInternal(profile: FullProfile): Promise<Fille
   return filled
 }
 
+function findComboboxContainer(ids: RegExp): HTMLElement | null {
+  return (
+    queryShadowAll<HTMLElement>('[data-automation-id]').find((el) =>
+      ids.test(el.getAttribute('data-automation-id') ?? '')
+    ) ?? null
+  )
+}
+
+function selectorFor(el: HTMLElement): string {
+  const id = el.getAttribute('data-automation-id')
+  return id ? `[data-automation-id="${id}"]` : ''
+}
+
 export async function fillWorkdayComboboxes(profile: FullProfile): Promise<FilledField[]> {
   const filled: FilledField[] = []
+  const cascadeLabels = new Set<string>()
 
-  for (const { ids, buttonSelector, resolve, label } of WORKDAY_COMBOBOX_MAP) {
+  // Country → state cascade: country must be filled first so Workday re-renders
+  // the state option list for the selected country before we attempt state fill.
+  const countryEntry = WORKDAY_COMBOBOX_MAP.find((e) => e.label === 'Country')
+  const stateEntry = WORKDAY_COMBOBOX_MAP.find((e) => e.label === 'State / Province')
+
+  if (countryEntry) cascadeLabels.add('Country')
+  if (stateEntry) cascadeLabels.add('State / Province')
+
+  const countryContainer = countryEntry ? findComboboxContainer(countryEntry.ids) : null
+  const stateContainer = stateEntry ? findComboboxContainer(stateEntry.ids) : null
+
+  if (countryContainer) {
+    const countryValue = countryEntry!.resolve(profile)
+    if (countryValue) {
+      try {
+        const ok = await fillWorkdayCombobox(countryContainer, countryValue)
+        if (ok) {
+          filled.push({ label: 'Country', value: countryValue, selector: selectorFor(countryContainer) })
+          // Wait for Workday to re-render state options after country selection.
+          // MutationObserver fires on childList change; 300ms fallback for slow pages.
+          if (stateContainer) await waitForChildListChange(stateContainer, 300)
+        }
+      } catch { /* skip */ }
+    }
+  }
+
+  if (stateContainer) {
+    const stateRaw = stateEntry!.resolve(profile)
+    if (stateRaw) {
+      const stateValue = US_STATES[stateRaw.toUpperCase()] ?? stateRaw
+      try {
+        const ok = await fillWorkdayCombobox(stateContainer, stateValue)
+        if (ok) {
+          filled.push({ label: 'State / Province', value: stateValue, selector: selectorFor(stateContainer) })
+        }
+      } catch { /* skip */ }
+    }
+  }
+
+  // Process remaining non-cascade comboboxes (work authorization, phone country code)
+  for (const { ids, resolve, label } of WORKDAY_COMBOBOX_MAP) {
+    if (cascadeLabels.has(label)) continue
     try {
       const value = resolve(profile)
       if (!value) continue
-
-      // Try direct button selector first (most reliable); fall back to wrapper scan
-      let button = queryShadowAll<HTMLElement>(buttonSelector)[0]
-      if (!button) {
-        const wrappers = queryShadowAll<HTMLElement>('[data-automation-id]').filter((el) =>
-          ids.test(el.getAttribute('data-automation-id') ?? '')
-        )
-        for (const wrapper of wrappers) {
-          const btn = queryShadowAll<HTMLElement>('button[aria-haspopup]', wrapper)[0]
-          if (btn) { button = btn; break }
-        }
-      }
-      if (!button) continue
-
-      const success = await clickWorkdayCombobox(button, value)
-      if (success) {
-        const fullName = US_STATES[value.toUpperCase()] ?? value
-        flashFill(button)
-        filled.push({ label, value: fullName, selector: buttonSelector })
+      const container = findComboboxContainer(ids)
+      if (!container) continue
+      const ok = await fillWorkdayCombobox(container, value)
+      if (ok) {
+        filled.push({ label, value, selector: selectorFor(container) })
       }
     } catch { /* skip */ }
   }
