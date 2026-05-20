@@ -4,6 +4,23 @@
 
 ---
 
+## Polish Pass plan (Claude Code, 2026-05-20)
+
+All P1–P3 phases are complete. A full grade review surfaced four remaining gaps. Codex owns all four — see `docs/CURRENT_TASK.md` § "Polish Pass" for full specs including migration SQL, file paths, and test patterns. Summary:
+
+| Task | What to do |
+|------|-----------|
+| **PP-1 Timezone** | Add `notification_timezone` to `users` (migration 026), timezone picker in settings, update `isInQuietHours` to use user's local time |
+| **PP-2 Graph test** | `GET /api/analytics/company-graph` integration test — happy path + auth guard |
+| **PP-3 LLM prompt tests** | Unit tests for STAR, cover-letter, and question-answer prompts — mock SDK, assert shape |
+| **PP-4 E2E depth** | Flesh out all 5 specs to 40–60 LOC; one error/negative test per spec |
+
+Suggested order: PP-2 (15 min) → PP-1 (45 min) → PP-3 (30 min) → PP-4 (45 min).
+
+Do all four before marking the polish pass complete. Claude Code has no remaining tasks in this pass.
+
+---
+
 ## Session: 2026-05-20 — Phase 9 E2E + CI hardening (Codex)
 
 ### What changed

@@ -1,7 +1,7 @@
 # Current Task
 
-**Last updated:** 2026-05-21
-**Status:** All P1, P2, and P3 phases complete. Phase 9 E2E coverage is implemented and CI has deterministic fixture-mode tests.
+**Last updated:** 2026-05-20
+**Status:** All P1–P3 phases complete. Polish Pass in progress — closing the remaining gaps between A- and clean A.
 
 ---
 
@@ -57,6 +57,64 @@ Suggested order: 3a → 3b → 4 → 5 → 6 → 2f/g → 8b → 9
 | **Phase 2f/g** — fill.ts + Sidebar.tsx decomposition | Codex | implemented |
 | **Phase 8b** — Easy/Hard SR buttons (300ms flash state machine, migration 023) | **Claude Code** | implemented |
 | **Phase 9** — E2E tests (Playwright global setup) | Codex | implemented |
+
+---
+
+## Polish Pass — Closing A- → A Gaps
+
+Full grade review completed 2026-05-20. Every section is A- or better. Four gaps remain before everything is a clean A.
+
+### Grade snapshot (post Phase 9)
+
+| Section | Grade | Gap |
+|---------|-------|-----|
+| Notifications | A- | Quiet hours check is UTC-only — no per-user timezone |
+| Extension | A | No code gap; manual Workday smoke test is the only remaining step (Kenny) |
+| Application Tracker | A | — |
+| Analytics | A- | No integration test for `GET /api/analytics/company-graph` |
+| Interview Prep | A- | Phase 5c LLM prompt unit tests never landed |
+| Profile | A | — |
+| Job Feed | A | — |
+| DSA | A | — |
+| E2E | B+ | 5 specs at ~20 LOC each — happy paths only, no error paths, no negative tests |
+
+### Polish Pass task list
+
+| Task | Owner | Effort | Section |
+|------|-------|--------|---------|
+| **PP-1** Timezone-aware quiet hours: add `notification_timezone` to `users` table (migration `026`), timezone picker in notification settings, update `isInQuietHours` to convert UTC now → user local time | **Codex** | M | Notifications |
+| **PP-2** Company-graph integration test: `GET /api/analytics/company-graph` returns `{ nodes, edges }` with correct Jaccard — happy path + auth guard | **Codex** | S | Analytics |
+| **PP-3** LLM prompt unit tests: mock Anthropic SDK at transport via MSW; assert prompt shape (not response content) for STAR builder, cover letter generator, and question generator | **Codex** | M | Interview Prep |
+| **PP-4** E2E depth: flesh out all 5 existing specs to 40–60 LOC each; add at least one error/negative test per spec (bad auth redirect, empty selection, filter with no results, failed drag rollback) | **Codex** | M | E2E |
+
+### PP-1 implementation notes (Timezone)
+
+- New migration `supabase/migrations/026_add_notification_timezone.sql`: `ALTER TABLE users ADD COLUMN notification_timezone text DEFAULT 'UTC'`
+- Settings page (`src/app/(app)/settings/page.tsx`): add a timezone selector. Use a `<select>` populated from the IANA timezone list (can hardcode the most common ones: US/EU/AU, ~30 entries). Save via `PATCH /api/profile`.
+- `worker/src/notifications/dispatcher.ts`: include `notification_timezone` in the user select query. Update `isInQuietHours(now, start, end, timezone)` to convert `now` to the user's local time before comparing: `new Date(now.toLocaleString('en-US', { timeZone: timezone }))`.
+- Tests: update dispatcher unit tests to cover timezone conversions — user in UTC+9 during their local quiet hours should get `pending`, user in UTC-8 should not.
+
+### PP-3 implementation notes (LLM prompt tests)
+
+LLM-calling routes to cover:
+- `src/app/api/prep/star/route.ts` (or wherever STAR generation lives) — assert prompt includes user's work history and the target company name
+- `src/app/api/cover-letter/route.ts` — assert prompt includes job description, user profile, and template selection logic
+- `src/app/api/extension/answer-question/route.ts` — question normalization + cache miss path calls Claude
+
+Pattern: mock `@anthropic-ai/sdk` at module level in vitest, capture the `messages.create` call args, assert the `messages` array shape and `system` prompt content. Do NOT assert on response content — only on what we send.
+
+### PP-4 implementation notes (E2E depth)
+
+For each of the 5 specs, add:
+1. A second `test()` that exercises an error or boundary condition
+2. At least 2 additional `expect()` assertions in the happy path test
+
+Suggested additions per spec:
+- `auth.spec.ts`: test that unauthenticated `/tracker` redirects to `/login`
+- `login-feed.spec.ts`: test that filter preset appears in sidebar after saving; test that feed with active filters shows reset button
+- `tracker-drag.spec.ts`: test that dragging to the same column does NOT show a toast
+- `bulk-tracker.spec.ts`: test that clicking "Select" with 0 cards selected does NOT show the bulk bar; cancel exits select mode
+- `prep-star.spec.ts`: test that re-enrich button shows loading state; test that 429 cooldown message appears
 
 ---
 
