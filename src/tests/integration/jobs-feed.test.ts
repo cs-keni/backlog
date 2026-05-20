@@ -73,12 +73,18 @@ describe('Feed query param builder', () => {
     expect(params.get('location')).toBeNull()
     expect(params.get('experience_level')).toBeNull()
   })
+
+  it('includes search params', () => {
+    const params = buildFeedParams({ search: 'backend' })
+    expect(params.get('search')).toBe('backend')
+  })
 })
 
 // ─── Helpers (mirrors logic from components, tests it in isolation) ───────────
 
 type FeedOptions = {
   sort?: string
+  search?: string
   isRemote?: 'all' | 'remote' | 'onsite'
   location?: string
   salaryMin?: string
@@ -92,6 +98,7 @@ function buildFeedParams(
 ): URLSearchParams {
   const params = new URLSearchParams()
   params.set('sort', opts.sort ?? 'newest')
+  if (opts.search) params.set('search', opts.search)
   if (opts.isRemote === 'remote') params.set('is_remote', 'true')
   if (opts.isRemote === 'onsite') params.set('is_remote', 'false')
   if (opts.location) params.set('location', opts.location)

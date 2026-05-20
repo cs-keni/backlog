@@ -393,3 +393,30 @@ See `docs/CURRENT_TASK.md`. Implementation of fill.ts, types.ts, Sidebar.tsx, fi
 - Extension `tsc --noEmit` still reports the same pre-existing WeakRef/sidebar-css/popup diagnostics from Phase 2a; production Vite builds pass.
 - Cover letter upload depends on an existing generated cover letter for the Backlog job; otherwise it is skipped and included in debug export/manual-input review.
 - Phase 2f/g decomposition is still not done and should remain P3.
+
+## 2026-05-20 — Phase 7 job feed presets + abortable fetches (Codex)
+
+### Implemented
+
+- Added feed `search` to `FeedFilters`, query param construction, and the filter sidebar UI.
+- Added `AbortController` handling for primary feed fetches so debounced search/filter/sort changes cancel stale in-flight requests.
+- Added `supabase/migrations/022_add_filter_presets.sql` with:
+  - `filter_presets` table
+  - versioned JSON check (`filters.version = 1`)
+  - RLS policies scoped to `auth.uid()`
+  - DB-level 20-preset BEFORE INSERT trigger
+- Added `/api/filter-presets` GET/POST and `/api/filter-presets/[id]` DELETE with auth, schema validation, max-20 API check, and 50-char name validation.
+- Added saved preset UI in `FilterSidebar`: save modal, replacement apply behavior, active chip state, click-active-to-clear, inline delete, empty state, and 10+ count badge.
+
+### Checks
+
+- `node node_modules/typescript/lib/tsc.js --noEmit` — passed
+- `node node_modules/vitest/dist/cli.js run --pool=threads src/tests/integration/filter-presets.test.ts src/tests/integration/jobs-feed.test.ts` — 17 passed
+- `node node_modules/next/dist/bin/next build` — passed after rerun with network access for Google font fetches
+- `git diff --check` — passed
+
+### Gotchas
+
+- `npm run build` still fails because `node_modules/.bin/next` cannot resolve `../server/require-hook`; direct `node node_modules/next/dist/bin/next build` works.
+- Migration 022 is written but still needs to be applied in Supabase.
+- Phase 8a ownership changed by user routing to Claude Code for the next handoff.

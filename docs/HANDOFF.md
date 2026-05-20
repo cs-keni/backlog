@@ -4,6 +4,34 @@
 
 ---
 
+## Session: 2026-05-20 — Phase 7 job feed presets + abortable fetches (Codex)
+
+### What changed
+
+- **Phase 7a — Search debounce + abort**
+  - Added a first-class feed `search` filter wired to `/api/jobs?search=...`.
+  - Primary feed fetches now use `AbortController` and ignore stale responses, so fast filter/search changes do not race old results into the UI.
+- **Phase 7b — Saved filter presets**
+  - Added `supabase/migrations/022_add_filter_presets.sql` with `filter_presets`, RLS, versioned JSON schema check, and DB-level 20-preset trigger.
+  - Added `GET /POST /api/filter-presets` and `DELETE /api/filter-presets/[id]`.
+  - Filter sidebar can save current filters, apply presets by replacement, clear an active preset by clicking it again, and delete presets inline.
+  - Preset chips follow the planned active/default/count/empty-state behavior.
+
+### Checks run
+
+- `node node_modules/typescript/lib/tsc.js --noEmit` — passed
+- `node node_modules/vitest/dist/cli.js run --pool=threads src/tests/integration/filter-presets.test.ts src/tests/integration/jobs-feed.test.ts` — 17 passed
+- `node node_modules/next/dist/bin/next build` — passed after rerun with network access for Google font fetches
+- `git diff --check` — passed
+
+### Known residuals
+
+- `npm run build` still fails because the local `node_modules/.bin/next` wrapper cannot resolve `../server/require-hook`; the direct Next entrypoint works.
+- Apply `supabase/migrations/022_add_filter_presets.sql` in Supabase before using saved filter presets in production.
+- Phase 8a is currently Claude-owned per latest routing. Phase 2f/g remains deferred to P3.
+
+---
+
 ## Session: 2026-05-20 — Phase 2b-2e extension core gaps (Codex)
 
 ### What changed

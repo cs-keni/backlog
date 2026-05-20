@@ -19,6 +19,7 @@ interface Cursor {
 }
 
 const DEFAULT_FILTERS: FeedFilters = {
+  search: '',
   location: '',
   isRemote: 'all',
   country: 'all',
@@ -35,6 +36,7 @@ function buildParams(
 ): URLSearchParams {
   const params = new URLSearchParams()
   params.set('sort', sort)
+  if (filters.search) params.set('search', filters.search)
   if (filters.location) params.set('location', filters.location)
   if (filters.isRemote === 'remote') params.set('is_remote', 'true')
   if (filters.isRemote === 'onsite') params.set('is_remote', 'false')
@@ -71,6 +73,8 @@ export function JobFeed({ initialJobId }: JobFeedProps) {
   const observerRef = useRef<IntersectionObserver | null>(null)
   const sentinelRef = useRef<HTMLDivElement | null>(null)
   const filterDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const fetchAbortRef = useRef<AbortController | null>(null)
+  const fetchSeqRef = useRef(0)
   const pendingFilters = useRef<FeedFilters>(filters)
   const filterFocusRef = useRef<(() => void) | null>(null)
   const cardRefs = useRef<Map<string, HTMLDivElement>>(new Map())
@@ -84,13 +88,20 @@ export function JobFeed({ initialJobId }: JobFeedProps) {
   // ─── Initial + filter/sort fetch ────────────────────────────────────────────
 
   const fetchJobs = useCallback(async (f: FeedFilters, s: SortOption) => {
+    fetchAbortRef.current?.abort()
+    const controller = new AbortController()
+    fetchAbortRef.current = controller
+    const seq = fetchSeqRef.current + 1
+    fetchSeqRef.current = seq
+
     setLoading(true)
     setError(null)
     setNewJobCount(0)
     try {
-      const res = await fetch(`/api/jobs?${buildParams(f, s)}`)
+      const res = await fetch(`/api/jobs?${buildParams(f, s)}`, { signal: controller.signal })
       if (!res.ok) throw new Error('Failed to fetch jobs')
       const data = await res.json() as { jobs: Job[]; nextCursor: Cursor | null }
+      if (fetchSeqRef.current !== seq) return
       setJobs((prev) => {
         // Keep the deep-linked job pinned at top if it's not in this page of results
         const stashed = deepLinkedJobRef.current
@@ -105,10 +116,14 @@ export function JobFeed({ initialJobId }: JobFeedProps) {
         setSelectedJobId(null)
       }
       preserveSelectionRef.current = false
-    } catch {
+    } catch (err) {
+      if (err instanceof DOMException && err.name === 'AbortError') return
       setError('Could not load jobs. Check your connection and try again.')
     } finally {
-      setLoading(false)
+      if (fetchSeqRef.current === seq) {
+        setLoading(false)
+        fetchAbortRef.current = null
+      }
     }
   }, [])
 
@@ -199,6 +214,12 @@ export function JobFeed({ initialJobId }: JobFeedProps) {
       if (filterDebounceRef.current) clearTimeout(filterDebounceRef.current)
     }
   }, [filters, sort, fetchJobs])
+
+  useEffect(() => {
+    return () => {
+      fetchAbortRef.current?.abort()
+    }
+  }, [])
 
   // ─── Feed keyboard shortcuts (J/K navigate, A quick-apply, F focus filter) ──
 

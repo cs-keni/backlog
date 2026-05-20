@@ -55,6 +55,7 @@ export interface Job {
 export type DateRange = '' | '24h' | '7d' | '30d' | '1y'
 
 export interface FeedFilters {
+  search: string
   location: string
   isRemote: 'all' | 'remote' | 'onsite'
   country: 'all' | 'us' | 'international'
@@ -62,6 +63,14 @@ export interface FeedFilters {
   experienceLevel: string
   roleType: string
   dateRange: DateRange
+}
+
+export interface SavedFilterPreset {
+  id: string
+  user_id: string
+  name: string
+  filters: FeedFilters & { version: 1 }
+  created_at: string
 }
 
 export type SortOption = 'newest' | 'salary'
