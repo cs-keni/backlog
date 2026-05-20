@@ -15,6 +15,19 @@ Full spec is in **`docs/GRADE_BOOST_PLAN.md`**. Read it before starting any phas
 
 ---
 
+## Agent ownership
+
+Some phases are reserved for Claude Code due to animation sequencing, subtle DOM interaction, or "feels right" judgment that's hard to verify without live testing. Do not implement reserved phases — leave them for Claude Code.
+
+| Phase | Owner | Reason |
+|-------|-------|--------|
+| Phase 2a — Workday comboboxes | **Claude Code** | MutationObserver timing + country→state cascade only surfaces bugs on real Workday pages, not unit tests |
+| Phase 3b — Bulk action bar UI | **Claude Code** | Framer Motion spring + DnD interaction with select mode + portal need to feel right in motion |
+| Phase 8b — Easy/Hard SR buttons | **Claude Code** | 300ms Hard flash sequence is a tight state machine; wrong sequencing causes double-fires or broken feel |
+| Everything else | **Codex** | Specs are complete; API routes, migrations, tests, decompositions are mechanical |
+
+---
+
 ## Implementation priority
 
 ### P1 — Core loop broken (do these first)
