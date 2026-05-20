@@ -4,6 +4,28 @@
 
 ---
 
+## Session: 2026-05-20 — Phase 3b bulk action bar (Claude Code)
+
+### What changed
+
+- Added `POST /api/applications/batch` — ownership check, archive or status bulk update.
+- Added `BulkActionBar` portal component: pill bar with spring animation, count badge, Archive button (optimistic + rollback), inline error, Escape to dismiss.
+- `ApplicationCard` now accepts `selectMode` / `isBulkSelected`; drag disabled in select mode; checkbox overlay in top-right.
+- `TrackerBoard` toolbar gets a "Select" button that activates select mode and hides the archive toggle. Card clicks toggle bulk selection in select mode; `AnimatePresence` wraps the bar for enter/exit animation.
+- 3 integration tests for batch route (own IDs → 200, foreign ID → 403, empty → 422).
+
+### Checks run
+
+- `node node_modules/typescript/lib/tsc.js --noEmit` — passed
+- `node node_modules/vitest/dist/cli.js run --pool=threads src/tests/integration/applications.test.ts` — 17 passed
+
+### Known residuals
+
+- Phase 8b (Easy/Hard SR buttons) remains Claude-reserved.
+- Codex can now pick up Phase 4, 5, 6, 2f/g, and 9.
+
+---
+
 ## End-of-day wrap — 2026-05-21 (Claude Code)
 
 ### State check

@@ -4,6 +4,50 @@ Reverse-chronological. One entry per meaningful session.
 
 ---
 
+## 2026-05-20 — Phase 3b: Bulk action bar (Claude Code)
+
+### What happened
+
+Codex completed Phase 3a (tracker integration tests). Picked up Phase 3b as reserved.
+
+### Commit
+
+`cc6c7a2` — Implement Phase 3b: bulk action bar (select mode + batch archive)
+
+### What changed
+
+- **`src/app/api/applications/batch/route.ts`** (new)
+  - `POST /api/applications/batch` — accepts `{ ids, action: 'archive' | 'status', status? }`
+  - Ownership check: queries all IDs filtered by `user_id` before any write; returns 403 if count < ids.length
+  - 422 on empty ids or invalid action/status; 200 with `{ updated: N }` on success
+- **`src/components/tracker/BulkActionBar.tsx`** (new)
+  - Portal render via `createPortal(…, document.body)` to escape overflow:hidden ancestors
+  - Pill bar: count badge, divider, Archive button (spinner on in-flight), inline error, dismiss ×
+  - Spring animation: `stiffness 350, damping 35` (matches existing detail panel)
+  - `position: fixed; bottom: max(24px, calc(env(safe-area-inset-bottom) + 8px))` for safe area
+  - Escape key → dismiss (useEffect listener attached/cleaned on mount)
+- **`src/components/tracker/ApplicationCard.tsx`**
+  - Added `selectMode` and `isBulkSelected` props
+  - `useDraggable` disabled when `selectMode` is true (prevents accidental drag during multi-select)
+  - Checkbox overlay (absolute top-right) shown only in select mode; filled blue when selected
+  - Bulk-selected card style: `bg-zinc-900/80 ring-1 ring-blue-500/40`
+- **`src/components/tracker/TrackerBoard.tsx`**
+  - Select mode state + selectedIds Set + bulkLoading + bulkError
+  - "Select" button in toolbar (right of archive toggle); shows "Cancel · N selected" when active
+  - Archive toggle hidden while in select mode (avoids conflicting affordances)
+  - Kanban card clicks route to `toggleBulkSelect` in select mode, detail panel selection otherwise
+  - `handleBulkArchive`: optimistic archive → POST batch → rollback on failure → 2s error then clear
+  - `AnimatePresence` wraps BulkActionBar for enter/exit spring animation
+- **`src/tests/integration/applications.test.ts`**
+  - 3 new tests: own IDs → 200, foreign ID → 403, empty → 422
+
+### Checks run
+
+- `node node_modules/typescript/lib/tsc.js --noEmit` — passed
+- `node node_modules/vitest/dist/cli.js run --pool=threads src/tests/integration/applications.test.ts` — 17 passed (14 pre-existing + 3 new)
+
+---
+
 ## 2026-05-20 — Phase 2a: Workday async comboboxes (Claude Code)
 
 ### What happened
