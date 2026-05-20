@@ -16,6 +16,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { ApplicationCard } from './ApplicationCard'
 import { ApplicationDetail } from './ApplicationDetail'
 import { ApplicationList } from './ApplicationList'
+import { BulkActionBar } from './BulkActionBar'
 import { LogApplicationModal } from '@/components/shared/LogApplicationModal'
 import type { ApplicationWithJob, ApplicationStatus } from '@/lib/jobs/types'
 import { useToast } from '@/components/ui/Toaster'
@@ -43,6 +44,10 @@ export function TrackerBoard({ initialApplications }: TrackerBoardProps) {
   const [view, setView] = useState<'kanban' | 'list'>('kanban')
   const [showArchived, setShowArchived] = useState(false)
   const [showLogModal, setShowLogModal] = useState(false)
+  const [selectMode, setSelectMode] = useState(false)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [bulkLoading, setBulkLoading] = useState(false)
+  const [bulkError, setBulkError] = useState<string | null>(null)
 
   const archivedCount = applications.filter(a => a.is_archived).length
   const visibleApps = showArchived ? applications : applications.filter(a => !a.is_archived)
@@ -145,6 +150,58 @@ export function TrackerBoard({ initialApplications }: TrackerBoardProps) {
     toast({ type: 'success', title: 'Application logged', description: `${application.jobs?.title ?? 'Job'} at ${application.jobs?.company ?? ''}` })
   }, [toast])
 
+  function enterSelectMode() {
+    setSelectMode(true)
+    setSelectedId(null)
+  }
+
+  function exitSelectMode() {
+    setSelectMode(false)
+    setSelectedIds(new Set())
+    setBulkError(null)
+  }
+
+  function toggleBulkSelect(appId: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(appId)) next.delete(appId)
+      else next.add(appId)
+      return next
+    })
+  }
+
+  async function handleBulkArchive() {
+    const ids = Array.from(selectedIds)
+    setBulkLoading(true)
+    setBulkError(null)
+
+    // Optimistic update
+    setApplications((prev) =>
+      prev.map((a) => ids.includes(a.id) ? { ...a, is_archived: true } : a)
+    )
+    if (!showArchived) setSelectedId(null)
+
+    try {
+      const res = await fetch('/api/applications/batch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids, action: 'archive' }),
+      })
+      if (!res.ok) throw new Error('Failed')
+      toast({ type: 'success', title: `Archived ${ids.length} application${ids.length !== 1 ? 's' : ''}` })
+      exitSelectMode()
+    } catch {
+      // Rollback
+      setApplications((prev) =>
+        prev.map((a) => ids.includes(a.id) ? { ...a, is_archived: false } : a)
+      )
+      setBulkError('Failed — reverted')
+      setTimeout(() => setBulkError(null), 2000)
+    } finally {
+      setBulkLoading(false)
+    }
+  }
+
   const appsByStatus = COLUMNS.reduce<Record<string, ApplicationWithJob[]>>((acc, col) => {
     acc[col.id] = visibleApps.filter((a) => a.status === col.id)
     return acc
@@ -178,7 +235,7 @@ export function TrackerBoard({ initialApplications }: TrackerBoardProps) {
         </div>
 
         {/* Archive toggle */}
-        {archivedCount > 0 && (
+        {archivedCount > 0 && !selectMode && (
           <button
             onClick={() => setShowArchived(s => !s)}
             className={`flex items-center gap-1.5 text-[11px] px-2.5 py-1 rounded-md border transition-colors ${
@@ -193,6 +250,19 @@ export function TrackerBoard({ initialApplications }: TrackerBoardProps) {
             {showArchived ? 'Hide archived' : `Show archived (${archivedCount})`}
           </button>
         )}
+
+        {/* Select mode toggle */}
+        <button
+          onClick={selectMode ? exitSelectMode : enterSelectMode}
+          aria-pressed={selectMode}
+          className={`flex items-center gap-1.5 text-[11px] px-2.5 py-1 rounded-md border transition-colors ${
+            selectMode
+              ? 'border-blue-500/40 bg-blue-500/10 text-blue-400'
+              : 'border-zinc-700 text-zinc-500 hover:text-zinc-300 hover:border-zinc-600'
+          }`}
+        >
+          {selectMode ? `Cancel · ${selectedIds.size} selected` : 'Select'}
+        </button>
 
         <div className="ml-auto flex items-center gap-2">
           <span className="text-xs text-zinc-600 tabular-nums">
@@ -227,7 +297,12 @@ export function TrackerBoard({ initialApplications }: TrackerBoardProps) {
                     column={col}
                     apps={appsByStatus[col.id] ?? []}
                     selectedId={selectedId}
-                    onCardClick={setSelectedId}
+                    selectMode={selectMode}
+                    selectedIds={selectedIds}
+                    onCardClick={(id) => {
+                      if (selectMode) toggleBulkSelect(id)
+                      else setSelectedId(selectedId === id ? null : id)
+                    }}
                   />
                 ))}
               </div>
@@ -319,6 +394,19 @@ export function TrackerBoard({ initialApplications }: TrackerBoardProps) {
         />
       )}
     </AnimatePresence>
+
+    {/* Bulk action bar */}
+    <AnimatePresence>
+      {selectMode && selectedIds.size > 0 && (
+        <BulkActionBar
+          selectedCount={selectedIds.size}
+          isLoading={bulkLoading}
+          error={bulkError}
+          onArchive={handleBulkArchive}
+          onDismiss={exitSelectMode}
+        />
+      )}
+    </AnimatePresence>
     </>
   )
 }
@@ -329,10 +417,12 @@ interface KanbanColumnProps {
   column: typeof COLUMNS[number]
   apps: ApplicationWithJob[]
   selectedId: string | null
+  selectMode: boolean
+  selectedIds: Set<string>
   onCardClick: (id: string) => void
 }
 
-function KanbanColumn({ column, apps, selectedId, onCardClick }: KanbanColumnProps) {
+function KanbanColumn({ column, apps, selectedId, selectMode, selectedIds, onCardClick }: KanbanColumnProps) {
   const { setNodeRef, isOver } = useDroppable({ id: column.id })
 
   return (
@@ -369,8 +459,10 @@ function KanbanColumn({ column, apps, selectedId, onCardClick }: KanbanColumnPro
               <ApplicationCard
                 app={app}
                 index={i}
-                isSelected={selectedId === app.id}
-                onClick={() => onCardClick(selectedId === app.id ? '' : app.id)}
+                isSelected={!selectMode && selectedId === app.id}
+                isBulkSelected={selectedIds.has(app.id)}
+                selectMode={selectMode}
+                onClick={() => onCardClick(app.id)}
               />
             </motion.div>
           ))}

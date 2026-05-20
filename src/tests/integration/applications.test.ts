@@ -34,6 +34,7 @@ import { createClient } from '@/lib/supabase/server'
 import { POST as applicationsPOST } from '@/app/api/applications/route'
 import { PATCH as applicationPATCH, DELETE as applicationDELETE } from '@/app/api/applications/[id]/route'
 import { POST as extensionApplyPOST } from '@/app/api/extension/apply/route'
+import { POST as batchPOST } from '@/app/api/applications/batch/route'
 
 const TEST_USER = { id: 'user-1', email: 'test@example.com' }
 const TEST_APP_ID = 'app-1'
@@ -344,6 +345,71 @@ describe('DELETE /api/applications/[id]', () => {
     })
     const res = await applicationDELETE(makeIdRequest('DELETE'), { params: Promise.resolve({ id: TEST_APP_ID }) })
     expect(res.status).toBe(204)
+  })
+})
+
+describe('POST /api/applications/batch', () => {
+  function makeBatchRequest(body: unknown): Request {
+    return new Request('http://localhost/api/applications/batch', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+  }
+
+  beforeEach(() => {
+    vi.resetAllMocks()
+    mockFrom.mockReset()
+    mockGetUser.mockReset()
+    vi.mocked(createClient).mockResolvedValue(mockSupabase as never)
+    mockGetUser.mockResolvedValue({ data: { user: TEST_USER } })
+  })
+
+  it('archives 3 own applications and returns 200', async () => {
+    const ids = ['app-1', 'app-2', 'app-3']
+    // ownership check — all 3 owned
+    mockFrom.mockReturnValueOnce({
+      select: vi.fn().mockReturnValue({
+        in: vi.fn().mockReturnValue({
+          eq: vi.fn().mockResolvedValue({ data: ids.map((id) => ({ id })), error: null }),
+        }),
+      }),
+    })
+    // batch update
+    const batchUpdate = vi.fn().mockReturnValue({
+      in: vi.fn().mockReturnValue({
+        eq: vi.fn().mockResolvedValue({ error: null }),
+      }),
+    })
+    mockFrom.mockReturnValueOnce({ update: batchUpdate })
+
+    const res = await batchPOST(makeBatchRequest({ ids, action: 'archive' }))
+    expect(res.status).toBe(200)
+    await expect(res.json()).resolves.toEqual({ updated: 3 })
+    expect(batchUpdate).toHaveBeenCalledWith(expect.objectContaining({ is_archived: true }))
+  })
+
+  it('returns 403 when any ID belongs to a different user', async () => {
+    const ids = ['app-1', 'app-2', 'app-foreign']
+    // ownership check — only 2 of 3 owned
+    mockFrom.mockReturnValueOnce({
+      select: vi.fn().mockReturnValue({
+        in: vi.fn().mockReturnValue({
+          eq: vi.fn().mockResolvedValue({ data: [{ id: 'app-1' }, { id: 'app-2' }], error: null }),
+        }),
+      }),
+    })
+    const batchUpdate = vi.fn()
+    mockFrom.mockReturnValueOnce({ update: batchUpdate })
+
+    const res = await batchPOST(makeBatchRequest({ ids, action: 'archive' }))
+    expect(res.status).toBe(403)
+    expect(batchUpdate).not.toHaveBeenCalled()
+  })
+
+  it('returns 422 for empty ids array', async () => {
+    const res = await batchPOST(makeBatchRequest({ ids: [], action: 'archive' }))
+    expect(res.status).toBe(422)
   })
 })
 

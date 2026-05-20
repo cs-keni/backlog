@@ -10,6 +10,8 @@ interface ApplicationCardProps {
   app: ApplicationWithJob
   index: number
   isSelected: boolean
+  isBulkSelected?: boolean
+  selectMode?: boolean
   isDragOverlay?: boolean
   onClick: () => void
 }
@@ -91,7 +93,7 @@ function companyAvatar(name: string): { initials: string; color: string } {
   return { initials, color: AVATAR_COLORS[hash % AVATAR_COLORS.length] }
 }
 
-export function ApplicationCard({ app, index, isSelected, isDragOverlay = false, onClick }: ApplicationCardProps) {
+export function ApplicationCard({ app, index, isSelected, isBulkSelected = false, selectMode = false, isDragOverlay = false, onClick }: ApplicationCardProps) {
   const domain = getDomain(app.jobs.company, app.jobs.url)
   const logoUrls = [
     `https://logo.clearbit.com/${domain}`,
@@ -105,7 +107,7 @@ export function ApplicationCard({ app, index, isSelected, isDragOverlay = false,
 
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: app.id,
-    disabled: isDragOverlay,
+    disabled: isDragOverlay || selectMode,
   })
 
   const style = transform
@@ -129,15 +131,33 @@ export function ApplicationCard({ app, index, isSelected, isDragOverlay = false,
         }
       }}
       className={`
-        rounded-xl border px-3 py-3 cursor-grab active:cursor-grabbing transition-colors select-none
+        relative rounded-xl border px-3 py-3 transition-colors select-none
         ${isDragOverlay
-          ? 'border-zinc-600 bg-zinc-800 shadow-2xl rotate-1 scale-105'
-          : isSelected
-            ? 'border-zinc-600 bg-zinc-800'
-            : 'border-zinc-800 bg-zinc-900 hover:border-zinc-700'
+          ? 'cursor-grabbing border-zinc-600 bg-zinc-800 shadow-2xl rotate-1 scale-105'
+          : selectMode
+            ? `cursor-pointer ${isBulkSelected ? 'border-blue-500/40 bg-zinc-900/80 ring-1 ring-blue-500/40' : 'border-zinc-800 bg-zinc-900/40 hover:border-zinc-700'}`
+            : isSelected
+              ? 'cursor-grab active:cursor-grabbing border-zinc-600 bg-zinc-800'
+              : 'cursor-grab active:cursor-grabbing border-zinc-800 bg-zinc-900 hover:border-zinc-700'
         }
       `}
     >
+      {/* Bulk-select checkbox */}
+      {selectMode && (
+        <div
+          aria-hidden="true"
+          className={`absolute top-2 right-2 w-4 h-4 rounded flex items-center justify-center transition-colors ${
+            isBulkSelected ? 'bg-blue-500' : 'border border-zinc-600'
+          }`}
+        >
+          {isBulkSelected && (
+            <svg className="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" strokeWidth={3} viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+            </svg>
+          )}
+        </div>
+      )}
+
       {/* Logo + title */}
       <div className="flex items-start gap-2.5 mb-2">
         {!logoFailed ? (
