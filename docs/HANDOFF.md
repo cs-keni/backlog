@@ -4,6 +4,47 @@
 
 ---
 
+## Session: 2026-05-20 — Phase 1 notifications (Codex)
+
+### What changed
+
+- **`supabase/migrations/025_notification_log_schema.sql`**
+  - Adds `notification_log.status` and `notification_log.error`.
+  - Adds `pending`, `sent`, `failed`, and `expired` statuses.
+  - Uses a partial unique index for `status = 'sent'` on `(user_id, job_id, channel)` so failed rows can be retried.
+- **`worker/src/notifications/dispatcher.ts`**
+  - Reworked into a digest dispatcher with per-user/per-channel matching.
+  - Dedupe checks only `status = 'sent'`.
+  - Quiet-hour matches become `pending` rows and are retried on later worker runs.
+  - Failed email/push delivery becomes `failed` rows and is retryable.
+  - Push 404/410 deletes the dead subscription and logs `expired`.
+  - Matching now uses Jaccard threshold plus saved profile filter fields: location, remote preference, and salary minimum.
+- **`worker/src/notifications/email.ts` / `push.ts`**
+  - Email digest lists up to 10 jobs and uses the planned subject format.
+  - Email/push misconfiguration and provider errors now throw so the dispatcher records retryable failures instead of marking sent.
+- **`worker/src/index.ts`**
+  - Calls the dispatcher every aggregation run, even when zero new jobs were written, so pending/failed rows can retry.
+- **`src/app/(app)/settings/page.tsx`**
+  - Recent notification history now shows only sent rows.
+- **`worker/tests/unit/dispatcher.test.ts`**
+  - Covers quiet-hour pending rows, retry after quiet hours, failed-row retry, sent dedupe, filter matching, and expired push cleanup.
+
+### Checks run
+
+- `cd worker && node node_modules/vitest/dist/cli.js run tests/unit/dispatcher.test.ts tests/unit/discord.test.ts --pool=threads` — passed, 19 tests
+- `cd worker && node ../node_modules/typescript/lib/tsc.js -p tsconfig.json` — passed
+- `node node_modules/typescript/lib/tsc.js --noEmit` — passed
+- `git diff --check` — passed
+
+### Required follow-up
+
+- Apply `supabase/migrations/025_notification_log_schema.sql` in Supabase before deploying this worker path.
+- Add `VAPID_PRIVATE_KEY`, `VAPID_PUBLIC_KEY`, and `VAPID_SUBJECT` to the worker environment if push notifications should send. Missing VAPID config now produces retryable failed push rows.
+- The planned file names under `src/lib/notifications/*` were not used because Resend/Web Push dependencies currently live in the worker package. The production dispatcher is in `worker/src/notifications/*`.
+- Local npm binary wrappers for `vitest` and worker `tsc` were broken in this checkout; direct package entrypoints worked and are listed in `docs/CURRENT_TASK.md`.
+
+---
+
 ## Session: 2026-05-19 — Grade boost planning (Claude Code)
 
 ### What changed

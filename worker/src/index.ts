@@ -40,9 +40,7 @@ async function runAndNotify(force = false): Promise<{ written: number; skipped: 
   isRunning = true
   try {
     const result = await runAggregation(force)
-    if (result.written > 0) {
-      await dispatchNotifications(result.newJobs, result.writtenJobPairs)
-    }
+    await dispatchNotifications(result.newJobs, result.writtenJobPairs)
     return { written: result.written, skipped: result.skipped }
   } finally {
     isRunning = false

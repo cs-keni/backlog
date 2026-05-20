@@ -19,23 +19,31 @@ export interface PushSubscription {
   auth: string
 }
 
+export class PushSubscriptionExpiredError extends Error {
+  constructor() {
+    super('Push subscription expired')
+    this.name = 'PushSubscriptionExpiredError'
+  }
+}
+
 export async function sendPushNotification(
   subscription: PushSubscription,
   jobs: NormalizedJob[],
   written: number
 ): Promise<void> {
   if (!process.env.VAPID_PUBLIC_KEY || !process.env.VAPID_PRIVATE_KEY || !process.env.VAPID_SUBJECT) {
-    console.warn('[push] VAPID keys not set — skipping push notification')
-    return
+    throw new Error('VAPID keys not set')
   }
 
   configure()
 
-  const title = `${written} new job${written === 1 ? '' : 's'} on Backlog`
-  const firstFew = jobs.slice(0, 3).map(j => j.company).join(', ')
-  const body = jobs.length > 3
-    ? `${firstFew} + ${jobs.length - 3} more`
-    : firstFew
+  const topJob = jobs[0]
+  const title = written === 1 && topJob
+    ? `New match: ${topJob.company}`
+    : `${written} new jobs match your profile`
+  const body = written === 1 && topJob
+    ? topJob.title
+    : `${written} new matches — ${topJob?.company ?? 'Backlog'}`
 
   const payload = JSON.stringify({ title, body, url: '/feed' })
 
@@ -49,10 +57,16 @@ export async function sendPushNotification(
     )
     console.log(`[push] Sent to ${subscription.endpoint.slice(0, 40)}…`)
   } catch (err: unknown) {
-    // 410 Gone = subscription expired/unsubscribed — caller should remove it
-    if (err && typeof err === 'object' && 'statusCode' in err && (err as { statusCode: number }).statusCode === 410) {
-      throw new Error('SUBSCRIPTION_EXPIRED')
+    // 410 Gone / 404 Not Found = subscription expired/unsubscribed.
+    if (
+      err &&
+      typeof err === 'object' &&
+      'statusCode' in err &&
+      ([404, 410] as number[]).includes((err as { statusCode: number }).statusCode)
+    ) {
+      throw new PushSubscriptionExpiredError()
     }
-    console.error('[push] Send threw:', err)
+    if (err instanceof Error) throw err
+    throw new Error(String(err))
   }
 }

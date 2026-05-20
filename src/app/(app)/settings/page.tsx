@@ -19,6 +19,7 @@ export default async function SettingsPage() {
     .from('notification_log')
     .select('id, channel, sent_at, jobs(title, company)')
     .eq('user_id', user.id)
+    .eq('status', 'sent')
     .order('sent_at', { ascending: false })
     .limit(20)
 

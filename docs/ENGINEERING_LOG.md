@@ -300,3 +300,32 @@ See `docs/CURRENT_TASK.md`. Implementation of fill.ts, types.ts, Sidebar.tsx, fi
 - 3-tier LLM strategy decided: deterministic → Haiku → Sonnet
 - Multi-page navigation architecture designed
 - Workday scoped as "best-effort" (later upgraded to Phase 1 targeted effort 2026-05-15)
+
+## 2026-05-20 — Phase 1 notification dispatcher (Codex)
+
+### Implemented
+
+- Added `supabase/migrations/025_notification_log_schema.sql` with `notification_log.status`, `error`, retry indexes, and a sent-only partial unique index for `(user_id, job_id, channel)`.
+- Reworked `worker/src/notifications/dispatcher.ts` into a digest dispatcher:
+  - one email/push digest per user/channel/run
+  - Jaccard threshold plus profile filter matching
+  - quiet-hour matches recorded as `pending`
+  - `failed` rows retry on later worker runs
+  - `sent` rows are the only dedupe blocker
+  - push 404/410 deletes expired subscriptions and logs `expired`
+- Updated email/push senders to throw on misconfiguration/provider failure so the dispatcher records retryable failures.
+- Worker now invokes the dispatcher every run, including zero-write runs, so pending/failed notifications are not stranded.
+- Settings recent-notification history filters to `status = 'sent'`.
+
+### Checks
+
+- `cd worker && node node_modules/vitest/dist/cli.js run tests/unit/dispatcher.test.ts tests/unit/discord.test.ts --pool=threads` — 19 passed
+- `cd worker && node ../node_modules/typescript/lib/tsc.js -p tsconfig.json` — passed
+- `node node_modules/typescript/lib/tsc.js --noEmit` — passed
+- `git diff --check` — passed
+
+### Gotchas
+
+- The plan mentioned `src/lib/notifications/*`, but Resend/Web Push are worker dependencies, so the implementation stays in `worker/src/notifications/*`.
+- A full unique constraint on `(user_id, job_id, channel)` conflicts with failed-row retry. Migration 025 uses a partial unique index where `status = 'sent'` instead.
+- Local npm binary wrappers for `vitest` and worker `tsc` are broken in this checkout; direct package entrypoints worked.

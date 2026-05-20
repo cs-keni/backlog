@@ -7,7 +7,7 @@ function getResend(): Resend {
   return _resend
 }
 
-const MAX_LISTED = 20
+const MAX_LISTED = 10
 
 export async function sendEmailNotification(
   to: string,
@@ -16,8 +16,7 @@ export async function sendEmailNotification(
 ): Promise<void> {
   const apiKey = process.env.RESEND_API_KEY
   if (!apiKey) {
-    console.warn('[email] RESEND_API_KEY not set — skipping email notification')
-    return
+    throw new Error('RESEND_API_KEY not set')
   }
 
   const listed = jobs.slice(0, MAX_LISTED)
@@ -55,7 +54,7 @@ export async function sendEmailNotification(
 
     <div style="background:#18181b;border:1px solid #27272a;border-radius:10px;padding:20px 24px;margin-bottom:20px">
       <p style="margin:0 0 4px;font-size:22px;font-weight:600;color:#f4f4f5">
-        ${written} new job${written === 1 ? '' : 's'} found
+        ${written === 1 ? '1 new job matches your profile' : `${written} new jobs match your profile`}
       </p>
       <p style="margin:0;font-size:13px;color:#71717a">${new Date().toUTCString()}</p>
     </div>
@@ -87,18 +86,26 @@ export async function sendEmailNotification(
     const { error } = await getResend().emails.send({
       from: 'Backlog <onboarding@resend.dev>',
       to,
-      subject: `${written} new job${written === 1 ? '' : 's'} on Backlog`,
+      subject: getSubject(jobs, written),
       html,
     })
 
     if (error) {
-      console.error('[email] Resend error:', error)
+      throw new Error(`Resend error: ${error.message}`)
     } else {
       console.log(`[email] Sent to ${to} — ${written} job${written === 1 ? '' : 's'}`)
     }
   } catch (err) {
-    console.error('[email] Send threw:', err)
+    if (err instanceof Error) throw err
+    throw new Error(String(err))
   }
+}
+
+function getSubject(jobs: NormalizedJob[], written: number): string {
+  const topJob = jobs[0]
+  if (!topJob) return 'New Backlog job matches'
+  if (written === 1) return `New match: ${topJob.title} at ${topJob.company}`
+  return `${written} new jobs match your profile — ${topJob.company}`
 }
 
 function formatSalary(min: number | null, max: number | null): string | null {
