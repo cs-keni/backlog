@@ -101,7 +101,10 @@ Auth: `Authorization: Bearer blg_<key>` header. Keys stored in chrome.storage.lo
 
 ## Active Work
 
-See `docs/CURRENT_TASK.md` for what's being worked on right now.
+**Current focus: Grade Boost — all sections to A.**
+Full spec: `docs/GRADE_BOOST_PLAN.md` — read this before starting any phase. It has architecture decisions, exact code shapes, test specs, and design specs all inline.
+
+Priority order and pending migrations: `docs/CURRENT_TASK.md`.
 
 See `PHASES.md` for the full roadmap with checkboxes.
 

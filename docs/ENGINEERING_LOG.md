@@ -4,6 +4,34 @@ Reverse-chronological. One entry per meaningful session.
 
 ---
 
+## 2026-05-19 — Grade boost planning (Claude Code)
+
+### What happened
+
+Planning-only session. Three full review passes completed (CEO + Eng + Design). No code written.
+
+Full plan committed to `docs/GRADE_BOOST_PLAN.md`. Start there.
+
+### Key decisions
+
+- Notification dedup query must use `WHERE status='sent'` — failed rows must not block retry
+- `daily_activity` table (migration 024) fixes DSA counter drift — `solved_at` overwrite bug makes any lc_solves derivation wrong
+- Bulk select: toolbar "Select" button activates mode, NOT hover-to-reveal (hover is broken on touch)
+- Filter preset apply = replace (not merge)
+- Easy/Hard SR buttons: icon + text, Hard shows 300ms "Back tomorrow" flash before card exits
+- Ownership checks on mutation routes must use explicit SELECT + 403, not rely on RLS (RLS returns 404 silently)
+- Extension cover letter source: job-specific, fetched from `/api/applications?jobId=X` — not profile-level
+- Initiate-from-Backlog URL construction: use `URL.searchParams.set()`, not string concat
+
+### Migrations needed (not yet written)
+
+- `022_add_filter_presets.sql`
+- `023_add_review_difficulty.sql`
+- `024_add_daily_activity.sql`
+- `025_notification_log_schema.sql`
+
+---
+
 ## 2026-05-18 — Worker run summaries (Codex)
 
 ### Implemented
