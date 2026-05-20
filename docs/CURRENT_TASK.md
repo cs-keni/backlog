@@ -49,7 +49,7 @@ Suggested order: 3a → 3b → 4 → 5 → 6 → 2f/g → 8b → 9
 
 | Phase | Owner | Status |
 |-------|-------|--------|
-| **Phase 3a** — Tracker integration tests | Codex | not started |
+| **Phase 3a** — Tracker integration tests | Codex | implemented |
 | **Phase 3b** — Bulk action bar UI (floating action bar, portal, Framer Motion) | **Claude Code** | not started |
 | **Phase 4** — Analytics decomposition + company graph skeleton | Codex | not started |
 | **Phase 5** — Prep decomposition + re-enrich button | Codex | not started |

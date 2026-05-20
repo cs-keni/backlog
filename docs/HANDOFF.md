@@ -30,6 +30,31 @@ Pending Supabase migrations (apply before depending on them in production):
 
 ---
 
+## Session: 2026-05-20 — Phase 3a tracker integration tests (Codex)
+
+### What changed
+
+- Expanded `src/tests/integration/applications.test.ts` coverage for tracker status mutations:
+  - status changes update `last_updated` and write a timeline row with `from_status`/`to_status`
+  - unchanged status updates do not duplicate timeline entries
+- Added extension apply integration coverage for:
+  - untracked ATS URL creates a hidden job stub, application, and initial extension timeline row
+  - Backlog-initiated saved application transitions to applied with one timeline row
+  - failed extension API-key auth returns 401 without touching Supabase
+- Kept extension-created jobs on `source: 'manual'` because the current `jobs.source` schema/type is `github | portal | manual`; the app already labels manual as “Pasted URLs or extension.”
+
+### Checks run
+
+- `node node_modules/vitest/dist/cli.js run --pool=threads src/tests/integration/applications.test.ts` — 14 passed
+- `node node_modules/typescript/lib/tsc.js --noEmit` — passed
+
+### Known residuals
+
+- Phase 3b remains Claude-reserved.
+- The Playwright optimistic rollback coverage called out in the plan still belongs with E2E work; current code already has rollback on kanban drag failure, but no browser-level regression test was added in 3a.
+
+---
+
 ## Session: 2026-05-21 — Phase 8a DSA counter drift fix (Codex)
 
 ### What changed

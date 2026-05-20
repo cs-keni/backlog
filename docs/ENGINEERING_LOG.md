@@ -440,3 +440,23 @@ See `docs/CURRENT_TASK.md`. Implementation of fill.ts, types.ts, Sidebar.tsx, fi
 
 - Migration 024 is written but still needs to be applied in Supabase.
 - Phase 8b remains Claude-reserved.
+
+## 2026-05-20 — Phase 3a tracker integration tests (Codex)
+
+### Implemented
+
+- Expanded `src/tests/integration/applications.test.ts` so status mutation tests assert `last_updated` and exact timeline payloads, not just insert call counts.
+- Added `/api/extension/apply` integration coverage for extension-created applications:
+  - unknown URL creates a hidden job stub, application row, and extension timeline row
+  - explicit saved application ID transitions to applied with one timeline row
+  - invalid extension API key short-circuits before Supabase access
+
+### Checks
+
+- `node node_modules/vitest/dist/cli.js run --pool=threads src/tests/integration/applications.test.ts` — 14 passed
+- `node node_modules/typescript/lib/tsc.js --noEmit` — passed
+
+### Gotchas
+
+- Extension-created job stubs still use `source: 'manual'` because migration 019 and the app type union only allow `github | portal | manual`; analytics already presents manual as pasted URLs or extension.
+- Playwright rollback coverage remains for the later E2E phase.
