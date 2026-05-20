@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { computeReviewDates, SR_INTERVALS_DAYS } from '@/lib/dsa/schedule'
+import { computeReviewDates, SR_INTERVALS_DAYS, computeNextInterval, LEITNER_INTERVALS } from '@/lib/dsa/schedule'
 
 describe('computeReviewDates', () => {
   it('returns 5 dates at the correct intervals', () => {
@@ -36,5 +36,20 @@ describe('computeReviewDates', () => {
     expect(dates[2]).toBe('2026-01-02') // +3 crosses into new year
     expect(dates[3]).toBe('2026-01-06') // +7
     expect(dates[4]).toBe('2026-01-13') // +14
+  })
+})
+
+describe('computeNextInterval', () => {
+  it('easy 1 → 3', () => expect(computeNextInterval(1, 'easy')).toBe(3))
+  it('easy 3 → 7', () => expect(computeNextInterval(3, 'easy')).toBe(7))
+  it('easy 7 → 14', () => expect(computeNextInterval(7, 'easy')).toBe(14))
+  it('easy 14 → 30', () => expect(computeNextInterval(14, 'easy')).toBe(30))
+  it('easy caps at 30', () => expect(computeNextInterval(30, 'easy')).toBe(30))
+  it('easy beyond-ladder still returns 30', () => expect(computeNextInterval(45, 'easy')).toBe(30))
+  it('easy 0-day interval starts at 3', () => expect(computeNextInterval(0, 'easy')).toBe(3))
+  it('hard always resets to 1 regardless of current', () => {
+    for (const n of LEITNER_INTERVALS) {
+      expect(computeNextInterval(n, 'hard')).toBe(1)
+    }
   })
 })

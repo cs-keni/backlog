@@ -15,6 +15,7 @@ export interface LcReview {
   solve_id: string
   scheduled_for: string
   completed_at: string | null
+  difficulty: 'easy' | 'hard' | null
 }
 
 export interface LcSolveWithReviews extends LcSolve {

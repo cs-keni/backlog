@@ -55,6 +55,7 @@ export function TodayPanel({
   onRescheduleComplete,
 }: TodayPanelProps) {
   const [completing, setCompleting] = useState<Set<string>>(new Set())
+  const [flashing, setFlashing] = useState<Set<string>>(new Set())
   const [solvingSlug, setSolvingSlug] = useState<string | null>(null)
   const [rescheduling, setRescheduling] = useState(false)
 
@@ -128,18 +129,38 @@ export function TodayPanel({
     }
   }
 
-  async function markDone(item: ReviewItem) {
+  async function markReview(item: ReviewItem, difficulty: 'easy' | 'hard') {
     if (completing.has(item.review.id)) return
     setCompleting(prev => new Set(prev).add(item.review.id))
-    try {
-      await fetch(`/api/dsa/reviews/${item.review.id}`, { method: 'PATCH' })
-      onReviewComplete(item.review.id, item.solve.id)
-    } finally {
-      setCompleting(prev => {
-        const next = new Set(prev)
-        next.delete(item.review.id)
-        return next
+
+    if (difficulty === 'hard') {
+      setFlashing(prev => new Set(prev).add(item.review.id))
+      // Fire PATCH immediately, parallel with the 300ms flash
+      fetch(`/api/dsa/reviews/${item.review.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ difficulty }),
       })
+      // After 300ms flash, trigger card exit
+      setTimeout(() => {
+        onReviewComplete(item.review.id, item.solve.id)
+      }, 300)
+    } else {
+      // Easy: wait for PATCH, then trigger exit
+      try {
+        await fetch(`/api/dsa/reviews/${item.review.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ difficulty }),
+        })
+        onReviewComplete(item.review.id, item.solve.id)
+      } finally {
+        setCompleting(prev => {
+          const next = new Set(prev)
+          next.delete(item.review.id)
+          return next
+        })
+      }
     }
   }
 
@@ -295,22 +316,43 @@ export function TodayPanel({
                     <p className="text-sm font-medium text-zinc-100 truncate">{item.solve.problem_title}</p>
                     <p className="text-xs text-zinc-500 mt-0.5">{item.solve.pattern}</p>
                   </div>
-                  <button
-                    onClick={() => markDone(item)}
-                    disabled={completing.has(item.review.id)}
-                    className="shrink-0 flex items-center justify-center h-7 w-7 rounded-md border border-zinc-700 text-zinc-500 hover:border-emerald-500/60 hover:text-emerald-400 hover:bg-emerald-500/10 disabled:opacity-40 transition-all"
-                  >
-                    {completing.has(item.review.id) ? (
-                      <svg className="h-3.5 w-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                      </svg>
-                    ) : (
-                      <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
-                      </svg>
-                    )}
-                  </button>
+                  {flashing.has(item.review.id) ? (
+                    <span className="shrink-0 text-xs text-orange-400 font-medium">↺ Back tomorrow</span>
+                  ) : (
+                    <div className="shrink-0 flex items-center gap-1.5">
+                      {/* Easy */}
+                      <button
+                        onClick={() => markReview(item, 'easy')}
+                        disabled={completing.has(item.review.id)}
+                        aria-label="Mark as easy — schedules next review further out"
+                        className="shrink-0 flex items-center gap-1 rounded-md border border-zinc-700 px-2 py-1 text-[11px] font-medium text-zinc-400 hover:border-emerald-500/60 hover:text-emerald-400 hover:bg-emerald-500/10 disabled:opacity-40 transition-all"
+                      >
+                        {completing.has(item.review.id) ? (
+                          <svg className="h-3 w-3 animate-spin" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                          </svg>
+                        ) : (
+                          <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                          </svg>
+                        )}
+                        Easy
+                      </button>
+                      {/* Hard */}
+                      <button
+                        onClick={() => markReview(item, 'hard')}
+                        disabled={completing.has(item.review.id)}
+                        aria-label="Mark as hard — resets review to tomorrow"
+                        className="shrink-0 flex items-center gap-1 rounded-md border border-zinc-700 px-2 py-1 text-[11px] font-medium text-zinc-400 hover:border-orange-500/60 hover:text-orange-400 hover:bg-orange-500/10 disabled:opacity-40 transition-all"
+                      >
+                        <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.85l3.181 3.182m0-4.991v4.99" />
+                        </svg>
+                        Hard
+                      </button>
+                    </div>
+                  )}
                 </div>
               </motion.div>
             ))
