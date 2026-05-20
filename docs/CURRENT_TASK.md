@@ -55,7 +55,7 @@ Suggested order: 3a → 3b → 4 → 5 → 6 → 2f/g → 8b → 9
 | **Phase 5** — Prep decomposition + re-enrich button | Codex | implemented |
 | **Phase 6** — Profile security (scoped SELECT + ownership tests) | Codex | implemented |
 | **Phase 2f/g** — fill.ts + Sidebar.tsx decomposition | Codex | implemented |
-| **Phase 8b** — Easy/Hard SR buttons (300ms flash state machine, migration 023) | **Claude Code** | not started |
+| **Phase 8b** — Easy/Hard SR buttons (300ms flash state machine, migration 023) | **Claude Code** | implemented |
 | **Phase 9** — E2E tests (Playwright global setup) | Codex | not started |
 
 ---

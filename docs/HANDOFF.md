@@ -4,6 +4,28 @@
 
 ---
 
+## Session: 2026-05-20 — Phase 8b Easy/Hard SR buttons (Claude Code)
+
+### What changed
+
+- **`supabase/migrations/023_add_review_difficulty.sql`** — adds `difficulty text check (difficulty in ('easy', 'hard'))` nullable to `lc_reviews`
+- **`src/lib/dsa/schedule.ts`** — `computeNextInterval(currentInterval, difficulty)` using Leitner ladder `[1, 3, 7, 14, 30]`; also exports `dateDiffDays` and `addDays` helpers
+- **`src/app/api/dsa/reviews/[id]/route.ts`** — PATCH now accepts optional `{ difficulty }`. With difficulty: fetches current review + most recent prior completed review to compute `currentInterval`, marks done with `difficulty` stamped, inserts new `lc_reviews` row at `today + nextInterval`. Without difficulty: legacy behavior (mark `completed_at` only) — existing callers unaffected.
+- **`src/components/dsa/TodayPanel.tsx`** — replaces single 28×28 checkmark button with Easy/Hard pair. Hard: both buttons disabled immediately → PATCH fires (parallel) → 300ms "↺ Back tomorrow" flash → `onReviewComplete` triggers exit. Easy: PATCH awaited → `onReviewComplete`. Both share the same `completing` Set for disabled state.
+- **`src/lib/dsa/types.ts`** — `LcReview.difficulty: 'easy' | 'hard' | null`
+
+### Checks run
+
+- `node node_modules/typescript/lib/tsc.js --noEmit` — passed
+- `node node_modules/vitest/dist/cli.js run --pool=threads src/tests/unit/dsa-schedule.test.ts src/tests/integration/dsa-reviews.test.ts` — 18 passed (8 pre-existing + 8 new schedule + 2 new review difficulty tests)
+
+### Known residuals
+
+- Apply `supabase/migrations/023_add_review_difficulty.sql` in Supabase before difficulty stamping takes effect in production.
+- Phase 9 (E2E Playwright infrastructure) is the only remaining P3 phase — Codex-owned.
+
+---
+
 ## Session: 2026-05-20 — Phase 3b bulk action bar (Claude Code)
 
 ### What changed
