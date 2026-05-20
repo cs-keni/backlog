@@ -4,6 +4,42 @@ Reverse-chronological. One entry per meaningful session.
 
 ---
 
+## 2026-05-20 — Phase 2a: Workday async comboboxes (Claude Code)
+
+### What happened
+
+Reviewed Codex's Phase 1 notification dispatcher (clean, approved). Implemented Phase 2a.
+
+### Commit
+
+`cf60859` — Implement Phase 2a: Workday async combobox fills (country/state cascade)
+
+### What changed
+
+- **`extension/src/content/fill-workday.ts`** (new)
+  - `fillWorkdayCombobox(container, value)` — MutationObserver-based, 1000ms timeout; observer attaches before `trigger.click()` (critical: click handler may append options synchronously, so observer must pre-exist the click).
+  - `waitForChildListChange(container, timeoutMs)` — resolves on first childList mutation or timeout fallback; drives the country → state cascade.
+- **`extension/src/content/fill.ts`**
+  - `WORKDAY_COMBOBOX_MAP` now has 4 entries: Country, State/Province, Work Authorization, Phone Country Code. Was state-only. Removed `buttonSelector` (no longer needed; trigger discovery is inside `fillWorkdayCombobox`).
+  - `fillWorkdayComboboxes` runs country → state cascade (fill country → `waitForChildListChange(stateContainer, 300)` → fill state) then processes remaining entries.
+  - Removed `clickWorkdayCombobox` (polling approach replaced). Kept `waitForListboxOptions` for the education degree picker in `fillWorkdayEducationInternal` — will be removed in Phase 2f.
+- **`extension/src/content/fill-workday.test.ts`** (new)
+  - 9 tests: exact match, case-insensitive, starts-with fallback, no trigger, no match, 1000ms timeout, childList mutation detection, fallback timeout, full cascade sequence.
+
+### Key gotcha discovered
+
+In jsdom (and real browsers), click event handlers fire synchronously. If the handler appends option elements to `document.body`, the mutation happens before the MutationObserver is set up — if you call `trigger.click()` before `observer.observe()`. Fix: always attach the observer BEFORE clicking the trigger.
+
+### Phase 1 review notes
+
+Codex's dispatcher is solid. One edge case worth knowing: when `pushResult.expired > 0` AND `pushResult.delivered` is true, `logStatusRows` writes both `expired` and `sent` rows for the same (user_id, job_id, channel='push') — the expired rows are noise but don't break dedup (unique index only covers `status='sent'`). Not blocking.
+
+### What's next
+
+Phase 2b (file upload FETCH_FILE protocol) is Codex-owned. Phase 3b (bulk action bar) and Phase 8b (Easy/Hard SR buttons) are reserved for Claude Code.
+
+---
+
 ## 2026-05-19 — Grade boost planning (Claude Code)
 
 ### What happened

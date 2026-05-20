@@ -4,6 +4,33 @@
 
 ---
 
+## Session: 2026-05-20 — Phase 2a: Workday async comboboxes (Claude Code)
+
+### What changed
+
+- **`extension/src/content/fill-workday.ts`** (new)
+  - `fillWorkdayCombobox(container, value)` — MutationObserver, 1000ms timeout; observer set up BEFORE trigger.click() (click handlers fire synchronously, so mutation can happen before observer if order is wrong).
+  - `waitForChildListChange(container, timeoutMs)` — cascade helper; resolves on first childList mutation or 300ms fallback.
+- **`extension/src/content/fill.ts`**
+  - `WORKDAY_COMBOBOX_MAP` expanded to 4 fields: Country, State/Province, Work Authorization, Phone Country Code.
+  - `fillWorkdayComboboxes` handles country → state cascade and remaining comboboxes.
+  - Removed `clickWorkdayCombobox` (polling); kept `waitForListboxOptions` for education degree picker (remove in Phase 2f).
+- **`extension/src/content/fill-workday.test.ts`** (new) — 9 tests, all passing.
+
+### Checks run
+
+- `node ../node_modules/vitest/dist/cli.js run --pool=threads` — 74 tests passed (3 suites)
+- `node node_modules/typescript/lib/tsc.js -p tsconfig.json --noEmit` — no new errors (pre-existing WeakRef/sidebar errors unchanged)
+- `node node_modules/vite/dist/node/cli.js build` — passed (content.js 33kB)
+
+### Required follow-up
+
+- Phase 1 migration `025_notification_log_schema.sql` still needs to be applied in Supabase before deploying the dispatcher.
+- Phase 2b (file upload FETCH_FILE protocol) → Codex
+- Phase 2c–2g → Codex per ownership table in CURRENT_TASK.md
+
+---
+
 ## Session: 2026-05-20 — Phase 1 notifications (Codex)
 
 ### What changed

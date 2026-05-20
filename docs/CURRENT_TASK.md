@@ -34,7 +34,7 @@ Some phases are reserved for Claude Code due to animation sequencing, subtle DOM
 - **Phase 1** — Notification dispatcher (email + push + dedup + quiet hours) — **implemented; migration pending in Supabase**
   - Implemented in worker notification modules: `worker/src/notifications/dispatcher.ts`, `email.ts`, `push.ts`
   - Migration written: `supabase/migrations/025_notification_log_schema.sql`
-- **Phase 2a** — Workday async comboboxes (`extension/src/content/fill-workday.ts`)
+- **Phase 2a** — Workday async comboboxes — **implemented** (`extension/src/content/fill-workday.ts`, commit `cf60859`)
 - **Phase 2b** — File upload FETCH_FILE protocol (content → background → ArrayBuffer)
 
 ### P2 — High leverage, low risk
