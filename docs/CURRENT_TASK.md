@@ -1,7 +1,7 @@
 # Current Task
 
-**Last updated:** 2026-05-20
-**Status:** Phase 1, Phase 2a-2e, Phase 7, and Phase 8a are implemented. Phase 2f/g decomposition is intentionally deferred to P3.
+**Last updated:** 2026-05-21
+**Status:** All P1 + P2 phases complete. Starting P3 (quality + maintainability). Phase 2f/g decomposition intentionally deferred into P3.
 
 ---
 
@@ -45,13 +45,18 @@ Some phases are reserved for Claude Code due to animation sequencing, subtle DOM
 - **Phase 8a** — DSA counter drift fix (daily_activity table, migration 024) — **implemented**
 
 ### P3 — Quality + maintainability
-- **Phase 3** — Tracker integration tests + bulk ops (floating action bar)
-- **Phase 4** — Analytics decomposition + company graph skeleton
-- **Phase 5** — Prep decomposition + re-enrich button
-- **Phase 6** — Profile security (scoped SELECT) + ownership tests
-- **Phase 2f/g** — fill.ts + extension Sidebar.tsx decomposition
-- **Phase 8b** — Adaptive SR intervals (Easy/Hard buttons, migration 023)
-- **Phase 9** — E2E tests (Playwright global setup)
+Suggested order: 3a → 3b → 4 → 5 → 6 → 2f/g → 8b → 9
+
+| Phase | Owner | Status |
+|-------|-------|--------|
+| **Phase 3a** — Tracker integration tests | Codex | not started |
+| **Phase 3b** — Bulk action bar UI (floating action bar, portal, Framer Motion) | **Claude Code** | not started |
+| **Phase 4** — Analytics decomposition + company graph skeleton | Codex | not started |
+| **Phase 5** — Prep decomposition + re-enrich button | Codex | not started |
+| **Phase 6** — Profile security (scoped SELECT + ownership tests) | Codex | not started |
+| **Phase 2f/g** — fill.ts + Sidebar.tsx decomposition | Codex | not started |
+| **Phase 8b** — Easy/Hard SR buttons (300ms flash state machine, migration 023) | **Claude Code** | not started |
+| **Phase 9** — E2E tests (Playwright global setup) | Codex | not started |
 
 ---
 

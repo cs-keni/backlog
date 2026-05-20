@@ -4,6 +4,32 @@
 
 ---
 
+## End-of-day wrap — 2026-05-21 (Claude Code)
+
+### State check
+
+All P1 and P2 phases are complete. Git log confirms:
+- `6780afd` Phase 8a (DSA daily_activity)
+- `491b3d2` Phase 7 (filter presets + abort)
+- `3e5119f` Phase 2b-2e (file upload, post-submit, initiate-from-backlog, debug export)
+- `cf60859` Phase 2a (Workday comboboxes)
+- `a513886` Phase 1 (notification dispatcher)
+
+`CURRENT_TASK.md` updated: date → 2026-05-21, P3 table with owner column added.
+
+### What's next (P3)
+
+Suggested order for Codex: **3a → 4 → 5 → 6 → 2f/g → 9**
+
+Claude Code picks up: **3b** (bulk action bar) and **8b** (Easy/Hard SR buttons) when available.
+
+Pending Supabase migrations (apply before depending on them in production):
+- `020_add_structured_address_fields.sql`
+- `021_extension_answer_cache.sql`
+- `024_add_daily_activity.sql`
+
+---
+
 ## Session: 2026-05-21 — Phase 8a DSA counter drift fix (Codex)
 
 ### What changed
