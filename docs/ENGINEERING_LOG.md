@@ -4,6 +4,27 @@ Reverse-chronological. One entry per meaningful session.
 
 ---
 
+## 2026-05-21 — Wave 2 P4 interview day kit (Codex)
+
+### Implemented
+
+- Added interview kit persistence schema.
+- Added prompt builder and Claude-backed interview-kit generator.
+- Added authenticated streaming generation and save endpoints.
+- Added Tracker detail `InterviewKit` UI gated to technical/final applications.
+- Added prompt, API, and component tests.
+
+### Checks
+
+- `node node_modules/typescript/bin/tsc --noEmit --pretty false` — passed
+- `node node_modules/vitest/vitest.mjs run src/tests/unit/interview-kit-prompt.test.ts src/tests/integration/interview-kit.test.ts src/tests/unit/interview-kit-component.test.tsx` — 4 passed
+
+### Gotchas
+
+- Apply migrations 028 and 029 before production use of P1/P4 persistence.
+
+---
+
 ## 2026-05-21 — Wave 2 P3 conversion analytics (Codex)
 
 ### Implemented

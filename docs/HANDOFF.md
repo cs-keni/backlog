@@ -4,6 +4,28 @@
 
 ---
 
+## Session: 2026-05-21 — Wave 2 P4 interview day kit (Codex)
+
+### What changed
+
+- Added `supabase/migrations/029_interview_kits.sql`.
+- Added interview-kit prompt/generation helper in `src/lib/llm/interview-kit.ts`.
+- Added `POST/GET /api/prep/interview-kit` and `POST /api/prep/interview-kit/save`.
+- Added `InterviewKit` component and rendered it in Tracker detail for `technical` and `final` applications.
+- Added prompt, streaming route, and component tests.
+
+### Checks run
+
+- `node node_modules/typescript/bin/tsc --noEmit --pretty false` — passed
+- `node node_modules/vitest/vitest.mjs run src/tests/unit/interview-kit-prompt.test.ts src/tests/integration/interview-kit.test.ts src/tests/unit/interview-kit-component.test.tsx` — 4 passed
+
+### Remaining work
+
+- Apply `supabase/migrations/028_add_dsa_track.sql` and `supabase/migrations/029_interview_kits.sql` in Supabase before relying on P1/P4 persistence in production.
+- A broader regression run is still recommended after migrations are applied.
+
+---
+
 ## Session: 2026-05-21 — Wave 2 P3 conversion analytics (Codex)
 
 ### What changed

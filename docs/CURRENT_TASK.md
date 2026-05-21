@@ -1,7 +1,7 @@
 # Current Task
 
 **Last updated:** 2026-05-21
-**Status:** Wave 2 P0, P5, P1, P2, and P3 implemented locally. P4 is next.
+**Status:** Wave 2 implemented locally through P4. Migrations 028 and 029 still need Supabase application.
 
 ---
 
@@ -18,7 +18,7 @@ Full spec is in **`docs/WAVE2_PLAN.md`**. Read it before starting any phase. It 
 | P1 | DSA track modes 75/150/250 + interview-aware Today queue | Codex | Implemented locally |
 | P2 | Application health scores on Tracker cards | Codex | Implemented locally |
 | P3 | Callback rate analytics (conversion breakdown) | Codex | Implemented locally |
-| P4 | Interview day kit (streaming LLM brief) | Codex | Ready |
+| P4 | Interview day kit (streaming LLM brief) | Codex | Implemented locally |
 
 **Previous plan:** Grade Boost — All Sections to A (complete). See `docs/GRADE_BOOST_PLAN.md`.
 

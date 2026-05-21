@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import type { ApplicationWithJob, ApplicationStatus, TimelineEntry } from '@/lib/jobs/types'
+import { InterviewKit } from './InterviewKit'
 
 interface ApplicationDetailProps {
   app: ApplicationWithJob | null
@@ -338,6 +339,10 @@ export function ApplicationDetail({ app, onClose, onStatusChange, onUpdate, onDe
                     ))}
                   </div>
                 </div>
+              )}
+
+              {(app.status === 'technical' || app.status === 'final') && (
+                <InterviewKit applicationId={app.id} />
               )}
             </div>
           </motion.aside>
