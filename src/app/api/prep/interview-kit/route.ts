@@ -1,6 +1,10 @@
 export const maxDuration = 60
 
 import { createClient } from '@/lib/supabase/server'
+import Anthropic from '@anthropic-ai/sdk'
+import { buildInterviewKitPrompt } from '@/lib/llm/interview-kit'
+
+const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
 interface ApplicationRow {
   id: string
@@ -11,30 +15,6 @@ interface ApplicationRow {
     description: string | null
     company_profiles: { description: string | null } | null
   } | null
-}
-
-function streamText(content: string): Response {
-  const encoder = new TextEncoder()
-  const chunks: string[] = []
-  for (let i = 0; i < content.length; i += 160) {
-    chunks.push(content.slice(i, i + 160))
-  }
-
-  const stream = new ReadableStream({
-    async start(controller) {
-      for (const chunk of chunks) {
-        controller.enqueue(encoder.encode(chunk))
-      }
-      controller.close()
-    },
-  })
-
-  return new Response(stream, {
-    headers: {
-      'Content-Type': 'text/event-stream; charset=utf-8',
-      'Cache-Control': 'no-cache',
-    },
-  })
 }
 
 export async function GET(request: Request) {
@@ -110,8 +90,7 @@ export async function POST(request: Request) {
     skills: string[] | null
   } | null
 
-  const { generateInterviewKit } = await import('@/lib/llm/interview-kit')
-  const content = await generateInterviewKit({
+  const prompt = buildInterviewKitPrompt({
     companyName: job.company,
     companyDescription: job.company_profiles?.description ?? null,
     roleTitle: job.title,
@@ -127,5 +106,36 @@ export async function POST(request: Request) {
     }>,
   })
 
-  return streamText(content)
+  const encoder = new TextEncoder()
+  const llmStream = anthropic.messages.stream({
+    model: 'claude-sonnet-4-6',
+    max_tokens: 1400,
+    messages: [{ role: 'user', content: prompt }],
+  })
+
+  const readable = new ReadableStream({
+    async start(controller) {
+      try {
+        for await (const event of llmStream) {
+          if (
+            event.type === 'content_block_delta' &&
+            event.delta.type === 'text_delta'
+          ) {
+            controller.enqueue(encoder.encode(event.delta.text))
+          }
+        }
+      } catch {
+        // stream error — client will surface its own error state
+      } finally {
+        controller.close()
+      }
+    },
+  })
+
+  return new Response(readable, {
+    headers: {
+      'Content-Type': 'text/event-stream; charset=utf-8',
+      'Cache-Control': 'no-cache',
+    },
+  })
 }

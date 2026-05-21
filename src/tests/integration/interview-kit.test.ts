@@ -1,21 +1,33 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { mockSupabase, mockGetUser, mockFrom, mockGenerateInterviewKit } = vi.hoisted(() => {
+const { mockSupabase, mockGetUser, mockFrom } = vi.hoisted(() => {
   const mockGetUser = vi.fn()
   const mockFrom = vi.fn()
-  const mockGenerateInterviewKit = vi.fn()
   return {
     mockSupabase: { auth: { getUser: mockGetUser }, from: mockFrom },
     mockGetUser,
     mockFrom,
-    mockGenerateInterviewKit,
   }
 })
 
 vi.mock('@/lib/supabase/server', () => ({ createClient: vi.fn() }))
-vi.mock('@/lib/llm/interview-kit', () => ({
-  generateInterviewKit: mockGenerateInterviewKit,
-}))
+
+vi.mock('@anthropic-ai/sdk', () => {
+  const mockStreamEvents = [
+    { type: 'content_block_delta', delta: { type: 'text_delta', text: 'Generated brief' } },
+  ]
+  const mockStream = {
+    async *[Symbol.asyncIterator]() {
+      for (const event of mockStreamEvents) yield event
+    },
+  }
+  // Use a plain function for stream (not vi.fn) so vi.resetAllMocks() doesn't clear it.
+  // The anthropic instance is module-level in route.ts and only constructed once.
+  function MockAnthropic() {
+    return { messages: { stream: () => mockStream } }
+  }
+  return { default: MockAnthropic }
+})
 
 import { createClient } from '@/lib/supabase/server'
 import { POST } from '@/app/api/prep/interview-kit/route'
@@ -35,7 +47,6 @@ describe('POST /api/prep/interview-kit', () => {
     vi.resetAllMocks()
     vi.mocked(createClient).mockResolvedValue(mockSupabase as never)
     mockGetUser.mockResolvedValue({ data: { user: TEST_USER } })
-    mockGenerateInterviewKit.mockResolvedValue('Generated brief')
   })
 
   it('returns 401 for unauthenticated requests', async () => {
