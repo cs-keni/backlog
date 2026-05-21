@@ -26,6 +26,7 @@ function makeApp(overrides: Partial<ApplicationWithJob> = {}): ApplicationWithJo
       url: null,
       is_remote: false,
       tags: null,
+      fetched_at: null,
     },
     ...overrides,
   }

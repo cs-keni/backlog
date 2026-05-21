@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { hasE2EAuthCookie } from '@/lib/e2e/server'
 import { e2eJobs } from '@/lib/e2e/fixtures'
+import { hiddenSources, type SourcePreferences } from '@/lib/user/source-preferences'
 
 export const dynamic = 'force-dynamic'
 
@@ -46,6 +47,12 @@ export async function GET(request: NextRequest) {
   const sort = searchParams.get('sort') ?? 'newest'
   const search = searchParams.get('search')
   const limitParam = searchParams.get('limit')
+  const { data: profile } = await supabase
+    .from('users')
+    .select('source_preferences')
+    .eq('id', user.id)
+    .single()
+  const sourcesToHide = hiddenSources(profile?.source_preferences as SourcePreferences | null)
 
   let query = supabase
     .from('jobs')
@@ -112,6 +119,7 @@ export async function GET(request: NextRequest) {
   if (salaryMin) query = query.gte('salary_min', parseInt(salaryMin, 10))
   if (experienceLevel) query = query.eq('experience_level', experienceLevel)
   if (roleType) query = query.eq('role_type', roleType)
+  if (sourcesToHide.length > 0) query = query.not('source', 'in', `(${sourcesToHide.join(',')})`)
   if (dateRange) {
     const cutoff = new Date()
     if (dateRange === '24h') cutoff.setDate(cutoff.getDate() - 1)

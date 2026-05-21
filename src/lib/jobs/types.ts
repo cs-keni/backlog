@@ -96,6 +96,7 @@ export interface ApplicationJob {
   url: string | null
   is_remote: boolean
   tags: string[] | null
+  fetched_at: string | null
 }
 
 export interface ApplicationWithJob {

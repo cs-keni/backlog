@@ -83,6 +83,7 @@ export const e2eApplications: ApplicationWithJob[] = [
       url: 'https://example.com/jobs/frontend-platform-engineer',
       is_remote: true,
       tags: ['React', 'TypeScript', 'Design Systems'],
+      fetched_at: now,
     },
   },
   {
@@ -106,6 +107,7 @@ export const e2eApplications: ApplicationWithJob[] = [
       url: 'https://example.com/jobs/backend-integrations-engineer',
       is_remote: false,
       tags: ['Node.js', 'Postgres', 'APIs'],
+      fetched_at: '2026-05-18T08:00:00.000Z',
     },
   },
   {
@@ -129,6 +131,7 @@ export const e2eApplications: ApplicationWithJob[] = [
       url: 'https://example.com/jobs/product-infra',
       is_remote: false,
       tags: ['React', 'Infrastructure'],
+      fetched_at: '2026-05-19T08:00:00.000Z',
     },
   },
 ]

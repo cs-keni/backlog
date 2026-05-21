@@ -87,7 +87,7 @@ export async function GET(request: Request) {
     .select(`
       id, status, applied_at, last_updated, notes, recruiter_name, recruiter_email,
       jobs (
-        id, title, company, location, salary_min, salary_max, url, is_remote, tags
+        id, title, company, location, salary_min, salary_max, url, is_remote, tags, fetched_at
       )
     `)
     .eq('user_id', userId)

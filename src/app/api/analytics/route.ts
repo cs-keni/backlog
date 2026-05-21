@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { computeConversionStats } from '@/lib/analytics/conversion'
+import type { SourcePreferences } from '@/lib/user/source-preferences'
 
 export const dynamic = 'force-dynamic'
 
@@ -85,7 +86,7 @@ export async function GET(request: NextRequest) {
 
   // ── Fetch data ──────────────────────────────────────────────────────────────
 
-  const [appsResult, jobsResult] = await Promise.all([
+  const [appsResult, jobsResult, profileResult] = await Promise.all([
     supabase
       .from('applications')
       .select('id, job_id, status, is_archived, applied_at, last_updated')
@@ -94,6 +95,11 @@ export async function GET(request: NextRequest) {
       .from('jobs')
       .select('id, company, source, fetched_at')
       .gte('fetched_at', cutoffIso),
+    supabase
+      .from('users')
+      .select('source_preferences')
+      .eq('id', user.id)
+      .single(),
   ])
 
   const allApps = (appsResult.data ?? []) as ApplicationRow[]
@@ -288,6 +294,7 @@ export async function GET(request: NextRequest) {
     topCompanies,
     sourceBreakdown: { github: githubCount, portal: portalCount, manual: manualCount },
     sourceYield,
+    sourcePreferences: (profileResult.data?.source_preferences ?? {}) as SourcePreferences,
     medianDaysToResponse,
     conversionStats,
   })

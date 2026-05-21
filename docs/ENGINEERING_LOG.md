@@ -4,6 +4,29 @@ Reverse-chronological. One entry per meaningful session.
 
 ---
 
+## 2026-05-21 — Wave 3 P6/P8/P1/P7/P4 partial implementation (Codex)
+
+### Implemented
+
+- P6: Tracker detail application packet checklist.
+- P8: Tracker detail prior-company application banner.
+- P1: Resume tailor PDF UI wired to the actual `job_id` route contract.
+- P7: Job freshness helper + Feed/Tracker badges from `jobs.fetched_at`.
+- P4: `source_preferences` migration, preference API, Analytics source yield pin/hide controls, and Feed hidden-source exclusion.
+
+### Checks
+
+- `node node_modules/typescript/bin/tsc --noEmit --pretty false` — passed
+- `node node_modules/vitest/vitest.mjs run src/tests/unit/application-checklist.test.ts src/tests/unit/freshness.test.ts src/tests/unit/source-preferences.test.ts src/tests/unit/application-card.test.tsx` — 9 passed
+
+### Gotchas
+
+- P1 route uses `job_id`, not `application_id`, and returns `{ id, pdf_url }`.
+- Migration `030_source_preferences.sql` must be applied before production use of P4 preferences.
+- Next Wave 3 phase is P2 (`031_applications_ats_platform.sql`, `032_users_ats_profile_fields.sql`).
+
+---
+
 ## 2026-05-21 — Wave 3 planning + interview kit streaming fix (Claude Code)
 
 ### Implemented

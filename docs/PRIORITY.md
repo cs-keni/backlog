@@ -18,11 +18,11 @@ Full spec in `docs/WAVE3_PLAN.md`. Execute in this order:
 
 | # | Phase | What | Status |
 |---|-------|------|--------|
-| 1 | P6 | Application packet checklist | Ready |
-| 2 | P8 | Company reuse banner | Ready |
-| 3 | P1 | Resume tailor UI (verify route contract first) | Ready |
-| 4 | P7 | Job freshness badge (display only) | Ready |
-| 5 | P4 | Source yield feedback loop + user source prefs | Ready — migration 030 |
+| 1 | P6 | Application packet checklist | Implemented locally |
+| 2 | P8 | Company reuse banner | Implemented locally |
+| 3 | P1 | Resume tailor UI (verify route contract first) | Implemented locally |
+| 4 | P7 | Job freshness badge (display only) | Implemented locally |
+| 5 | P4 | Source yield feedback loop + user source prefs | Implemented locally — migration 030 written |
 | 6 | P2 | Per-ATS completeness score | Ready — migrations 031, 032 |
 | 7 | P5 | Negative relevance feedback | Ready — migration 033 |
 | 8 | P0 | ATS keyword gap analysis | Ready — migration 034 |
@@ -52,7 +52,7 @@ Full spec in `docs/WAVE3_PLAN.md`. Execute in this order:
 | `027_add_dsa_track.sql` | Written (Wave 2 P1) | DSA track modes |
 | `028_interview_kits.sql` | Written (Wave 2 P4) | Interview day kit |
 | `029_interview_kits_unique.sql` | Written (Wave 2 P4) | Interview kit unique constraint |
-| `030_source_preferences.sql` | To write (Wave 3 P4) | Source yield prefs |
+| `030_source_preferences.sql` | Written, not applied (Wave 3 P4) | Source yield prefs |
 | `031_applications_ats_platform.sql` | To write (Wave 3 P2) | ATS completeness |
 | `032_users_ats_profile_fields.sql` | To write (Wave 3 P2) | phone/address/linkedin |
 | `033_job_feedback.sql` | To write (Wave 3 P5) | Negative relevance |

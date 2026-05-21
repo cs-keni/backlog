@@ -1,4 +1,5 @@
 import type { ConversionStats } from '@/lib/analytics/conversion'
+import type { SourcePreferences } from '@/lib/user/source-preferences'
 
 export type AnalyticsRange = '7d' | '30d' | '1y'
 
@@ -27,6 +28,7 @@ export interface AnalyticsData {
     responseRate: number
     interviewRate: number
   }>
+  sourcePreferences: SourcePreferences
   medianDaysToResponse: number | null
   conversionStats: ConversionStats
 }

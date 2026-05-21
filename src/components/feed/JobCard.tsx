@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { Job } from '@/lib/jobs/types'
 import { useToast } from '@/components/ui/Toaster'
+import { freshnessColor, freshnessLabel } from '@/lib/tracker/freshness'
 
 interface JobCardProps {
   job: Job
@@ -169,6 +170,8 @@ export function JobCard({ job, isSelected, onClick, onQuickApply, index }: JobCa
   const salary = formatSalary(job.salary_min, job.salary_max)
   // Fall back to fetched_at when posted_at is null (common for jobs ingested before date parsing was reliable)
   const { label: timeLabel, isNew } = timeAgo(job.posted_at ?? job.fetched_at)
+  const postingFreshness = freshnessLabel(job.fetched_at)
+  const postingFreshnessColor = freshnessColor(job.fetched_at)
   const application = job.applications?.[0]
   const avatar = companyAvatar(job.company)
 
@@ -262,6 +265,20 @@ export function JobCard({ job, isSelected, onClick, onQuickApply, index }: JobCa
             <span className="text-xs text-zinc-500">{salary.annual}</span>
             <span className="text-zinc-700">·</span>
             <span className="text-xs text-zinc-600">{salary.hourly}</span>
+          </>
+        )}
+        {postingFreshness && (
+          <>
+            <span className="text-zinc-700">·</span>
+            <span className={`text-[10px] ${
+              postingFreshnessColor === 'green'
+                ? 'text-emerald-500'
+                : postingFreshnessColor === 'yellow'
+                  ? 'text-amber-500'
+                  : 'text-red-500'
+            }`}>
+              {postingFreshness}
+            </span>
           </>
         )}
         <span className="text-zinc-700 ml-auto text-xs">{timeLabel}</span>

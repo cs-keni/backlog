@@ -6,6 +6,10 @@ import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import type { ApplicationWithJob, ApplicationStatus, TimelineEntry } from '@/lib/jobs/types'
 import { InterviewKit } from './InterviewKit'
+import { ApplicationChecklist } from './ApplicationChecklist'
+import { ResumeTailor } from './ResumeTailor'
+import { buildApplicationChecklist } from '@/lib/tracker/application-checklist'
+import { freshnessColor, freshnessLabel } from '@/lib/tracker/freshness'
 
 interface ApplicationDetailProps {
   app: ApplicationWithJob | null
@@ -40,6 +44,20 @@ const STATUS_COLORS: Record<ApplicationStatus, string> = {
   rejected: 'bg-red-500/20 text-red-400 border-red-500/30',
 }
 
+interface PriorApplication {
+  id: string
+  status: ApplicationStatus
+  applied_at: string | null
+  jobs: { title: string; company: string } | null
+}
+
+interface ApplicationDetailMeta {
+  hasResume: boolean
+  hasCoverLetter: boolean
+  hasInterviewKit: boolean
+  priorApplications: PriorApplication[]
+}
+
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
@@ -64,6 +82,7 @@ function useDebounce<T>(value: T, delay: number): T {
 
 export function ApplicationDetail({ app, onClose, onStatusChange, onUpdate, onDelete, onArchive }: ApplicationDetailProps) {
   const [timeline, setTimeline] = useState<TimelineEntry[]>([])
+  const [detailMeta, setDetailMeta] = useState<ApplicationDetailMeta | null>(null)
   const [recruiterName, setRecruiterName] = useState('')
   const [recruiterEmail, setRecruiterEmail] = useState('')
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved'>('idle')
@@ -83,10 +102,14 @@ export function ApplicationDetail({ app, onClose, onStatusChange, onUpdate, onDe
     setRecruiterEmail(app.recruiter_email ?? '')
     setDeleteState('idle')
     setTimeline([])
+    setDetailMeta(null)
 
     fetch(`/api/applications/${app.id}`)
       .then((r) => r.json())
-      .then((d: { timeline: TimelineEntry[] }) => setTimeline(d.timeline ?? []))
+      .then((d: { timeline: TimelineEntry[]; detail?: ApplicationDetailMeta }) => {
+        setTimeline(d.timeline ?? [])
+        setDetailMeta(d.detail ?? null)
+      })
       .catch(() => {})
   }, [app])
 
@@ -162,6 +185,17 @@ export function ApplicationDetail({ app, onClose, onStatusChange, onUpdate, onDe
       setTimeline(d.timeline ?? [])
     }
   }
+
+  const checklistItems = app && detailMeta
+    ? buildApplicationChecklist({
+      hasResume: detailMeta.hasResume,
+      hasCoverLetter: detailMeta.hasCoverLetter,
+      hasInterviewKit: detailMeta.hasInterviewKit,
+      appliedAt: app.applied_at,
+    })
+    : null
+  const postingFreshness = app ? freshnessLabel(app.jobs.fetched_at) : null
+  const postingFreshnessColor = app ? freshnessColor(app.jobs.fetched_at) : null
 
   return (
     <AnimatePresence>
@@ -239,10 +273,39 @@ export function ApplicationDetail({ app, onClose, onStatusChange, onUpdate, onDe
 
             {/* Body */}
             <div className="flex-1 overflow-y-auto p-5 space-y-6">
+              {detailMeta && detailMeta.priorApplications.length > 0 && (
+                <div className="rounded-lg border border-amber-900/40 bg-amber-950/20 px-3 py-2.5 text-xs text-amber-300">
+                  <p>
+                    You've applied to {app.jobs.company} {detailMeta.priorApplications.length}x before.
+                  </p>
+                  <div className="mt-1.5 space-y-1 text-amber-200/80">
+                    {detailMeta.priorApplications.map((prior) => (
+                      <div key={prior.id} className="flex items-center justify-between gap-3">
+                        <span className="truncate">{prior.jobs?.title ?? 'Previous application'}</span>
+                        <span className="shrink-0 text-[11px] text-amber-300/70">
+                          {prior.applied_at ? formatDate(prior.applied_at) : STATUS_LABELS[prior.status] ?? prior.status}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* Meta */}
               <div className="flex flex-wrap gap-2 text-xs text-zinc-500">
                 {app.jobs.location && <span>📍 {app.jobs.location}</span>}
                 {app.jobs.is_remote && <span>🌐 Remote</span>}
+                {postingFreshness && (
+                  <span className={
+                    postingFreshnessColor === 'green'
+                      ? 'text-emerald-500'
+                      : postingFreshnessColor === 'yellow'
+                        ? 'text-amber-500'
+                        : 'text-red-500'
+                  }>
+                    {postingFreshness}
+                  </span>
+                )}
                 {formatSalary(app.jobs.salary_min, app.jobs.salary_max) && (
                   <span>💰 {formatSalary(app.jobs.salary_min, app.jobs.salary_max)}</span>
                 )}
@@ -280,6 +343,12 @@ export function ApplicationDetail({ app, onClose, onStatusChange, onUpdate, onDe
                   ))}
                 </div>
               </div>
+
+              {checklistItems && (
+                <ApplicationChecklist items={checklistItems} />
+              )}
+
+              <ResumeTailor jobId={app.jobs.id} />
 
               {/* Recruiter */}
               <div className="space-y-2">

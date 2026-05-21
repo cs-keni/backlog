@@ -23,12 +23,12 @@ export async function GET(
   } = await supabase.auth.getUser()
   if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const [appResult, timelineResult] = await Promise.all([
+  const [appResult, timelineResult, profileResult, coverLetterResult, interviewKitResult] = await Promise.all([
     supabase
       .from('applications')
       .select(`
         id, status, applied_at, last_updated, notes, recruiter_name, recruiter_email,
-        jobs (id, title, company, location, salary_min, salary_max, url, is_remote, tags)
+        jobs (id, title, company, location, salary_min, salary_max, url, is_remote, tags, fetched_at)
       `)
       .eq('id', id)
       .eq('user_id', user.id)
@@ -38,15 +38,57 @@ export async function GET(
       .select('id, application_id, from_status, to_status, changed_at, note')
       .eq('application_id', id)
       .order('changed_at', { ascending: true }),
+    supabase
+      .from('users')
+      .select('resume_text')
+      .eq('id', user.id)
+      .single(),
+    supabase
+      .from('cover_letters')
+      .select('id')
+      .eq('user_id', user.id)
+      .eq('application_id', id)
+      .limit(1)
+      .maybeSingle(),
+    supabase
+      .from('interview_kits')
+      .select('id')
+      .eq('user_id', user.id)
+      .eq('application_id', id)
+      .limit(1)
+      .maybeSingle(),
   ])
 
   if (appResult.error || !appResult.data) {
     return Response.json({ error: 'Not found' }, { status: 404 })
   }
 
+  type AppWithJob = {
+    jobs?: { company?: string | null } | null
+  }
+  const company = (appResult.data as AppWithJob).jobs?.company
+  let priorApplications: unknown[] = []
+  if (company) {
+    const { data: priorApps } = await supabase
+      .from('applications')
+      .select('id, status, applied_at, jobs!inner(title, company)')
+      .eq('user_id', user.id)
+      .neq('id', id)
+      .eq('jobs.company', company)
+      .order('applied_at', { ascending: false })
+      .limit(3)
+    priorApplications = priorApps ?? []
+  }
+
   return Response.json({
     application: appResult.data,
     timeline: timelineResult.data ?? [],
+    detail: {
+      hasResume: Boolean(profileResult.data?.resume_text?.trim()),
+      hasCoverLetter: Boolean(coverLetterResult.data),
+      hasInterviewKit: Boolean(interviewKitResult.data),
+      priorApplications,
+    },
   })
 }
 

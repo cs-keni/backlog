@@ -4,6 +4,34 @@
 
 ---
 
+## Session: 2026-05-21 — Wave 3 P6/P8/P1/P7/P4 partial implementation (Codex)
+
+### What changed
+
+- Implemented P6 application packet checklist in Tracker detail, derived from resume, cover letter, interview kit, and applied date data.
+- Implemented P8 company reuse banner in Tracker detail, backed by prior applications at the same company.
+- Implemented P1 resume tailor UI against the actual existing route contract: `GET/POST /api/resume/tailor` with `job_id`, returning a PDF URL.
+- Implemented P7 job freshness labels in Feed cards and Tracker detail using `jobs.fetched_at`.
+- Implemented P4 source preferences:
+  - Added `supabase/migrations/030_source_preferences.sql`.
+  - Added `PUT /api/user/source-preferences`.
+  - Added source preference merge helpers and tests.
+  - Added pin/hide controls to Analytics source yield.
+  - Hidden sources are excluded from the Feed query.
+
+### Checks run
+
+- `node node_modules/typescript/bin/tsc --noEmit --pretty false` — passed
+- `node node_modules/vitest/vitest.mjs run src/tests/unit/application-checklist.test.ts src/tests/unit/freshness.test.ts src/tests/unit/source-preferences.test.ts src/tests/unit/application-card.test.tsx` — 9 passed
+
+### Remaining work
+
+- Continue Wave 3 at **P2 per-ATS completeness score**.
+- Apply migration `030_source_preferences.sql` in Supabase before relying on P4 source preferences in production.
+- Broader regression run still recommended after the remaining Wave 3 phases.
+
+---
+
 ## Session: 2026-05-21 — Wave 3 planning + interview kit streaming fix (Claude Code)
 
 ### What changed

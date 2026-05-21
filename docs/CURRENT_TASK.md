@@ -1,7 +1,7 @@
 # Current Task
 
 **Last updated:** 2026-05-21
-**Status:** Wave 3 planned and ready for Codex. Wave 2 complete locally (migrations 028/029 need Supabase application).
+**Status:** Wave 3 partially implemented locally. P6/P8/P1/P7/P4 are done; P2 is next. Wave 2 complete locally (migrations 028/029 need Supabase application).
 
 ---
 
@@ -13,11 +13,11 @@ Full spec is in **`docs/WAVE3_PLAN.md`**. Read it before starting any phase. It 
 
 | Phase | What | Owner | Status |
 |-------|------|-------|--------|
-| P6 | Application packet checklist (no migration) | Codex | Ready |
-| P8 | Company reuse banner (read-only query) | Codex | Ready |
-| P1 | Resume tailor UI (verify route contract first) | Codex | Ready |
-| P7 | Job freshness badge (display only) | Codex | Ready |
-| P4 | Source yield feedback loop + source prefs | Codex | Ready — migration 030 |
+| P6 | Application packet checklist (no migration) | Codex | Implemented locally |
+| P8 | Company reuse banner (read-only query) | Codex | Implemented locally |
+| P1 | Resume tailor UI (verify route contract first) | Codex | Implemented locally |
+| P7 | Job freshness badge (display only) | Codex | Implemented locally |
+| P4 | Source yield feedback loop + source prefs | Codex | Implemented locally — migration 030 written |
 | P2 | Per-ATS completeness score | Codex | Ready — migrations 031, 032 |
 | P5 | Negative relevance feedback | Codex | Ready — migration 033 |
 | P0 | ATS keyword gap analysis | Codex | Ready — migration 034 |
