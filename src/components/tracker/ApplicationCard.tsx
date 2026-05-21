@@ -5,6 +5,8 @@ import { useDraggable } from '@dnd-kit/core'
 import { CSS } from '@dnd-kit/utilities'
 import { motion } from 'framer-motion'
 import type { ApplicationWithJob } from '@/lib/jobs/types'
+import { getCompanyTier } from '@/lib/tracker/company-tier'
+import { getApplicationHealth, getDaysSinceApplication, RESPONSE_WINDOW_DAYS } from '@/lib/tracker/health'
 
 interface ApplicationCardProps {
   app: ApplicationWithJob
@@ -56,6 +58,12 @@ const AVATAR_COLORS = [
   'bg-yellow-500/20 text-yellow-300', 'bg-rose-500/20 text-rose-300',
 ]
 
+const HEALTH_COLORS = {
+  green: 'bg-emerald-500',
+  yellow: 'bg-amber-500',
+  red: 'bg-red-500',
+}
+
 function getDomain(company: string, jobUrl: string | null): string {
   if (!jobUrl) return `${company.toLowerCase().replace(/[^a-z0-9]/g, '')}.com`
   try {
@@ -104,6 +112,13 @@ export function ApplicationCard({ app, index, isSelected, isBulkSelected = false
   const avatar = companyAvatar(app.jobs.company)
   const salary = formatSalary(app.jobs.salary_min, app.jobs.salary_max)
   const { label: ageLabel, nudge } = appAge(app)
+  const companyTier = getCompanyTier(app.jobs.company)
+  const health = app.status === 'applied' && app.applied_at
+    ? getApplicationHealth(app.applied_at, companyTier)
+    : null
+  const healthTitle = app.applied_at
+    ? `${getDaysSinceApplication(app.applied_at)} days since application · Typical response: ~${RESPONSE_WINDOW_DAYS[companyTier]} days`
+    : ''
 
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: app.id,
@@ -157,6 +172,14 @@ export function ApplicationCard({ app, index, isSelected, isBulkSelected = false
             </svg>
           )}
         </div>
+      )}
+
+      {health && (
+        <span
+          data-testid="application-health-dot"
+          title={healthTitle}
+          className={`absolute top-2 ${selectMode ? 'right-7' : 'right-2'} h-1.5 w-1.5 rounded-full ${HEALTH_COLORS[health]}`}
+        />
       )}
 
       {/* Logo + title */}

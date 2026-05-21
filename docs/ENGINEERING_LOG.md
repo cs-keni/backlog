@@ -4,6 +4,22 @@ Reverse-chronological. One entry per meaningful session.
 
 ---
 
+## 2026-05-21 — Wave 2 P2 tracker health scores (Codex)
+
+### Implemented
+
+- Added company-tier detection and tier-specific application response windows.
+- Added green/yellow/red health scoring for applied applications.
+- Rendered a small health dot on Tracker applied cards with response-window tooltip context.
+- Added tests for scoring and rendered card indicator behavior.
+
+### Checks
+
+- `node node_modules/typescript/bin/tsc --noEmit --pretty false` — passed
+- `node node_modules/vitest/vitest.mjs run src/tests/unit/tracker-health.test.ts src/tests/unit/application-card.test.tsx` — 6 passed
+
+---
+
 ## 2026-05-21 — Wave 2 P1 DSA intelligence (Codex)
 
 ### Implemented

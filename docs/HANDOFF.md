@@ -4,6 +4,26 @@
 
 ---
 
+## Session: 2026-05-21 — Wave 2 P2 tracker health scores (Codex)
+
+### What changed
+
+- Added `src/lib/tracker/company-tier.ts` for FAANG/large/mid/startup tier detection.
+- Added `src/lib/tracker/health.ts` for tier-specific response windows and green/yellow/red application health.
+- Tracker `ApplicationCard` now shows a 6px health dot for `applied` cards with tooltip copy: days since application and typical response window.
+- Added unit/component tests for tier detection, health scoring, and card health-dot rendering.
+
+### Checks run
+
+- `node node_modules/typescript/bin/tsc --noEmit --pretty false` — passed
+- `node node_modules/vitest/vitest.mjs run src/tests/unit/tracker-health.test.ts src/tests/unit/application-card.test.tsx` — 6 passed
+
+### Remaining work
+
+- P3 callback-rate analytics breakdown is next.
+
+---
+
 ## Session: 2026-05-21 — Wave 2 P1 DSA intelligence (Codex)
 
 ### What changed
