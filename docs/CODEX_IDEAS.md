@@ -1,179 +1,79 @@
 # Codex Ideas
 
-Last updated: 2026-05-18
+Last updated: 2026-05-21
 
-This is a lightweight idea bank for Claude Code / Codex. It is not a task queue by itself; promote items into `docs/CURRENT_TASK.md` when actively working on them.
+Lightweight idea bank. Items here are not yet in a plan — promote to `docs/WAVE2_PLAN.md` or `TODOS.md` when actively working on them.
+
+**Already implemented (removed from list):** Workday debug export button (Phase 2e), extension debug diagnostics, bulk action bar (Phase 3b), filter presets (Phase 7), timezone-aware quiet hours (PP-1), E2E depth (PP-4).
 
 ---
 
-## Extension Thoughts For Claude
+## Extension
 
-The Workday extension work is already in a serious, useful state. The current code has:
-
-- 5s Tier 2 timeout fallback in both popup/sidebar-style fill flows.
-- Workday text fill via `data-automation-id`.
-- Workday state combobox support.
-- Workday skills autocomplete support.
-- Workday work-history and education section add/fill helpers.
-- Cancel and review states in the sidebar.
-
-### Highest-leverage next Workday work
+### Workday observability improvements
 
 1. **Capture real Workday DOM fixtures**
-   - This is the most important next step before adding more heuristics.
-   - Synthetic tests will keep missing nested shadow-root/progressive-rendering issues.
-   - Suggested artifact: `extension/src/test/fixtures/workday-page1.html`.
-   - If full shadow DOM serialization is hard, capture a redacted debug dump instead: visible labels, automation IDs, roles, placeholders, element path, and nearest section text.
+   - Most important before adding more selectors.
+   - On a real Workday application page, run `document.documentElement.outerHTML` in console.
+   - Save to `extension/src/test/fixtures/workday-page1.html`.
+   - Use in `fill.test.ts` to test against real DOM shapes (nested shadow roots, repeated automation IDs, async mount order).
 
-2. **Add a Workday debug export button**
-   - In the sidebar review/error state, add a small dev-only button that copies a redacted JSON diagnostic:
-     - URL host/path only
-     - detected ATS/page type
-     - visible fillable fields
-     - labels
-     - `data-automation-id`
-     - role/aria attributes
-     - whether each field was filled/skipped
-     - skip reason
-   - This would make user smoke tests much cheaper: Kenny can paste one compact diagnostic instead of describing page behavior manually.
+2. **Make Workday fills observable per phase**
+   - Internal logs should record fill results by phase: deterministic text / combobox / work history / education / skills / Tier 2 / Tier 3.
+   - Sidebar can still show a simple total, but structured logs make debugging much cheaper.
 
-3. **Make Workday fills observable per phase**
-   - Record fill results as:
-     - deterministic text
-     - Workday combobox
-     - work history
-     - education
-     - skills
-     - Tier 2 profile values
-     - Tier 3 open-ended answers
-   - The sidebar can still show a simple total, but internal logs should reveal which phase failed.
+3. **Address fields should be structured profile fields**
+   - `parseAddress()` is a fragile fallback.
+   - Migration 020 already adds `street_address`, `city`, `state`, `postal_code` — apply it, update Profile UI, update extension to prefer structured fields.
 
-4. **Add modal guard before auto-advance**
-   - `TODOS.md` still has this and it is valid.
-   - Before clicking Next/Continue, block if a visible modal/dialog exists:
-     - `[role="dialog"]`
-     - `[aria-modal="true"]`
-     - obvious modal classes
-   - Surface “Modal detected, review before continuing” instead of clicking through.
-
-5. **Handle “previously worked here” with actual work history**
-   - Current radio resolver defaults prior-employer questions to `No`.
-   - Better: infer company from page context and compare against `profile.workHistory[].company`.
-   - Keep default `No` when no confident company match exists.
-
-6. **Address fields should become structured profile fields**
-   - Current `parseAddress()` fallback is fragile.
-   - Add user fields for street/city/state/postal code, then keep parsing only as fallback.
-   - This benefits Workday and generic ATS forms.
-
-### Workday caution
-
-Avoid large new heuristics until there is one real captured failure case. Workday forms differ by tenant and application flow; the next gains probably come from better observability and fixtures, not more broad selectors.
+4. **Modal guard before auto-advance**
+   - Before clicking Next/Continue, check for visible modals: `[role="dialog"]`, `aria-modal="true"`.
+   - Surface "Modal detected — review before continuing" instead of clicking through.
+   - Already in TODOS.md.
 
 ---
 
-## Token And Cost Optimization Ideas
+## Token / Cost Optimization
 
-1. **Cache extension question answers**
+1. **Cache generated extension answers**
    - Key by normalized question text + coarse job/company context.
-   - Before calling Sonnet, check:
-     - saved answers
-     - recently generated answers
-     - previous answer for semantically identical question
-   - Store source as `saved`, `cached_generated`, or `generated`.
+   - Migration 021 is written; apply in Supabase, then wire lookup in `/api/extension/answer-question`.
 
 2. **Batch open-ended extension answers**
-   - Current flows can call `answerQuestion` per open-ended field.
-   - Add a batch endpoint for multiple questions from one page.
-   - One Sonnet call can answer all fields with shared profile/job context.
+   - Current flows call `answerQuestion` per field. One Sonnet call can answer all fields with shared profile/job context.
 
 3. **Tier 2 field analysis cache**
    - Cache Haiku analysis by ATS + normalized label + input type + option list hash.
-   - Many forms ask the same fields repeatedly.
 
 4. **Worker enrichment budget**
-   - Add per-run caps for:
-     - job URL description fetches
-     - OpenAI normalization batches
-     - Brave Search queries
+   - Add per-run caps for job URL fetches, OpenAI batches, Brave queries.
    - Log a compact cost summary per run.
 
-5. **Description-first filtering**
-   - For Brave-discovered jobs, keep doing cheap title/search-result filtering first.
-   - Only run expensive extraction/enrichment if URL/title/snippet pass role + seniority gates.
-
-6. **Lazy match scoring**
-   - Keep match scores lazy and cached.
-   - Add a “score top N newest jobs only” background job if feed scanning gets slow.
+5. **Lazy match scoring**
+   - Keep scores lazy and cached. Add "score top N newest jobs only" background job if feed scanning gets slow.
 
 ---
 
-## Backlog Product Ideas
+## Product Ideas (not yet in Wave 2)
 
-1. **Daily “apply queue”**
-   - A focused page with the top 5-10 newest matching jobs.
-   - Actions: save, open application, mark applied, hide, not relevant.
-   - This keeps the workflow from becoming an infinite feed.
+1. **Negative relevance feedback**
+   - "Not relevant" reasons: too senior, ML/data, not SWE, location, sponsorship, duplicate.
+   - Feed back into filters and future Brave query tuning.
 
-2. **Negative feedback loop**
-   - Add “Not relevant” reasons:
-     - too senior
-     - ML/data/research
-     - not SWE
-     - location
-     - sponsorship
-     - duplicate/closed
-   - Feed these reasons back into filters and future search query tuning.
+2. **Job freshness + closing risk**
+   - Show "posted today/this week" and recheck whether the URL is still live before surfacing old jobs.
 
-3. **Job freshness and closing risk**
-   - Show “posted today / this week” plus source confidence.
-   - For discovered URLs, recheck whether the page is still live before highlighting it.
+3. **Application packet checklist**
+   - Per job: resume ready, cover letter done, common answers ready, extension profile complete, applied.
+   - Makes Backlog feel like a cockpit, not just a tracker.
 
-4. **Application packet checklist**
-   - Per job:
-     - resume ready
-     - cover letter optional
-     - common answers ready
-     - extension profile complete
-     - application opened
-     - applied
-   - This makes Backlog feel like a cockpit, not just a tracker.
+4. **Company reuse across applications**
+   - When applying to a company already in tracker: surface prior applications, past answers, recruiter contacts, interview notes.
 
-5. **Company reuse**
-   - If applying to a company already in the tracker, surface:
-     - previous applications
-     - previous answers
-     - recruiter contacts
-     - interview notes
-     - company-specific cover letter tone
+5. **Profile completeness by ATS**
+   - Instead of one generic score: "Greenhouse readiness 90%, Workday readiness 60% (missing street address)."
 
-6. **Closed-loop job search analytics**
-   - Track which source produced applications and responses:
-     - GitHub
-     - portal scan
-     - Brave Search
-     - manual
-   - Then bias future discovery toward sources that actually lead to interviews.
-
-7. **Saved answer library improvement**
-   - Detect repeated application questions from extension usage.
-   - Suggest saving generated answers that were edited or reused.
-
-8. **Profile completeness by ATS**
-   - Instead of one generic completeness score, show:
-     - Greenhouse readiness
-     - Lever readiness
-     - Workday readiness
-   - Example: “Workday readiness is low because address street/postal code is missing.”
-
----
-
-## Docs/TODO Hygiene
-
-`TODOS.md` is partially stale. Examples:
-
-- Haiku timeout is already implemented.
-- Workday combobox/work-history/education support exists, though it still needs live validation.
-- Relevance filter test notes still mention allowing PM/TPM, but current user preference is software engineering only.
-
-Suggested cleanup task: reconcile `TODOS.md` and `TESTING-SUITE.md` against current code before using them as planning truth.
+6. **Source yield as a feedback loop**
+   - Track which source (GitHub, portal, Brave, manual) produced applications and interviews.
+   - Bias future discovery budget toward sources that lead to callbacks.
+   - Baseline analytics in place; close the loop with discovery-side tuning.

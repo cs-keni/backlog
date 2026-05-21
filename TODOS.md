@@ -42,3 +42,32 @@ Deferred tasks and known issues. Each item has enough context to pick up months 
 **Why:** Codex flagged during the 2026-05-15 eng review that synthetic tests won't catch real Workday behavior: nested shadow roots, repeated automation IDs across steps, async mount order, React controlled inputs.
 **How to apply:** On a real Workday application page (console), run: `document.documentElement.outerHTML` to capture the serialized DOM. Save to `extension/src/test/fixtures/workday-page1.html`. Then write `fill.test.ts` tests that load this fixture into jsdom and run `computeFills` against it.
 **Depends on:** Workday text-input fill being implemented and tested live first.
+
+---
+
+## Wave 2 Deferred / Wave 3
+
+### Salary negotiation playbook
+**What:** When an application moves to `offer` status, surface a comp range estimate + counter-offer email template.
+**Why:** The most financially consequential moment in the job search gets zero support today. Typical negotiation on a $160K offer is worth $10-25K.
+**Blocked on:** Reliable per-company compensation data. Levels.fyi isn't programmatically accessible. Unblock by: (a) letting the user manually input the offer, then comparing to general negotiation bands (15-20% counter is standard), or (b) adding a `comp_target` field to the user profile that the playbook uses as the anchor.
+**How to apply:** Trigger on `status = 'offer'` in ApplicationDetail. Show: "Your target: $X. Typical counter: $X × 1.15–1.20. Here's the email:" with a generated template. Store user's `comp_target` in `users` table.
+**Effort:** M once comp data story is decided.
+
+### Warm referral radar
+**What:** Detect LinkedIn connections at companies where you have open applications. Surface the connection + a message template.
+**Why:** Referrals get 5-10x better callback rates than cold applications. This is the highest-leverage action in job search.
+**Blocked on:** LinkedIn data access. Options: (a) Chrome extension reads LinkedIn connections page and syncs to Backlog, (b) user pastes LinkedIn export CSV, (c) user manually enters connections per company.
+**Effort:** M (data pipeline) + S (UI).
+
+### Auto-apply review queue
+**What:** Backlog curates 3-5 matching jobs per day and queues them for your 5-minute morning review. You approve → extension applies.
+**Why:** Closes the loop between job discovery and application submission without spam.
+**Blocked on:** Callback rate data (Wave 2 P3) to validate that match quality is high enough before auto-applying. Don't ship this until P3 shows the matching is trustworthy.
+**Effort:** L.
+
+### ATS keyword gap analysis
+**What:** Per job description, show which keywords your resume is missing. Integrated as a tab in ApplicationDetail.
+**Why:** Direct competitor feature (Teal does this). High perceived value for ATS-heavy companies.
+**How to apply:** Diff job description keywords against resume text using TF-IDF or simple word set overlap. Highlight top 5-10 missing terms.
+**Effort:** M.

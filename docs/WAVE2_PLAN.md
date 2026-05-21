@@ -8,9 +8,35 @@
 
 ---
 
+## Codex Quick-Start
+
+**All phases in this plan are Codex-owned.** No Claude Code reservation.
+
+1. Read this file top to bottom before writing any code.
+2. Start with **P0** — the bugs block trust in the app.
+3. Each phase section has: exact file paths, code shapes, migration SQL, and test specs.
+4. Apply migrations in Supabase **before** implementing the feature that depends on them.
+5. Run checks after each phase:
+   ```bash
+   node node_modules/typescript/bin/tsc --noEmit
+   node node_modules/vitest/vitest.mjs run <test-file>
+   ```
+6. Update `docs/HANDOFF.md` and `docs/ENGINEERING_LOG.md` after each phase.
+
+---
+
 ## Execution Order
 
 Ship phases in order. Each phase is independently deployable.
+
+| Phase | Owner | Description |
+|-------|-------|-------------|
+| **P0** | **Codex** | 3 bug fixes — must ship first |
+| **P5** | **Codex** | UX polish trio — ship alongside P0 |
+| **P1** | **Codex** | DSA track modes + interview-aware Today queue |
+| **P2** | **Codex** | Application health scores on Tracker cards |
+| **P3** | **Codex** | Callback rate analytics breakdown |
+| **P4** | **Codex** | Interview day kit (streaming LLM brief) |
 
 ---
 

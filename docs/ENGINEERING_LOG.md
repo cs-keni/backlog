@@ -4,6 +4,38 @@ Reverse-chronological. One entry per meaningful session.
 
 ---
 
+## 2026-05-21 — Wave 2 planning + docs cleanup (Claude Code)
+
+### What changed
+
+- Ran `/qa-only` on main branch. QA score: **77/100 (B+)**. Full report: `.gstack/qa-reports/qa-report-localhost-2026-05-21.md`.
+- Ran `/plan-ceo-review` in SCOPE EXPANSION mode. Produced Wave 2 plan.
+- **Wave 2 spec written to `docs/WAVE2_PLAN.md`** — full implementation spec for all 6 phases.
+- Docs cleanup: deleted `GRADE_BOOST_PLAN.md` (complete), rewrote `PRIORITY.md`, pruned `CODEX_IDEAS.md`, updated `AI_CONTEXT.md`, added Wave 2 deferred items to `TODOS.md`.
+- Commit: `9effe14`
+
+### Wave 2 scope accepted
+
+| Phase | What |
+|-------|------|
+| P0 | Fix Log Application, Settings toast, company enrich 500s |
+| P5 | Button labels, Tracker empty state, STORY BANK CSS |
+| P1 | DSA track modes 75/150/250 + interview-aware Today queue |
+| P2 | Application health scores on Tracker cards |
+| P3 | Callback rate analytics breakdown |
+| P4 | Interview day kit (streaming LLM brief) |
+
+### No code changes
+
+Planning session only. All phases ready for Codex to implement from `docs/WAVE2_PLAN.md`.
+
+### Known issues for next session
+
+- BUG-001 root cause not yet confirmed — add server logging first, then fix per decision tree in WAVE2_PLAN.md.
+- Migrations 020 and 021 are written but not applied in Supabase. Apply before relying on address fields or extension answer cache.
+
+---
+
 ## 2026-05-20 — Phase 9 E2E and CI hardening (Codex)
 
 ### Implemented

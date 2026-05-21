@@ -101,12 +101,14 @@ Auth: `Authorization: Bearer blg_<key>` header. Keys stored in chrome.storage.lo
 
 ## Active Work
 
-**Current focus: Grade Boost — all sections to A.**
-Full spec: `docs/GRADE_BOOST_PLAN.md` — read this before starting any phase. It has architecture decisions, exact code shapes, test specs, and design specs all inline.
+**Current focus: Wave 2 — Co-Pilot features + QA bug fixes.**
+Full spec: `docs/WAVE2_PLAN.md` — read this before starting any phase. It has file paths, code shapes, migration SQL, data flow diagrams, and test specs for every item.
 
-Priority order and pending migrations: `docs/CURRENT_TASK.md`.
+Execution order: **P0 (bugs) → P5 (UX polish) → P1 (DSA) → P2 (Tracker) → P3 (Analytics) → P4 (Interview Kit)**
 
-See `PHASES.md` for the full roadmap with checkboxes.
+All Wave 2 phases are **Codex-owned** — no Claude Code reservation.
+
+See `docs/CURRENT_TASK.md` for the phase table and checks to run.
 
 See `TODOS.md` for deferred items with context.
 
