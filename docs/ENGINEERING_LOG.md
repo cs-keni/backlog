@@ -4,6 +4,28 @@ Reverse-chronological. One entry per meaningful session.
 
 ---
 
+## 2026-05-21 — Wave 2 P0 bug fixes (Codex)
+
+### Implemented
+
+- Hardened `POST /api/jobs/manual` against company upsert misses, duplicate job URLs, duplicate user/job applications, and no-URL manual jobs.
+- Added `supabase/migrations/027_allow_manual_job_url_null.sql`.
+- Added `onChange` to the notification timezone select to stop React controlled-input warnings.
+- Made company enrichment provider failures return existing company data instead of a UI-visible 500.
+- Added `src/tests/integration/manual-jobs.test.ts` for no-URL and duplicate-URL manual job paths.
+
+### Checks
+
+- `node node_modules/typescript/bin/tsc --noEmit --pretty false` — passed
+- `node node_modules/vitest/vitest.mjs run src/tests/integration/manual-jobs.test.ts` — 2 passed
+
+### Gotchas
+
+- Wave 2 migration numbering shifted: P1 DSA track should use `028_add_dsa_track.sql`; P4 interview kits should use `029_interview_kits.sql`.
+- Apply migration 027 in Supabase before production no-URL manual application logging.
+
+---
+
 ## 2026-05-21 — Wave 2 planning + docs cleanup (Claude Code)
 
 ### What changed

@@ -8,6 +8,20 @@ import { enrichCompany } from '@/lib/llm/company-enricher'
 
 const FULL_SELECT = 'id, name, description, mission, notable_products, website_url, headcount_range, funding_stage, tech_stack, enriched_at'
 
+function serializeError(error: unknown) {
+  if (error && typeof error === 'object') {
+    const err = error as { name?: unknown; message?: unknown; code?: unknown; type?: unknown; status?: unknown }
+    return {
+      name: typeof err.name === 'string' ? err.name : undefined,
+      message: typeof err.message === 'string' ? err.message : undefined,
+      code: typeof err.code === 'string' ? err.code : undefined,
+      type: typeof err.type === 'string' ? err.type : undefined,
+      status: typeof err.status === 'number' ? err.status : undefined,
+    }
+  }
+  return { message: String(error) }
+}
+
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -68,7 +82,13 @@ export async function POST(
     .order('fetched_at', { ascending: false })
     .limit(5)
 
-  const result = await enrichCompany(company.name, jobs ?? [])
+  let result: Awaited<ReturnType<typeof enrichCompany>>
+  try {
+    result = await enrichCompany(company.name, jobs ?? [])
+  } catch (error) {
+    console.error('[company-enrich] provider request failed:', JSON.stringify(serializeError(error)))
+    return Response.json(company)
+  }
 
   const admin = createAdminClient()
   const { data: updated } = await admin

@@ -4,6 +4,33 @@
 
 ---
 
+## Session: 2026-05-21 — Wave 2 P0 bug fixes (Codex)
+
+### What changed
+
+- Fixed `POST /api/jobs/manual` to:
+  - log serialized Supabase errors for company/job/application writes,
+  - tolerate company profile upsert returning no row by falling back to a select,
+  - reuse existing jobs on URL unique conflicts,
+  - upsert duplicate user/job applications instead of failing,
+  - avoid duplicate timeline rows when the status is unchanged.
+- Added `supabase/migrations/027_allow_manual_job_url_null.sql` so manually logged jobs can omit a posting URL.
+- Fixed the notification timezone select controlled-input warning by adding `onChange`.
+- Made company enrichment provider failures best-effort: logs provider error metadata and returns the existing company row instead of surfacing a 500 to the UI.
+- Added focused integration coverage for manual no-URL and duplicate-URL paths.
+
+### Checks run
+
+- `node node_modules/typescript/bin/tsc --noEmit --pretty false` — passed
+- `node node_modules/vitest/vitest.mjs run src/tests/integration/manual-jobs.test.ts` — 2 passed
+
+### Remaining work
+
+- Apply `supabase/migrations/027_allow_manual_job_url_null.sql` in Supabase before relying on no-URL manual applications in production.
+- P5 is next. Because P0 consumed migration `027`, use `028_add_dsa_track.sql` for P1 and `029_interview_kits.sql` for P4.
+
+---
+
 ## Session: 2026-05-21 — Wave 2 planning (Claude Code)
 
 ### What happened
@@ -26,7 +53,7 @@ Six phases, in order:
 - Tracker empty state: guidance copy + CTA buttons when 0 applications
 - "STORY BANK" CSS glitch: add `whitespace-nowrap` to the heading
 
-**P1–P4:** DSA tracks (migration 027), interview-aware Today queue, application health scores, callback rate analytics, interview day kit (migration 028, streaming).
+**P1–P4:** DSA tracks (migration 028), interview-aware Today queue, application health scores, callback rate analytics, interview day kit (migration 029, streaming).
 
 ### No changes made to code this session
 

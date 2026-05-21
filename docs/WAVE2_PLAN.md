@@ -151,7 +151,7 @@ Add `whitespace-nowrap` to the section label element that has `text-transform: u
 
 ### DSA-001 — Track modes: 75 / 150 / 250
 
-**Migration 027:** `supabase/migrations/027_add_dsa_track.sql`
+**Migration 028:** `supabase/migrations/028_add_dsa_track.sql`
 ```sql
 ALTER TABLE users
   ADD COLUMN IF NOT EXISTS dsa_track text NOT NULL DEFAULT '150'
@@ -318,7 +318,7 @@ export interface ConversionStats {
 
 ### PREP-001 — Interview kit (streaming)
 
-**Migration 028:** `supabase/migrations/028_interview_kits.sql`
+**Migration 029:** `supabase/migrations/029_interview_kits.sql`
 ```sql
 CREATE TABLE IF NOT EXISTS interview_kits (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -392,8 +392,9 @@ POST /api/prep/interview-kit
 
 Apply in order after P0 is deployed:
 
-- [ ] `027_add_dsa_track.sql` — before P1 DSA work
-- [ ] `028_interview_kits.sql` — before P4 Interview Kit
+- [x] `027_allow_manual_job_url_null.sql` — before relying on manual jobs without URLs
+- [ ] `028_add_dsa_track.sql` — before P1 DSA work
+- [ ] `029_interview_kits.sql` — before P4 Interview Kit
 
 ---
 
