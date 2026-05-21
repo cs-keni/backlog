@@ -25,16 +25,41 @@ function GapSection({ label, terms }: { label: string; terms: string[] }) {
   )
 }
 
+function GapSkeleton() {
+  return (
+    <div className="space-y-3 rounded-lg border border-zinc-800 bg-zinc-900/50 px-3 py-3">
+      {[40, 64, 52].map((w) => (
+        <div key={w} className="space-y-1.5">
+          <div className="h-2 w-12 animate-pulse rounded bg-zinc-700" />
+          <div className="flex gap-1">
+            <div className={`h-5 w-${w} animate-pulse rounded-full bg-zinc-800`} />
+            <div className="h-5 w-16 animate-pulse rounded-full bg-zinc-800" />
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 export function KeywordGap({ applicationId }: { applicationId: string }) {
   const [row, setRow] = useState<KeywordGapRow | null>(null)
+  const [initialLoading, setInitialLoading] = useState(true)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
+    let cancelled = false
+    setInitialLoading(true)
     fetch(`/api/prep/keyword-gap?application_id=${encodeURIComponent(applicationId)}`)
-      .then((res) => res.ok ? res.json() : null)
-      .then((data: KeywordGapRow | null) => setRow(data))
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: KeywordGapRow | null) => {
+        if (!cancelled) setRow(data)
+      })
       .catch(() => {})
+      .finally(() => {
+        if (!cancelled) setInitialLoading(false)
+      })
+    return () => { cancelled = true }
   }, [applicationId])
 
   async function generate() {
@@ -63,16 +88,19 @@ export function KeywordGap({ applicationId }: { applicationId: string }) {
     <div className="space-y-2">
       <div className="flex items-center justify-between gap-3">
         <h3 className="text-xs font-semibold uppercase tracking-wide text-zinc-400">Keyword Gaps</h3>
-        <button
-          onClick={generate}
-          disabled={loading}
-          className="rounded-md border border-zinc-700 px-2.5 py-1 text-[11px] font-medium text-zinc-400 transition-colors hover:border-zinc-500 hover:text-zinc-200 disabled:opacity-50"
-        >
-          {loading ? 'Analyzing…' : row ? 'Refresh' : 'Analyze'}
-        </button>
+        {!initialLoading && (
+          <button
+            onClick={generate}
+            disabled={loading}
+            className="rounded-md border border-zinc-700 px-2.5 py-1 text-[11px] font-medium text-zinc-400 transition-colors hover:border-zinc-500 hover:text-zinc-200 disabled:opacity-50"
+          >
+            {loading ? 'Analyzing…' : row ? 'Refresh' : 'Analyze'}
+          </button>
+        )}
       </div>
       {error && <p className="text-xs text-red-400">{error}</p>}
-      {row && (
+      {initialLoading && <GapSkeleton />}
+      {!initialLoading && row && (
         <div className="space-y-3 rounded-lg border border-zinc-800 bg-zinc-900/50 px-3 py-3">
           {hasGaps ? (
             <>

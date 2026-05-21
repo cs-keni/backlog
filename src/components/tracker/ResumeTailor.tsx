@@ -14,18 +14,23 @@ interface ResumeTailorProps {
 
 export function ResumeTailor({ jobId }: ResumeTailorProps) {
   const [version, setVersion] = useState<ResumeVersion | null>(null)
+  const [initialLoading, setInitialLoading] = useState(true)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     let cancelled = false
+    setInitialLoading(true)
     setError(null)
     fetch(`/api/resume/tailor?job_id=${encodeURIComponent(jobId)}`)
-      .then((res) => res.ok ? res.json() : null)
+      .then((res) => (res.ok ? res.json() : null))
       .then((data: ResumeVersion | null) => {
         if (!cancelled) setVersion(data)
       })
       .catch(() => {})
+      .finally(() => {
+        if (!cancelled) setInitialLoading(false)
+      })
     return () => { cancelled = true }
   }, [jobId])
 
@@ -60,7 +65,7 @@ export function ResumeTailor({ jobId }: ResumeTailorProps) {
           <h3 className="text-xs font-semibold uppercase tracking-wide text-zinc-400">
             Resume Tailor
           </h3>
-          {version?.created_at && (
+          {!initialLoading && version?.created_at && (
             <p className="mt-0.5 text-[11px] text-zinc-600">
               Last generated {new Date(version.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
             </p>
@@ -68,14 +73,14 @@ export function ResumeTailor({ jobId }: ResumeTailorProps) {
         </div>
         <button
           onClick={tailor}
-          disabled={loading}
+          disabled={loading || initialLoading}
           className="rounded-md border border-zinc-700 px-2.5 py-1 text-[11px] font-medium text-zinc-400 transition-colors hover:border-zinc-500 hover:text-zinc-200 disabled:opacity-50"
         >
-          {loading ? 'Tailoring…' : version ? 'Re-tailor' : 'Tailor Resume'}
+          {loading ? 'Tailoring…' : initialLoading ? 'Loading…' : version ? 'Re-tailor' : 'Tailor Resume'}
         </button>
       </div>
       {error && <p className="text-xs text-red-400">{error}</p>}
-      {version?.pdf_url && (
+      {!initialLoading && version?.pdf_url && (
         <a
           href={version.pdf_url}
           target="_blank"
