@@ -1,13 +1,13 @@
 # Current Task
 
 **Last updated:** 2026-05-21
-**Status:** Wave 3 + Quality Wave 4 complete locally. Current full regression: 240 tests passing.
+**Status:** Wave 3 + Quality Wave 4 + post-QW4 fixes complete. Current full regression: 241 tests passing.
 
 ---
 
 ## Context: where we are
 
-Wave 3 (Outcome Engine) is fully implemented locally. A quality pass on 2026-05-21 brought coverage from ~20% to ~32% of routes tested and fixed several architecture issues. The current grade is estimated **90/100**.
+Wave 3 (Outcome Engine) is fully implemented locally. Quality Wave 4 brought coverage to ~37% of routes tested. Post-QW4 fixes addressed a one-frame skeleton flash in ApplicationDetail and a missing 403 in cover-letter PATCH. The current grade is estimated **92/100**.
 
 **All migrations 028–035 still need to be applied in Supabase before production use of Wave 2/3 features.**
 

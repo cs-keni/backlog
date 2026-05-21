@@ -4,6 +4,26 @@
 
 ---
 
+## Session: 2026-05-21 — Flash fix + cover-letter 403 (Claude Code)
+
+### What changed
+
+- **`ApplicationDetail.tsx`** — split the single `useEffect` into a `useLayoutEffect` (synchronous state resets: `setDetailLoading(true)`, `setTimeline([])`, `setDetailMeta(null)`, recruiter fields, delete state) + a `useEffect` (async fetch only). `useLayoutEffect` fires before paint, so the skeleton is visible on the same frame the application is selected — no one-frame flash of empty content.
+- **`src/app/api/cover-letter/[id]/route.ts`** — `PATCH` now fetches `cover_letters.user_id` before updating and returns 403 for non-owner rows. Previously fell through to a 500/null.
+- **`src/tests/integration/cover-letter.test.ts`** — added `PATCH returns 403 for non-owner row` test; updated `PATCH updates content for an owner row` to supply the new ownership-fetch mock.
+
+### Checks run
+
+- `node node_modules/typescript/bin/tsc --noEmit --pretty false` — passed
+- `node node_modules/vitest/vitest.mjs run src/tests/ --reporter=dot` — 241 passed
+
+### Remaining work
+
+- Apply Supabase migrations 028–035 before production use of Wave 2/3 features.
+- Next quality candidates: Tracker detail E2E smoke, broader visual checks for new detail panel sections.
+
+---
+
 ## Session: 2026-05-21 — Quality Wave 4 test coverage + ApplicationDetail skeleton (Codex)
 
 ### What changed

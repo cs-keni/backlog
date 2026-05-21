@@ -4,6 +4,20 @@ Reverse-chronological. One entry per meaningful session.
 
 ---
 
+## 2026-05-21 — Post-QW4 fixes: skeleton flash + cover-letter 403 (Claude Code)
+
+**Commit:** 7a10237
+
+### What shipped
+
+- **ApplicationDetail no-flash fix** — split `useEffect` into `useLayoutEffect` (sync resets: detailLoading, timeline, detailMeta, recruiter fields, deleteState) + `useEffect` (async fetch). `useLayoutEffect` runs before paint so skeleton appears on the same frame as app selection.
+- **cover-letter PATCH 403** — `PATCH /api/cover-letter/[id]` now fetches ownership before update; returns 403 for non-owner rows. Previously fell through to 500.
+- **cover-letter test** — added `PATCH returns 403 for non-owner row`; updated success test to supply ownership mock.
+
+### Test count: 241 (all passing)
+
+---
+
 ## 2026-05-21 — Quality Wave 4 test coverage + ApplicationDetail skeleton (Codex)
 
 ### What shipped
