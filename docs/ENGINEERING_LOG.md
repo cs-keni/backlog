@@ -4,6 +4,22 @@ Reverse-chronological. One entry per meaningful session.
 
 ---
 
+## 2026-05-21 — Quality Wave 4 test coverage + ApplicationDetail skeleton (Codex)
+
+### What shipped
+
+- Added integration coverage for cover-letter, resume-tailor, and star-responses routes.
+- Added explicit `403` non-owner behavior for `PATCH /api/star-responses/[id]`.
+- Added ApplicationDetail skeleton placeholders while `detailMeta` loads.
+
+### Checks
+
+- `node node_modules/typescript/bin/tsc --noEmit --pretty false` — passed
+- `node node_modules/vitest/vitest.mjs run src/tests/integration/cover-letter.test.ts src/tests/integration/resume-tailor.test.ts src/tests/integration/star-responses.test.ts --reporter=dot` — 29 passed
+- `node node_modules/vitest/vitest.mjs run src/tests/ --reporter=dot` — 240 passed
+
+---
+
 ## 2026-05-21 — Quality pass: 84→90 grade (Claude Code)
 
 **Commits:** 65e9600, 081f029, 73baac0

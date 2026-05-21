@@ -4,6 +4,29 @@
 
 ---
 
+## Session: 2026-05-21 — Quality Wave 4 test coverage + ApplicationDetail skeleton (Codex)
+
+### What changed
+
+- Added `src/tests/integration/cover-letter.test.ts` covering GET/POST cover-letter and PATCH cover-letter by id.
+- Added `src/tests/integration/resume-tailor.test.ts` covering GET/POST resume tailoring, PDF generation, storage upload, and existing versions.
+- Added `src/tests/integration/star-responses.test.ts` covering GET/POST/PATCH star response paths.
+- Updated `PATCH /api/star-responses/[id]` to return `403` for non-owner rows via an explicit ownership check.
+- Added ApplicationDetail loading skeletons while `detailMeta` is still loading to reduce panel layout shift.
+
+### Checks run
+
+- `node node_modules/typescript/bin/tsc --noEmit --pretty false` — passed
+- `node node_modules/vitest/vitest.mjs run src/tests/integration/cover-letter.test.ts src/tests/integration/resume-tailor.test.ts src/tests/integration/star-responses.test.ts --reporter=dot` — 29 passed
+- `node node_modules/vitest/vitest.mjs run src/tests/ --reporter=dot` — 240 passed
+
+### Remaining work
+
+- Apply Supabase migrations 028–035 before production use of Wave 2/3 features.
+- Next quality candidates: Tracker detail E2E smoke, broader visual checks for the new detail panel sections.
+
+---
+
 ## Session: 2026-05-21 — Quality pass: 84→90 grade improvements (Claude Code)
 
 ### What changed

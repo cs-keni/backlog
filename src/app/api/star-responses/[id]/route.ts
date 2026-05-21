@@ -35,6 +35,19 @@ export async function PATCH(
   const action = body.action ?? ''
   const result = body.result ?? ''
 
+  const { data: existing, error: existingError } = await supabase
+    .from('star_responses')
+    .select('user_id')
+    .eq('id', id)
+    .single()
+
+  if (existingError || !existing) {
+    return Response.json({ error: 'Response not found' }, { status: 404 })
+  }
+  if (existing.user_id !== user.id) {
+    return Response.json({ error: 'Forbidden' }, { status: 403 })
+  }
+
   const full_response = [
     `Situation: ${situation}`,
     `Task: ${task}`,

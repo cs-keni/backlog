@@ -87,6 +87,7 @@ function useDebounce<T>(value: T, delay: number): T {
 export function ApplicationDetail({ app, onClose, onStatusChange, onUpdate, onDelete, onArchive }: ApplicationDetailProps) {
   const [timeline, setTimeline] = useState<TimelineEntry[]>([])
   const [detailMeta, setDetailMeta] = useState<ApplicationDetailMeta | null>(null)
+  const [detailLoading, setDetailLoading] = useState(false)
   const [recruiterName, setRecruiterName] = useState('')
   const [recruiterEmail, setRecruiterEmail] = useState('')
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved'>('idle')
@@ -107,6 +108,7 @@ export function ApplicationDetail({ app, onClose, onStatusChange, onUpdate, onDe
     setDeleteState('idle')
     setTimeline([])
     setDetailMeta(null)
+    setDetailLoading(true)
 
     fetch(`/api/applications/${app.id}`)
       .then((r) => r.json())
@@ -115,6 +117,7 @@ export function ApplicationDetail({ app, onClose, onStatusChange, onUpdate, onDe
         setDetailMeta(d.detail ?? null)
       })
       .catch(() => {})
+      .finally(() => setDetailLoading(false))
   }, [app])
 
   // Auto-save recruiter fields
@@ -350,6 +353,30 @@ export function ApplicationDetail({ app, onClose, onStatusChange, onUpdate, onDe
 
               {checklistItems && (
                 <ApplicationChecklist items={checklistItems} />
+              )}
+
+              {detailLoading && (
+                <div className="space-y-6" aria-label="Loading application details">
+                  <div className="space-y-2 animate-pulse">
+                    <div className="flex items-center justify-between">
+                      <div className="h-3 w-32 rounded bg-zinc-800" />
+                      <div className="h-3 w-8 rounded bg-zinc-800" />
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      <div className="h-5 w-24 rounded-full bg-zinc-800" />
+                      <div className="h-5 w-28 rounded-full bg-zinc-800" />
+                      <div className="h-5 w-32 rounded-full bg-zinc-800" />
+                    </div>
+                  </div>
+                  <div className="space-y-2 animate-pulse">
+                    <div className="h-3 w-20 rounded bg-zinc-800" />
+                    <div className="h-16 rounded-lg bg-zinc-800" />
+                  </div>
+                  <div className="space-y-2 animate-pulse">
+                    <div className="h-3 w-24 rounded bg-zinc-800" />
+                    <div className="h-9 rounded-lg bg-zinc-800" />
+                  </div>
+                </div>
               )}
 
               <ResumeTailor jobId={app.jobs.id} />

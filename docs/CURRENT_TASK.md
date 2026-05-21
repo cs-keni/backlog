@@ -1,7 +1,7 @@
 # Current Task
 
 **Last updated:** 2026-05-21
-**Status:** Wave 3 + quality pass complete. Next: integration test coverage for high-value untested routes.
+**Status:** Wave 3 + Quality Wave 4 complete locally. Current full regression: 240 tests passing.
 
 ---
 
@@ -13,7 +13,7 @@ Wave 3 (Outcome Engine) is fully implemented locally. A quality pass on 2026-05-
 
 ---
 
-## Active plan: Quality Wave 4 — Test coverage + ApplicationDetail skeleton
+## Completed plan: Quality Wave 4 — Test coverage + ApplicationDetail skeleton
 
 ### Goal
 
@@ -23,10 +23,10 @@ Push from 90 → 92 by adding integration tests for 3 high-value, currently-unte
 
 | Phase | What | Priority | Estimated tests |
 |-------|------|----------|-----------------|
-| **QW4-A** | Integration tests: `cover-letter` routes | High | 8 tests |
-| **QW4-B** | Integration tests: `resume/tailor` routes | High | 6 tests |
-| **QW4-C** | Integration tests: `star-responses` routes | Medium | 8 tests |
-| **QW4-D** | ApplicationDetail skeleton while `detailMeta` is null | Medium | visual |
+| **QW4-A** | Integration tests: `cover-letter` routes | High | Done |
+| **QW4-B** | Integration tests: `resume/tailor` routes | High | Done |
+| **QW4-C** | Integration tests: `star-responses` routes | Medium | Done |
+| **QW4-D** | ApplicationDetail skeleton while `detailMeta` is null | Medium | Done |
 
 ---
 
