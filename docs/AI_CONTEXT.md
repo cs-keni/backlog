@@ -101,12 +101,14 @@ Auth: `Authorization: Bearer blg_<key>` header. Keys stored in chrome.storage.lo
 
 ## Active Work
 
-**Current focus: Wave 2 — Co-Pilot features + QA bug fixes.**
-Full spec: `docs/WAVE2_PLAN.md` — read this before starting any phase. It has file paths, code shapes, migration SQL, data flow diagrams, and test specs for every item.
+**Current focus: Wave 3 — Outcome Engine.**
+Full spec: `docs/WAVE3_PLAN.md` — read this before starting any phase. It has file paths, exact code shapes, migration SQL, and test specs for every item.
 
-Execution order: **P0 (bugs) → P5 (UX polish) → P1 (DSA) → P2 (Tracker) → P3 (Analytics) → P4 (Interview Kit)**
+Execution order: **P6 → P8 → P1 → P7 → P4 → P2 → P5 → P0 → P3** (each phase independently deployable)
 
-All Wave 2 phases are **Codex-owned** — no Claude Code reservation.
+All Wave 3 phases are **Codex-owned** — no Claude Code reservation.
+
+Wave 2 is complete. Migrations 028/029 still need to be applied in Supabase for production use.
 
 See `docs/CURRENT_TASK.md` for the phase table and checks to run.
 

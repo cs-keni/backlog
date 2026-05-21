@@ -4,6 +4,35 @@ Reverse-chronological. One entry per meaningful session.
 
 ---
 
+## 2026-05-21 — Wave 3 planning + interview kit streaming fix (Claude Code)
+
+### Implemented
+
+- Fixed fake streaming in `POST /api/prep/interview-kit/route.ts`: replaced blocking `generateInterviewKit()` + simulated chunk loop with `anthropic.messages.stream()` piped to a `ReadableStream`. Users now see tokens within ~1-2s instead of waiting for the full response.
+- Fixed the integration test in `src/tests/integration/interview-kit.test.ts`: changed mock target to `@anthropic-ai/sdk`, used a plain constructor function (not arrow) for `MockAnthropic`, and used a plain function for `stream: () => mockStream` so `vi.resetAllMocks()` doesn't clear the module-level singleton's method.
+- Planned Wave 3 via `/plan-ceo-review` SCOPE EXPANSION. CEO plan at `~/.gstack/projects/cs-keni-backlog/ceo-plans/2026-05-21-backlog-wave3.md`.
+- Wrote `docs/WAVE3_PLAN.md` — full Codex implementation spec for 9 phases (P0–P8).
+- Updated `docs/PRIORITY.md`, `docs/AI_CONTEXT.md`, `docs/CURRENT_TASK.md`.
+
+### Wave 3 scope (9 phases)
+
+P6 checklist → P8 company reuse → P1 resume tailor UI → P7 freshness badge → P4 source yield → P2 ATS completeness → P5 negative feedback → P0 keyword gap → P3 salary playbook
+
+### Key architectural decisions
+
+- P0 keyword gap: single LLM call (Haiku) returns gap + categories together; cached in `keyword_gaps` table; invalidated on `resume_text` update
+- P2 ATS completeness: URL pattern-match for platform detection; null = no feature shown; manual override dropdown; no backfill for existing rows
+- P3 salary range: static comp bands in `src/lib/salary/comp-bands.ts` (not external API); updated quarterly via code PR
+- P5 negative feedback: soft filters activate only after N≥5 dismissals with same reason
+- P7 liveness checker: deferred to TODOS.md (rate-limit + infra complexity); only freshness badge ships in Wave 3
+
+### Checks
+
+- TypeScript: clean (no new TS files changed)
+- Tests: interview-kit integration test passes with plain-function stream mock
+
+---
+
 ## 2026-05-21 — Wave 2 P4 interview day kit (Codex)
 
 ### Implemented

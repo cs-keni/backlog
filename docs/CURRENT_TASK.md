@@ -1,36 +1,35 @@
 # Current Task
 
 **Last updated:** 2026-05-21
-**Status:** Wave 2 implemented locally through P4. Migrations 028 and 029 still need Supabase application.
+**Status:** Wave 3 planned and ready for Codex. Wave 2 complete locally (migrations 028/029 need Supabase application).
 
 ---
 
-## Active plan: Backlog Co-Pilot — Wave 2
+## Active plan: Backlog Wave 3 — Outcome Engine
 
-Full spec is in **`docs/WAVE2_PLAN.md`**. Read it before starting any phase. It contains file paths, exact code shapes, migration SQL, and test specs for every item.
+Full spec is in **`docs/WAVE3_PLAN.md`**. Read it before starting any phase. It contains file paths, exact code shapes, migration SQL, and test specs for every item.
 
-**Execution order: P0 → P5 → P1 → P2 → P3 → P4** (each phase independently deployable)
+**Execution order: P6 → P8 → P1 → P7 → P4 → P2 → P5 → P0 → P3** (each phase independently deployable — start with low-risk read-only features)
 
 | Phase | What | Owner | Status |
 |-------|------|-------|--------|
-| P0 | 3 bug fixes (Log Application, Settings toast, enrich 500s) | Codex | Implemented locally |
-| P5 | UX polish trio (button labels, Tracker empty state, STORY BANK) | Codex | Implemented locally |
-| P1 | DSA track modes 75/150/250 + interview-aware Today queue | Codex | Implemented locally |
-| P2 | Application health scores on Tracker cards | Codex | Implemented locally |
-| P3 | Callback rate analytics (conversion breakdown) | Codex | Implemented locally |
-| P4 | Interview day kit (streaming LLM brief) | Codex | Implemented locally |
+| P6 | Application packet checklist (no migration) | Codex | Ready |
+| P8 | Company reuse banner (read-only query) | Codex | Ready |
+| P1 | Resume tailor UI (verify route contract first) | Codex | Ready |
+| P7 | Job freshness badge (display only) | Codex | Ready |
+| P4 | Source yield feedback loop + source prefs | Codex | Ready — migration 030 |
+| P2 | Per-ATS completeness score | Codex | Ready — migrations 031, 032 |
+| P5 | Negative relevance feedback | Codex | Ready — migration 033 |
+| P0 | ATS keyword gap analysis | Codex | Ready — migration 034 |
+| P3 | Salary negotiation playbook | Codex | Ready — migration 035 |
 
-**Previous plan:** Grade Boost — All Sections to A (complete). See `docs/GRADE_BOOST_PLAN.md`.
+**Previous plan:** Wave 2 — Co-Pilot features (complete). See `docs/WAVE2_PLAN.md`.
 
 ---
 
 ## Agent ownership
 
-All phases in Wave 2 are **Codex**. No Claude Code reservation needed — specs are precise enough that no animation/DOM timing judgment is required.
-
----
-
-> **Previous plan (complete):** Grade Boost — all phases P1–P9 + Polish Pass PP1–PP4 shipped as of 2026-05-21.
+All phases in Wave 3 are **Codex**. CEO plan: `~/.gstack/projects/cs-keni-backlog/ceo-plans/2026-05-21-backlog-wave3.md`.
 
 ---
 

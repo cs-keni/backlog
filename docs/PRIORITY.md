@@ -2,33 +2,39 @@
 
 Last updated: 2026-05-21
 
-**Current wave:** Wave 2 — Co-Pilot features. Full spec in `docs/WAVE2_PLAN.md`.
+**Current wave:** Wave 3 — Outcome Engine. Full spec in `docs/WAVE3_PLAN.md`.
 
 ---
 
-## Wave 2 — In Progress (all Codex)
+## Wave 2 — Complete (all Codex)
+
+All phases implemented locally. Migrations 028 and 029 need Supabase application before production use.
+
+---
+
+## Wave 3 — Next Up (all Codex)
+
+Full spec in `docs/WAVE3_PLAN.md`. Execute in this order:
 
 | # | Phase | What | Status |
 |---|-------|------|--------|
-| 1 | P0 | Fix Log Application "Failed to create job" | Ready |
-| 2 | P0 | Fix Settings "1 Issue" toast (React controlled input) | Ready |
-| 3 | P0 | Fix company enrich 500s (add silent catch in JobDetail) | Ready |
-| 4 | P5 | UX polish: button labels, Tracker empty state, STORY BANK | Ready |
-| 5 | P1 | DSA track modes 75/150/250 + migration 027 | Ready |
-| 6 | P1 | DSA interview-aware Today queue (company pattern map) | Ready |
-| 7 | P2 | Application health scores on Tracker cards | Ready |
-| 8 | P3 | Callback rate analytics breakdown | Ready |
-| 9 | P4 | Interview day kit (streaming LLM, migration 028) | Ready |
+| 1 | P6 | Application packet checklist | Ready |
+| 2 | P8 | Company reuse banner | Ready |
+| 3 | P1 | Resume tailor UI (verify route contract first) | Ready |
+| 4 | P7 | Job freshness badge (display only) | Ready |
+| 5 | P4 | Source yield feedback loop + user source prefs | Ready — migration 030 |
+| 6 | P2 | Per-ATS completeness score | Ready — migrations 031, 032 |
+| 7 | P5 | Negative relevance feedback | Ready — migration 033 |
+| 8 | P0 | ATS keyword gap analysis | Ready — migration 034 |
+| 9 | P3 | Salary negotiation playbook | Ready — migration 035 |
 
 ---
 
-## Extension — Ongoing (separate from Wave 2)
-
-These are not in Wave 2 scope. Pick up after Wave 2 ships or in parallel if bandwidth allows.
+## Extension — Ongoing (separate from Wave 3)
 
 | # | What | Owner | Notes |
 |---|------|-------|-------|
-| E1 | Workday DOM fixture capture | Claude Code | Real page required for testing; Kenny needs to run on a live Workday form |
+| E1 | Workday DOM fixture capture | Claude Code | Real page required; Kenny needs to run on a live Workday form |
 | E2 | Next-button modal guard | Claude Code | Detect `[role="dialog"]` before auto-advancing |
 | E3 | Prior-employer radio logic | Claude Code | Compare company name to `profile.work_experience` |
 | E4 | Batch open-ended extension answers | Codex | One Sonnet call for all open-ended fields on a page |
@@ -36,22 +42,27 @@ These are not in Wave 2 scope. Pick up after Wave 2 ships or in parallel if band
 
 ---
 
-## Pending Supabase migrations (apply before relying on features)
+## Pending Supabase migrations
 
 | Migration | Status | Blocks |
 |-----------|--------|--------|
 | `020_add_structured_address_fields.sql` | Written, not applied | Profile address fields |
 | `021_extension_answer_cache.sql` | Written, not applied | Extension answer caching |
-| `026_add_notification_timezone.sql` | Written, apply when ready | Per-user quiet hour timezones |
-| `027_add_dsa_track.sql` | **To write (Wave 2 P1)** | DSA track modes |
-| `028_interview_kits.sql` | **To write (Wave 2 P4)** | Interview day kit |
+| `026_add_notification_timezone.sql` | Written, not applied | Per-user quiet hour timezones |
+| `027_add_dsa_track.sql` | Written (Wave 2 P1) | DSA track modes |
+| `028_interview_kits.sql` | Written (Wave 2 P4) | Interview day kit |
+| `029_interview_kits_unique.sql` | Written (Wave 2 P4) | Interview kit unique constraint |
+| `030_source_preferences.sql` | To write (Wave 3 P4) | Source yield prefs |
+| `031_applications_ats_platform.sql` | To write (Wave 3 P2) | ATS completeness |
+| `032_users_ats_profile_fields.sql` | To write (Wave 3 P2) | phone/address/linkedin |
+| `033_job_feedback.sql` | To write (Wave 3 P5) | Negative relevance |
+| `034_keyword_gaps.sql` | To write (Wave 3 P0) | Keyword gap cache |
+| `035_users_comp_target.sql` | To write (Wave 3 P3) | Salary playbook |
 
 ---
 
-## Deferred (Wave 3+)
+## Deferred (Wave 4+)
 
-- Salary negotiation playbook — needs per-company comp data
-- Warm referral radar — needs LinkedIn data access
-- Auto-apply queue — needs callback rate data to validate match quality
-- ATS keyword gap analysis — good idea, next wave
-- Daily apply queue / negative relevance feedback — see TODOS.md
+- HTTP liveness checker — background URL dead-link detector; needs job queue infra first
+- Warm referral radar — LinkedIn data access blocked
+- Auto-apply queue — needs P4 source yield + P2 ATS completeness data first
