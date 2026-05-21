@@ -4,6 +4,47 @@
 
 ---
 
+## Session: 2026-05-21 — Wave 3 planning + interview kit streaming fix (Claude Code)
+
+### What changed
+
+- **`src/app/api/prep/interview-kit/route.ts`** — fixed fake streaming. Replaced blocking `generateInterviewKit()` + simulated chunk loop with `anthropic.messages.stream()` piped directly to a `ReadableStream`. Tokens now appear within ~1-2s instead of after the full LLM response completes.
+- **`src/tests/integration/interview-kit.test.ts`** — fixed mock: changed target to `@anthropic-ai/sdk`, used a plain constructor function (not arrow) for `MockAnthropic`, used plain function for `stream` so `vi.resetAllMocks()` doesn't clear the module-level singleton's method.
+- **`docs/WAVE3_PLAN.md`** — written. Full Codex implementation spec for Wave 3 (9 phases). Read this before starting any Wave 3 phase.
+- **`docs/PRIORITY.md`**, **`docs/AI_CONTEXT.md`**, **`docs/CURRENT_TASK.md`**, **`docs/ENGINEERING_LOG.md`** — updated to reflect Wave 3.
+
+### What's next
+
+**Wave 3 is ready to implement.** Full spec: `docs/WAVE3_PLAN.md`.
+
+Execute phases in this order (each independently deployable):
+
+| Phase | What | Notes |
+|-------|------|-------|
+| **P6** | Application packet checklist | No migration, no risk — start here |
+| **P8** | Company reuse banner | Read-only query |
+| **P1** | Resume tailor UI | Backend built — verify route contract before wiring UI |
+| **P7** | Job freshness badge | Display only, `jobs.fetched_at` exists |
+| **P4** | Source yield feedback loop | Migration 030 |
+| **P2** | Per-ATS completeness score | Migrations 031, 032 |
+| **P5** | Negative relevance feedback | Migration 033 |
+| **P0** | ATS keyword gap analysis | Migration 034, LLM call (Haiku) |
+| **P3** | Salary negotiation playbook | Migration 035, LLM call + static comp bands |
+
+### Checks run
+
+- `node node_modules/typescript/bin/tsc --noEmit --pretty false` — passed
+- `node node_modules/vitest/vitest.mjs run src/tests/integration/interview-kit.test.ts src/tests/unit/interview-kit-prompt.test.ts` — passed
+
+### Gotchas
+
+- Wave 2 migrations 028 and 029 still need to be applied in Supabase for interview kit persistence in production.
+- P1 resume tailor: read `src/app/api/resume/tailor/route.ts` before wiring the UI — confirm whether it streams or returns JSON/PDF, then adapt the UI accordingly.
+- P2 ATS completeness: do NOT backfill existing `applications` rows. New applications only.
+- P5 negative feedback: soft filters must NOT activate until N≥5 dismissals with the same reason.
+
+---
+
 ## Session: 2026-05-21 — Wave 2 P4 interview day kit (Codex)
 
 ### What changed
