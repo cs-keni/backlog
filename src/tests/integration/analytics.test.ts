@@ -97,7 +97,10 @@ describe('GET /api/analytics', () => {
         if (jobsCallCount === 2) {
           return {
             select: vi.fn().mockReturnValue({
-              in: vi.fn().mockResolvedValue({ data: jobs.map(({ id, source }) => ({ id, source })), error: null }),
+              in: vi.fn().mockResolvedValue({
+                data: jobs.map(({ id, company, source }) => ({ id, title: 'Software Engineer', company, source })),
+                error: null,
+              }),
             }),
           }
         }

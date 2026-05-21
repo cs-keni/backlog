@@ -7,6 +7,7 @@ import { AnalyticsFunnel } from '@/components/analytics/AnalyticsFunnel'
 import { AnalyticsSkeleton } from '@/components/analytics/AnalyticsSection'
 import { AnalyticsStats } from '@/components/analytics/AnalyticsStats'
 import { CompanyGraph } from '@/components/analytics/CompanyGraph'
+import { ConversionStats } from '@/components/analytics/ConversionStats'
 import { FeedBreakdown, SourceYield } from '@/components/analytics/SourceYield'
 import type { AnalyticsData, AnalyticsRange } from '@/components/analytics/types'
 import type { CompanyGraphData } from '@/app/api/analytics/company-graph/route'
@@ -120,6 +121,7 @@ export default function AnalyticsPage() {
             <AnalyticsFunnel data={data} />
             <FeedBreakdown data={data} range={range} />
             <SourceYield data={data} />
+            <ConversionStats data={data.conversionStats} />
           </>
         ))}
       </div>

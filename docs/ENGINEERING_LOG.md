@@ -4,6 +4,22 @@ Reverse-chronological. One entry per meaningful session.
 
 ---
 
+## 2026-05-21 — Wave 2 P3 conversion analytics (Codex)
+
+### Implemented
+
+- Added conversion breakdown logic for company tier, title keyword, and application source.
+- Added `conversionStats` to `GET /api/analytics`.
+- Added `ConversionStats` UI under Analytics charts with placeholder gating until 5 callbacks.
+- Added unit/component coverage and kept analytics integration coverage passing.
+
+### Checks
+
+- `node node_modules/typescript/bin/tsc --noEmit --pretty false` — passed
+- `node node_modules/vitest/vitest.mjs run src/tests/unit/conversion-stats.test.tsx src/tests/integration/analytics.test.ts` — 8 passed
+
+---
+
 ## 2026-05-21 — Wave 2 P2 tracker health scores (Codex)
 
 ### Implemented

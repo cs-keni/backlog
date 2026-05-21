@@ -1,3 +1,5 @@
+import type { ConversionStats } from '@/lib/analytics/conversion'
+
 export type AnalyticsRange = '7d' | '30d' | '1y'
 
 export interface AnalyticsData {
@@ -26,5 +28,5 @@ export interface AnalyticsData {
     interviewRate: number
   }>
   medianDaysToResponse: number | null
+  conversionStats: ConversionStats
 }
-

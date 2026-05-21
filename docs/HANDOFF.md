@@ -4,6 +4,26 @@
 
 ---
 
+## Session: 2026-05-21 — Wave 2 P3 conversion analytics (Codex)
+
+### What changed
+
+- Added `src/lib/analytics/conversion.ts` for callback-rate breakdowns by company tier, title keyword, and source.
+- Analytics API now returns `conversionStats` with total callbacks and filtered buckets requiring at least 2 applications.
+- Added `ConversionStats` component and rendered it below the existing analytics charts.
+- Added tests for FAANG callback rate, callback status counting, placeholder mode, stat-card rendering, and existing analytics API compatibility.
+
+### Checks run
+
+- `node node_modules/typescript/bin/tsc --noEmit --pretty false` — passed
+- `node node_modules/vitest/vitest.mjs run src/tests/unit/conversion-stats.test.tsx src/tests/integration/analytics.test.ts` — 8 passed
+
+### Remaining work
+
+- P4 interview day kit is next. Use migration `029_interview_kits.sql`.
+
+---
+
 ## Session: 2026-05-21 — Wave 2 P2 tracker health scores (Codex)
 
 ### What changed

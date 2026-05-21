@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { computeConversionStats } from '@/lib/analytics/conversion'
 
 export const dynamic = 'force-dynamic'
 
@@ -29,6 +30,8 @@ interface JobRow {
 
 interface JobSourceRow {
   id: string
+  title: string
+  company: string
   source: string
 }
 
@@ -113,10 +116,11 @@ export async function GET(request: NextRequest) {
   const appJobsResult = appliedJobIds.length > 0
     ? await supabase
         .from('jobs')
-        .select('id, source')
+        .select('id, title, company, source')
         .in('id', appliedJobIds)
     : { data: [] }
   const appJobSources = (appJobsResult.data ?? []) as JobSourceRow[]
+  const appJobById = new Map(appJobSources.map((job) => [job.id, job]))
   const sourceByJobId = new Map(appJobSources.map((job) => [job.id, toSourceKey(job.source)]))
 
   // ── Stats ───────────────────────────────────────────────────────────────────
@@ -224,6 +228,21 @@ export async function GET(request: NextRequest) {
     }
   })
 
+  const conversionStats = computeConversionStats(
+    allApps
+      .map((app) => {
+        const job = appJobById.get(app.job_id)
+        if (!job) return null
+        return {
+          status: app.status,
+          title: job.title,
+          company: job.company,
+          source: job.source,
+        }
+      })
+      .filter((app): app is { status: string; title: string; company: string; source: string } => app !== null)
+  )
+
   // ── Median time to first response (days) ─────────────────────────────────────
 
   // For each "applied" application, find first timeline entry to a response status
@@ -270,5 +289,6 @@ export async function GET(request: NextRequest) {
     sourceBreakdown: { github: githubCount, portal: portalCount, manual: manualCount },
     sourceYield,
     medianDaysToResponse,
+    conversionStats,
   })
 }
