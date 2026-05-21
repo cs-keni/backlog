@@ -4,6 +4,36 @@
 
 ---
 
+## Session: 2026-05-21 — Wave 2 planning (Claude Code)
+
+### What happened
+
+- Ran `/qa-only` on main — scored 77/100 (B+). Full report at `.gstack/qa-reports/qa-report-localhost-2026-05-21.md`.
+- Ran `/plan-ceo-review` in SCOPE EXPANSION mode. Produced full spec for Wave 2.
+- Wave 2 spec written to `docs/WAVE2_PLAN.md` — read this before implementing anything.
+
+### What's ready to implement
+
+Six phases, in order:
+
+**P0 (bugs — ship these first):**
+- BUG-001: `POST /api/jobs/manual` returns "Failed to create job" on new user save. Two likely causes (unique constraint or company_profiles null race) — add logging to diagnose first, then fix per decision tree in WAVE2_PLAN.md.
+- BUG-002: Settings page emits "1 Issue" toast — `NotificationSettings.tsx:301` `<select>` has `value` + `onBlur` but no `onChange`. One-line fix.
+- BUG-003: Company enrich API fires 500s from `JobDetail.tsx:82`. Add silent catch around the fire-and-forget; verify provider API key.
+
+**P5 (UX polish — ship with P0):**
+- Button label semantics: "Mark Applied" / "Mark Solved" (action verbs for unsolved state)
+- Tracker empty state: guidance copy + CTA buttons when 0 applications
+- "STORY BANK" CSS glitch: add `whitespace-nowrap` to the heading
+
+**P1–P4:** DSA tracks (migration 027), interview-aware Today queue, application health scores, callback rate analytics, interview day kit (migration 028, streaming).
+
+### No changes made to code this session
+
+This was a pure planning session. No files edited except docs/.
+
+---
+
 ## Session: 2026-05-21 — Polish Pass PP-1 through PP-4 (Codex)
 
 ### What changed

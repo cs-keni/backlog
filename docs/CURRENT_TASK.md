@@ -1,11 +1,37 @@
 # Current Task
 
-**Last updated:** 2026-05-20
-**Status:** All P1–P3 phases complete. Polish Pass PP-1 through PP-4 implemented; CI verification in progress.
+**Last updated:** 2026-05-21
+**Status:** Wave 2 planning complete. All bugs + feature specs ready for implementation.
 
 ---
 
-## Active plan: Grade Boost — All Sections to A
+## Active plan: Backlog Co-Pilot — Wave 2
+
+Full spec is in **`docs/WAVE2_PLAN.md`**. Read it before starting any phase. It contains file paths, exact code shapes, migration SQL, and test specs for every item.
+
+**Execution order: P0 → P5 → P1 → P2 → P3 → P4** (each phase independently deployable)
+
+| Phase | What | Owner | Status |
+|-------|------|-------|--------|
+| P0 | 3 bug fixes (Log Application, Settings toast, enrich 500s) | Codex | Ready |
+| P5 | UX polish trio (button labels, Tracker empty state, STORY BANK) | Codex | Ready |
+| P1 | DSA track modes 75/150/250 + interview-aware Today queue | Codex | Ready |
+| P2 | Application health scores on Tracker cards | Codex | Ready |
+| P3 | Callback rate analytics (conversion breakdown) | Codex | Ready |
+| P4 | Interview day kit (streaming LLM brief) | Codex | Ready |
+
+**Previous plan:** Grade Boost — All Sections to A (complete). See `docs/GRADE_BOOST_PLAN.md`.
+
+---
+
+## Agent ownership
+
+All phases in Wave 2 are **Codex**. No Claude Code reservation needed — specs are precise enough that no animation/DOM timing judgment is required.
+
+---
+
+<!-- Old content below — superseded by Wave 2 -->
+## Previous plan: Grade Boost — All Sections to A
 
 Full spec is in **`docs/GRADE_BOOST_PLAN.md`**. Read it before starting any phase. It contains:
 - Architecture decisions with exact code shapes
