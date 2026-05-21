@@ -4,6 +4,30 @@
 
 ---
 
+## Session: 2026-05-21 — Quality pass: 84→90 grade improvements (Claude Code)
+
+### What changed
+
+- **5 new integration test suites** — keyword-gap, salary-playbook, jobs-feedback, source-preferences, ats-platform. 47 new tests; total now 211 (88 unit + 123 integration).
+- **salary-playbook route refactored** — extracted `loadSalaryContext()` helper shared by GET and POST, replacing the internal `GET(new Request('http://localhost/...'))` self-call smell.
+- **salary-playbook structured output** — POST now prompts for and parses JSON `{ recruiter_call, email_counter, deadline_extension }` instead of unstructured plain text.
+- **SalaryPlaybook component** — tabbed script UI (Recruiter call / Email counter / Deadline extension) + skeleton while initial GET resolves.
+- **KeywordGap component** — skeleton during initial fetch (was silently rendering `null`).
+- **ResumeTailor component** — button shows "Loading…" and stays disabled during initial fetch.
+
+### Checks run
+
+- `node node_modules/typescript/bin/tsc --noEmit` — passed
+- `node node_modules/vitest/vitest.mjs run src/tests/` — 211 passed (88 unit + 123 integration)
+
+### Remaining high-value improvements (to reach 92+)
+
+- Integration tests for cover-letter, resume/tailor, and star-responses routes
+- E2E smoke test for Tracker detail panel (open application → see keyword gap skeleton → click Analyze)
+- ApplicationDetail side panel: show skeleton while `detailMeta` is null (currently blank layout)
+
+---
+
 ## Session: 2026-05-21 — Wave 3 remaining phases P2/P5/P0/P3 (Codex)
 
 ### What changed
