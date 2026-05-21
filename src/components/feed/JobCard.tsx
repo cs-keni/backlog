@@ -288,11 +288,19 @@ export function JobCard({ job, isSelected, onClick, onQuickApply, index }: JobCa
             onClick={handleQuickApply}
             className="shrink-0 opacity-0 group-hover:opacity-100 text-[10px] font-medium px-2 py-0.5 rounded-full bg-blue-500/15 text-blue-400 border border-blue-500/25 hover:bg-blue-500/25 transition-all"
           >
-            ✓ Applied
+            Mark Applied
           </button>
         )}
         {quickApplyState === 'loading' && (
           <span className="shrink-0 text-[10px] text-zinc-500">Saving…</span>
+        )}
+        {quickApplyState === 'done' && (
+          <button
+            disabled
+            className="shrink-0 text-[10px] font-medium px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
+          >
+            ✓ Applied
+          </button>
         )}
       </div>
     </motion.div>

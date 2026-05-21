@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useCallback } from 'react'
+import Link from 'next/link'
 import {
   DndContext,
   DragOverlay,
@@ -20,7 +21,6 @@ import { BulkActionBar } from './BulkActionBar'
 import { LogApplicationModal } from '@/components/shared/LogApplicationModal'
 import type { ApplicationWithJob, ApplicationStatus } from '@/lib/jobs/types'
 import { useToast } from '@/components/ui/Toaster'
-import { EmptyState } from '@/components/ui/EmptyState'
 
 interface TrackerBoardProps {
   initialApplications: ApplicationWithJob[]
@@ -366,21 +366,32 @@ export function TrackerBoard({ initialApplications }: TrackerBoardProps) {
       {/* Empty state */}
       {applications.length === 0 && (
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-          <EmptyState
-            variant="kanban"
-            title="No applications yet"
-            description="Save or apply to jobs from the feed, or log an application you already sent."
-            action={{
-              label: 'Log your first application',
-              onClick: () => setShowLogModal(true),
-              icon: (
-                <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-                </svg>
-              ),
-            }}
-            className="pointer-events-auto"
-          />
+          <div className="pointer-events-auto flex flex-col items-center gap-3 py-12 text-center">
+            <svg className="h-12 w-12 text-zinc-700" fill="none" viewBox="0 0 48 48" stroke="currentColor" strokeWidth={1.5}>
+              <rect x="8" y="10" width="12" height="12" rx="3" />
+              <rect x="28" y="10" width="12" height="12" rx="3" />
+              <rect x="8" y="28" width="12" height="12" rx="3" />
+              <rect x="28" y="28" width="12" height="12" rx="3" />
+            </svg>
+            <h3 className="text-sm font-semibold text-zinc-200">Track your job search</h3>
+            <p className="max-w-xs text-xs text-zinc-500">
+              Log applications manually or save jobs from the Feed to start tracking.
+            </p>
+            <div className="mt-1 flex gap-2">
+              <Link
+                href="/feed"
+                className="rounded-lg border border-zinc-700 px-3 py-1.5 text-xs text-zinc-400 transition-colors hover:text-zinc-200"
+              >
+                Browse jobs →
+              </Link>
+              <button
+                onClick={() => setShowLogModal(true)}
+                className="rounded-lg bg-zinc-100 px-3 py-1.5 text-xs font-medium text-zinc-900 transition-colors hover:bg-white"
+              >
+                + Log Application
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

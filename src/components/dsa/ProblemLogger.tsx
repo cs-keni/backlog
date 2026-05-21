@@ -47,7 +47,6 @@ export function ProblemLogger({ solves, today, onSolveLogged }: ProblemLoggerPro
   const [query, setQuery] = useState('')
   const [selectedPattern, setSelectedPattern] = useState<string>('All')
   const [logging, setLogging] = useState<string | null>(null)
-  const [confirmReset, setConfirmReset] = useState<string | null>(null)
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set())
 
   // Bulk mode state
@@ -115,11 +114,6 @@ export function ProblemLogger({ solves, today, onSolveLogged }: ProblemLoggerPro
   }
 
   async function handleLogClick(problem: NeetcodeProblem) {
-    if (solveBySlug[problem.slug] && confirmReset !== problem.slug) {
-      setConfirmReset(problem.slug)
-      return
-    }
-    setConfirmReset(null)
     setLogging(problem.slug)
     try {
       await logSolve(problem, getTodayLocal())
@@ -223,28 +217,16 @@ export function ProblemLogger({ solves, today, onSolveLogged }: ProblemLoggerPro
           {!bulkMode && (
             <div className="shrink-0">
               <AnimatePresence mode="wait">
-                {confirmReset === problem.slug ? (
-                  <motion.div
-                    key="confirm"
-                    initial={{ opacity: 0, scale: 0.9 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.9 }}
-                    className="flex items-center gap-1.5"
+                {existing ? (
+                  <motion.span
+                    key="solved"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    className="inline-flex items-center rounded-md border border-emerald-500/20 bg-emerald-500/10 px-2.5 py-1 text-[11px] font-medium text-emerald-400"
                   >
-                    <span className="text-[10px] text-zinc-500">Reset chain?</span>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); handleLogClick(problem) }}
-                      className="text-[10px] px-2 py-1 rounded bg-orange-500/15 text-orange-400 hover:bg-orange-500/25 transition-colors"
-                    >
-                      Yes
-                    </button>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); setConfirmReset(null) }}
-                      className="text-[10px] px-2 py-1 rounded bg-zinc-800 text-zinc-400 hover:bg-zinc-700 transition-colors"
-                    >
-                      No
-                    </button>
-                  </motion.div>
+                    ✓ Solved
+                  </motion.span>
                 ) : (
                   <motion.button
                     key="log"
@@ -260,10 +242,8 @@ export function ProblemLogger({ solves, today, onSolveLogged }: ProblemLoggerPro
                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                         <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                       </svg>
-                    ) : existing ? (
-                      'Re-solve'
                     ) : (
-                      'Solved'
+                      'Mark Solved'
                     )}
                   </motion.button>
                 )}

@@ -4,6 +4,25 @@
 
 ---
 
+## Session: 2026-05-21 — Wave 2 P5 UX polish (Codex)
+
+### What changed
+
+- Feed job-card quick action now says `Mark Applied`; after success it shows disabled `✓ Applied`.
+- DSA unsolved problem rows now say `Mark Solved`; solved rows show a non-action `✓ Solved` status.
+- Tracker zero-application state now shows the Wave 2 guidance copy with Browse jobs and Log Application CTAs.
+- Prep Story Bank heading now has `whitespace-nowrap` to prevent the uppercase letter-spacing wrap glitch.
+
+### Checks run
+
+- `node node_modules/typescript/bin/tsc --noEmit --pretty false` — passed
+
+### Remaining work
+
+- P1 is next. Use `supabase/migrations/028_add_dsa_track.sql` for the DSA track migration.
+
+---
+
 ## Session: 2026-05-21 — Wave 2 P0 bug fixes (Codex)
 
 ### What changed
@@ -26,8 +45,8 @@
 
 ### Remaining work
 
-- Apply `supabase/migrations/027_allow_manual_job_url_null.sql` in Supabase before relying on no-URL manual applications in production.
-- P5 is next. Because P0 consumed migration `027`, use `028_add_dsa_track.sql` for P1 and `029_interview_kits.sql` for P4.
+- Migration `027_allow_manual_job_url_null.sql` was applied in Supabase after this commit.
+- Because P0 consumed migration `027`, use `028_add_dsa_track.sql` for P1 and `029_interview_kits.sql` for P4.
 
 ---
 

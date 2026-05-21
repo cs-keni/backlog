@@ -173,7 +173,7 @@ export function StoryBank() {
     <section className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-xs font-semibold text-zinc-400 uppercase tracking-wide">Story Bank</h2>
+          <h2 className="text-xs font-semibold text-zinc-400 uppercase tracking-wide whitespace-nowrap">Story Bank</h2>
           <p className="text-xs text-zinc-600 mt-0.5">Reusable STAR narratives — referenced automatically during prep</p>
         </div>
         {!creating && !editingId && (

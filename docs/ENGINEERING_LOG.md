@@ -4,6 +4,21 @@ Reverse-chronological. One entry per meaningful session.
 
 ---
 
+## 2026-05-21 — Wave 2 P5 UX polish (Codex)
+
+### Implemented
+
+- Updated Feed card quick apply wording from `✓ Applied` to `Mark Applied`, with disabled `✓ Applied` after success.
+- Updated DSA problem rows from action-style solved wording to `Mark Solved` for unsolved rows and `✓ Solved` for solved rows.
+- Replaced Tracker empty-state copy/actions with the Wave 2 browse/log CTAs.
+- Added `whitespace-nowrap` to the Prep Story Bank heading.
+
+### Checks
+
+- `node node_modules/typescript/bin/tsc --noEmit --pretty false` — passed
+
+---
+
 ## 2026-05-21 — Wave 2 P0 bug fixes (Codex)
 
 ### Implemented
@@ -22,7 +37,7 @@ Reverse-chronological. One entry per meaningful session.
 ### Gotchas
 
 - Wave 2 migration numbering shifted: P1 DSA track should use `028_add_dsa_track.sql`; P4 interview kits should use `029_interview_kits.sql`.
-- Apply migration 027 in Supabase before production no-URL manual application logging.
+- Migration 027 was applied in Supabase after the P0 commit.
 
 ---
 
