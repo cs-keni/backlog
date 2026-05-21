@@ -4,6 +4,31 @@
 
 ---
 
+## Session: 2026-05-21 — Wave 2 P1 DSA intelligence (Codex)
+
+### What changed
+
+- Added `supabase/migrations/028_add_dsa_track.sql` for `users.dsa_track`.
+- Added `PATCH /api/dsa/track` with auth guard and `75 | 150 | 250` validation.
+- Added Blind 75, NeetCode 150, and NeetCode 250 track sets in `src/lib/dsa/neetcode150.ts`; NeetCode 250 follows the official current per-pattern counts from `neetcode.io/practice/practice/neetcode250`.
+- Added DSA track segmented control and persisted optimistic track switching.
+- Filtered DSA Today, Calendar, Problem Logger, counts, recommendations, and solves by active track.
+- Added interview-aware Today focus for open technical/final applications using `src/lib/dsa/company-patterns.ts`.
+- Added tests for track datasets, recommendation compatibility, track API, company pattern matching, and TodayPanel interview focus.
+
+### Checks run
+
+- `node node_modules/typescript/bin/tsc --noEmit --pretty false` — passed
+- `node node_modules/vitest/vitest.mjs run src/tests/unit/dsa-tracks.test.ts src/tests/unit/dsa-recommend.test.ts src/tests/unit/company-patterns.test.ts src/tests/unit/dsa-today-panel.test.tsx src/tests/integration/dsa-track.test.ts` — 22 passed
+- `git diff --check` — passed
+
+### Remaining work
+
+- Apply `supabase/migrations/028_add_dsa_track.sql` in Supabase before relying on track persistence in production.
+- P2 application health scores are next.
+
+---
+
 ## Session: 2026-05-21 — Wave 2 P5 UX polish (Codex)
 
 ### What changed

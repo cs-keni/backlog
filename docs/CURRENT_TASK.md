@@ -1,7 +1,7 @@
 # Current Task
 
 **Last updated:** 2026-05-21
-**Status:** Wave 2 P0 and P5 implemented. P1 is next.
+**Status:** Wave 2 P0, P5, and P1 implemented locally. P2 is next.
 
 ---
 
@@ -15,7 +15,7 @@ Full spec is in **`docs/WAVE2_PLAN.md`**. Read it before starting any phase. It 
 |-------|------|-------|--------|
 | P0 | 3 bug fixes (Log Application, Settings toast, enrich 500s) | Codex | Implemented locally |
 | P5 | UX polish trio (button labels, Tracker empty state, STORY BANK) | Codex | Implemented locally |
-| P1 | DSA track modes 75/150/250 + interview-aware Today queue | Codex | Ready |
+| P1 | DSA track modes 75/150/250 + interview-aware Today queue | Codex | Implemented locally |
 | P2 | Application health scores on Tracker cards | Codex | Ready |
 | P3 | Callback rate analytics (conversion breakdown) | Codex | Ready |
 | P4 | Interview day kit (streaming LLM brief) | Codex | Ready |

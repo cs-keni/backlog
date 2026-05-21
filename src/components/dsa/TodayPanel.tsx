@@ -3,7 +3,9 @@
 import { useMemo, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import type { LcSolveWithReviews, LcReview } from '@/lib/dsa/types'
-import type { NeetcodeProblem } from '@/lib/dsa/neetcode150'
+import type { DsaTrack, NeetcodeProblem } from '@/lib/dsa/neetcode150'
+import { NEETCODE_250, TRACK_PROBLEMS } from '@/lib/dsa/neetcode150'
+import { getCompanyPatterns } from '@/lib/dsa/company-patterns'
 import {
   getActiveCategory,
   getRecommendations,
@@ -17,10 +19,20 @@ interface ReviewItem {
   isOverdue: boolean
 }
 
+interface InterviewFocus {
+  company: string
+  pattern: string
+  solved: number
+  total: number
+  nextProblem: NeetcodeProblem
+}
+
 interface TodayPanelProps {
   solves: LcSolveWithReviews[]
   today: string
   newSolvesToday: number
+  track: DsaTrack
+  openTechnicalApps: { company: string; applied_at: string | null }[]
   onReviewComplete: (reviewId: string, solveId: string) => void
   onSolveLogged: (solve: LcSolveWithReviews, isNewSolve: boolean) => void
   onRescheduleComplete: () => void
@@ -50,6 +62,8 @@ export function TodayPanel({
   solves,
   today,
   newSolvesToday,
+  track,
+  openTechnicalApps,
   onReviewComplete,
   onSolveLogged,
   onRescheduleComplete,
@@ -59,19 +73,19 @@ export function TodayPanel({
   const [solvingSlug, setSolvingSlug] = useState<string | null>(null)
   const [rescheduling, setRescheduling] = useState(false)
 
-  const activeCategory = useMemo(() => getActiveCategory(solves), [solves])
+  const activeCategory = useMemo(() => getActiveCategory(solves, track), [solves, track])
 
-  const recommendations = useMemo(() => getRecommendations(solves), [solves])
+  const recommendations = useMemo(() => getRecommendations(solves, DAILY_NEW_TARGET, track), [solves, track])
 
   const categoryProgress = useMemo(
-    () => (activeCategory ? getCategoryProgress(solves, activeCategory) : null),
-    [solves, activeCategory]
+    () => (activeCategory ? getCategoryProgress(solves, activeCategory, track) : null),
+    [solves, activeCategory, track]
   )
 
   const nextProblemPreview = useMemo(() => {
-    const extended = getRecommendations(solves, DAILY_NEW_TARGET + 1)
+    const extended = getRecommendations(solves, DAILY_NEW_TARGET + 1, track)
     return extended.length > DAILY_NEW_TARGET ? extended[DAILY_NEW_TARGET] : null
-  }, [solves])
+  }, [solves, track])
 
   const dueItems = useMemo<ReviewItem[]>(() => {
     const items: ReviewItem[] = []
@@ -90,6 +104,34 @@ export function TodayPanel({
   }, [solves, today])
 
   const overdueCount = useMemo(() => dueItems.filter(i => i.isOverdue).length, [dueItems])
+
+  const interviewFocus = useMemo(() => {
+    const solvedSlugs = new Set(solves.map(s => s.problem_slug))
+    const trackSet = TRACK_PROBLEMS[track]
+    const trackProblems = NEETCODE_250.filter(problem => trackSet.has(problem.slug))
+
+    for (const app of openTechnicalApps) {
+      const patterns = getCompanyPatterns(app.company)
+      if (!patterns) continue
+
+      const candidates = patterns
+        .map<InterviewFocus | null>(pattern => {
+          const problems = trackProblems.filter(problem => problem.pattern === pattern)
+          if (problems.length === 0) return null
+          const solved = problems.filter(problem => solvedSlugs.has(problem.slug)).length
+          const nextProblem = problems.find(problem => !solvedSlugs.has(problem.slug)) ?? null
+          if (!nextProblem) return null
+          return { company: app.company, pattern, solved, total: problems.length, nextProblem }
+        })
+        .filter((candidate): candidate is InterviewFocus => candidate !== null)
+        .sort((a, b) => (a.solved / a.total) - (b.solved / b.total))
+
+      const weakest = candidates[0]
+      if (weakest?.nextProblem) return weakest
+    }
+
+    return null
+  }, [openTechnicalApps, solves, track])
 
   async function handleInlineSolve(problem: NeetcodeProblem) {
     if (solvingSlug) return
@@ -180,9 +222,29 @@ export function TodayPanel({
           )}
         </div>
 
+        {interviewFocus && (
+          <div className="mb-3 rounded-lg border border-teal-500/20 bg-teal-500/5 px-3.5 py-3">
+            <p className="text-xs font-medium text-teal-300">
+              {interviewFocus.company} screen — focus on {interviewFocus.pattern} today
+            </p>
+            <p className="mt-1 text-xs text-zinc-500">
+              You've solved {interviewFocus.solved}/{interviewFocus.total} {interviewFocus.pattern} problems.
+            </p>
+            <a
+              href={interviewFocus.nextProblem.leetcodeUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-teal-300 hover:text-teal-200"
+            >
+              {interviewFocus.nextProblem.title}
+              <ExternalLinkIcon />
+            </a>
+          </div>
+        )}
+
         {allSolved ? (
           <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/5 px-4 py-3 text-center">
-            <p className="text-sm font-medium text-emerald-400">All 150 solved!</p>
+            <p className="text-sm font-medium text-emerald-400">All {track} solved!</p>
             <p className="text-xs text-zinc-500 mt-0.5">Consider re-solving to reset your chains</p>
           </div>
         ) : isDoneToday ? (

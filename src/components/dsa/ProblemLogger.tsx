@@ -2,14 +2,15 @@
 
 import { useState, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { NEETCODE_150, PATTERNS } from '@/lib/dsa/neetcode150'
+import { NEETCODE_250, PATTERNS, TRACK_PROBLEMS } from '@/lib/dsa/neetcode150'
 import { getTodayLocal } from '@/lib/dsa/schedule'
 import type { LcSolveWithReviews } from '@/lib/dsa/types'
-import type { NeetcodeProblem } from '@/lib/dsa/neetcode150'
+import type { DsaTrack, NeetcodeProblem } from '@/lib/dsa/neetcode150'
 
 interface ProblemLoggerProps {
   solves: LcSolveWithReviews[]
   today: string
+  track: DsaTrack
   onSolveLogged: (solve: LcSolveWithReviews, isNewSolve: boolean) => void
 }
 
@@ -43,7 +44,7 @@ function ChevronIcon({ collapsed }: { collapsed: boolean }) {
   )
 }
 
-export function ProblemLogger({ solves, today, onSolveLogged }: ProblemLoggerProps) {
+export function ProblemLogger({ solves, today, track, onSolveLogged }: ProblemLoggerProps) {
   const [query, setQuery] = useState('')
   const [selectedPattern, setSelectedPattern] = useState<string>('All')
   const [logging, setLogging] = useState<string | null>(null)
@@ -55,6 +56,11 @@ export function ProblemLogger({ solves, today, onSolveLogged }: ProblemLoggerPro
   const [bulkDate, setBulkDate] = useState(today)
   const [bulkLogging, setBulkLogging] = useState(false)
 
+  const trackProblems = useMemo(
+    () => NEETCODE_250.filter(problem => TRACK_PROBLEMS[track].has(problem.slug)),
+    [track]
+  )
+
   const solveBySlug = useMemo(() => {
     const map: Record<string, LcSolveWithReviews> = {}
     for (const s of solves) map[s.problem_slug] = s
@@ -63,12 +69,12 @@ export function ProblemLogger({ solves, today, onSolveLogged }: ProblemLoggerPro
 
   const filtered = useMemo(() => {
     const q = query.toLowerCase()
-    return NEETCODE_150.filter((p) => {
+    return trackProblems.filter((p) => {
       const matchesPattern = selectedPattern === 'All' || p.pattern === selectedPattern
       const matchesQuery = !q || p.title.toLowerCase().includes(q) || p.pattern.toLowerCase().includes(q)
       return matchesPattern && matchesQuery
     })
-  }, [query, selectedPattern])
+  }, [query, selectedPattern, trackProblems])
 
   // Grouped view when "All" is selected; flat otherwise
   const groups = useMemo(() => {
@@ -127,7 +133,7 @@ export function ProblemLogger({ solves, today, onSolveLogged }: ProblemLoggerPro
     setBulkLogging(true)
     try {
       for (const slug of bulkSelected) {
-        const problem = NEETCODE_150.find((p) => p.slug === slug)
+        const problem = trackProblems.find((p) => p.slug === slug)
         if (!problem) continue
         await logSolve(problem, bulkDate)
       }
@@ -263,7 +269,7 @@ export function ProblemLogger({ solves, today, onSolveLogged }: ProblemLoggerPro
         <div className="flex items-center justify-between mb-3">
           <p className="text-xs font-medium text-zinc-400">Problems</p>
           <div className="flex items-center gap-2">
-            <span className="text-xs text-zinc-600">{solves.length}/150 solved</span>
+            <span className="text-xs text-zinc-600">{solves.length}/{track} solved</span>
             <button
               onClick={() => { setBulkMode(!bulkMode); setBulkSelected(new Set()) }}
               className={`text-xs px-2 py-1 rounded border transition-colors ${
