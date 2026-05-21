@@ -54,7 +54,7 @@ export async function GET(request: NextRequest) {
     .eq('id', user.id)
     .single()
   const sourcesToHide = hiddenSources(profile?.source_preferences as SourcePreferences | null)
-  const feedbackFilters = await getActiveFeedbackFilters(user.id, supabase as never)
+  const feedbackFilters = await getActiveFeedbackFilters(user.id, supabase)
 
   let query = supabase
     .from('jobs')

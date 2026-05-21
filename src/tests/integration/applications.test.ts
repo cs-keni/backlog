@@ -87,11 +87,19 @@ describe('POST /api/applications', () => {
         }),
       }),
     })
+    // jobs URL lookup for ATS detection (only for new applications)
+    mockFrom.mockReturnValueOnce({
+      select: vi.fn().mockReturnValue({
+        eq: vi.fn().mockReturnValue({
+          single: vi.fn().mockResolvedValue({ data: { url: 'https://boards.greenhouse.io/acme/jobs/123' } }),
+        }),
+      }),
+    })
     // upsert → returns new app
     mockFrom.mockReturnValueOnce({
       upsert: vi.fn().mockReturnValue({
         select: vi.fn().mockReturnValue({
-          single: vi.fn().mockResolvedValue({ data: { id: TEST_APP_ID, status: 'saved' }, error: null }),
+          single: vi.fn().mockResolvedValue({ data: { id: TEST_APP_ID, status: 'saved', ats_platform: 'greenhouse' }, error: null }),
         }),
       }),
     })

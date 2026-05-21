@@ -189,9 +189,13 @@ describe('profile mutation routes', () => {
     const updateScores = vi.fn().mockReturnValue({
       eq: vi.fn().mockResolvedValue({ error: null }),
     })
+    const deleteKeywordGaps = vi.fn().mockReturnValue({
+      eq: vi.fn().mockResolvedValue({ error: null }),
+    })
     mockFrom
       .mockReturnValueOnce({ update: updateUsers })
       .mockReturnValueOnce({ update: updateScores })
+      .mockReturnValueOnce({ delete: deleteKeywordGaps })
 
     const formData = new FormData()
     formData.set('resume', new Blob(['%PDF-1.4 test'], { type: 'application/pdf' }))

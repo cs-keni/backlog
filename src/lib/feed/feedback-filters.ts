@@ -35,12 +35,12 @@ export function computeActiveFeedbackFilters(rows: Array<{ reason: string }>): F
 
 export async function getActiveFeedbackFilters(
   userId: string,
-  supabase: { from: (table: string) => { select: (columns: string) => { eq: (column: string, value: string) => unknown } } }
+  supabase: Awaited<ReturnType<typeof import('@/lib/supabase/server').createClient>>
 ): Promise<FeedbackFilters> {
   const { data } = await supabase
     .from('job_feedback')
     .select('reason')
-    .eq('user_id', userId) as { data: Array<{ reason: string }> | null }
+    .eq('user_id', userId)
 
-  return computeActiveFeedbackFilters(data ?? [])
+  return computeActiveFeedbackFilters((data ?? []) as Array<{ reason: string }>)
 }

@@ -119,6 +119,15 @@ describe('GET /api/analytics', () => {
           }),
         }
       }
+      if (table === 'users') {
+        return {
+          select: vi.fn().mockReturnValue({
+            eq: vi.fn().mockReturnValue({
+              single: vi.fn().mockResolvedValue({ data: { source_preferences: {} }, error: null }),
+            }),
+          }),
+        }
+      }
       throw new Error(`Unexpected table: ${table}`)
     })
 

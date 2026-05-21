@@ -23,19 +23,29 @@ const PLATFORM_OPTIONS: Array<{ value: AtsPlatform | 'unknown'; label: string }>
 export function AtsCompleteness({ applicationId, platform, score, missing }: AtsCompletenessProps) {
   const [currentPlatform, setCurrentPlatform] = useState(platform)
   const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState(false)
   const radius = 18
   const circumference = 2 * Math.PI * radius
   const pct = score ?? 0
 
   async function updatePlatform(nextPlatform: string) {
+    const prev = currentPlatform
     setCurrentPlatform(nextPlatform)
+    setSaveError(false)
     setSaving(true)
     try {
-      await fetch(`/api/applications/${applicationId}/ats-platform`, {
+      const res = await fetch(`/api/applications/${applicationId}/ats-platform`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ats_platform: nextPlatform }),
       })
+      if (!res.ok) {
+        setCurrentPlatform(prev)
+        setSaveError(true)
+      }
+    } catch {
+      setCurrentPlatform(prev)
+      setSaveError(true)
     } finally {
       setSaving(false)
     }
@@ -60,6 +70,7 @@ export function AtsCompleteness({ applicationId, platform, score, missing }: Ats
               <option key={option.value} value={option.value}>{option.label}</option>
             ))}
           </select>
+          {saveError && <p className="mt-1 text-[11px] text-red-400">Failed to save — try again</p>}
         </div>
       </div>
     )
@@ -69,16 +80,19 @@ export function AtsCompleteness({ applicationId, platform, score, missing }: Ats
     <div className="space-y-2">
       <div className="flex items-center justify-between gap-3">
         <h3 className="text-xs font-semibold uppercase tracking-wide text-zinc-400">ATS Profile</h3>
-        <select
-          value={currentPlatform}
-          onChange={(event) => updatePlatform(event.target.value)}
-          disabled={saving}
-          className="rounded-md border border-zinc-700 bg-zinc-950 px-2 py-1 text-[11px] text-zinc-400"
-        >
-          {PLATFORM_OPTIONS.map((option) => (
-            <option key={option.value} value={option.value}>{option.label}</option>
-          ))}
-        </select>
+        <div className="flex flex-col items-end gap-0.5">
+          <select
+            value={currentPlatform}
+            onChange={(event) => updatePlatform(event.target.value)}
+            disabled={saving}
+            className="rounded-md border border-zinc-700 bg-zinc-950 px-2 py-1 text-[11px] text-zinc-400"
+          >
+            {PLATFORM_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>{option.label}</option>
+            ))}
+          </select>
+          {saveError && <p className="text-[10px] text-red-400">Failed to save</p>}
+        </div>
       </div>
       <div className="flex items-center gap-3 rounded-lg border border-zinc-800 bg-zinc-900/50 px-3 py-3">
         <svg className="h-12 w-12 -rotate-90" viewBox="0 0 48 48" aria-hidden="true">
