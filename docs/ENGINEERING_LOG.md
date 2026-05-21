@@ -4,6 +4,32 @@ Reverse-chronological. One entry per meaningful session.
 
 ---
 
+## 2026-05-21 — Quality pass: 84→90 grade (Claude Code)
+
+**Commits:** 65e9600, 081f029, 73baac0
+
+### What shipped
+
+- **5 new integration test suites** covering all Wave 3 routes that had no tests:
+  - `keyword-gap.test.ts` — 9 tests (GET cache hit/miss, POST 401/400/404/422/success)
+  - `salary-playbook.test.ts` — 9 tests (GET/POST auth, validation, structured scripts)
+  - `jobs-feedback.test.ts` — 8 tests (all 5 valid reasons, bad reason, missing fields)
+  - `source-preferences.test.ts` — 8 tests (all 3 valid actions, preference merge)
+  - `ats-platform.test.ts` — 13 tests (all valid platforms, invalid platform, non-owner 404)
+- **Architecture fix:** `POST /api/prep/salary-playbook` was calling `GET(new Request('http://localhost/...'))` internally. Extracted `loadSalaryContext()` helper called by both handlers.
+- **Structured salary scripts:** POST now prompts for JSON `{ recruiter_call, email_counter, deadline_extension }` instead of free text.
+- **SalaryPlaybook component:** 3-tab script panel (Recruiter call / Email counter / Deadline extension) + skeleton during initial fetch.
+- **KeywordGap component:** skeleton during initial GET (was rendering invisible `null`).
+- **ResumeTailor component:** button stays disabled and shows "Loading…" during initial fetch.
+
+### Test counts after this session
+
+- 88 unit tests
+- 123 integration tests
+- **Total: 211 (all passing)**
+
+---
+
 ## 2026-05-21 — Wave 3 remaining phases P2/P5/P0/P3 (Codex)
 
 ### Implemented
