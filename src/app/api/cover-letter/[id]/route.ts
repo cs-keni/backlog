@@ -30,6 +30,19 @@ export async function PATCH(
     return Response.json({ error: 'No valid fields to update' }, { status: 400 })
   }
 
+  const { data: existing, error: existingError } = await supabase
+    .from('cover_letters')
+    .select('user_id')
+    .eq('id', id)
+    .single()
+
+  if (existingError || !existing) {
+    return Response.json({ error: 'Cover letter not found' }, { status: 404 })
+  }
+  if (existing.user_id !== user.id) {
+    return Response.json({ error: 'Forbidden' }, { status: 403 })
+  }
+
   const { data, error } = await supabase
     .from('cover_letters')
     .update(updates)

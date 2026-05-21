@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState, useCallback } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
@@ -97,18 +97,24 @@ export function ApplicationDetail({ app, onClose, onStatusChange, onUpdate, onDe
   const debouncedName = useDebounce(recruiterName, 800)
   const debouncedEmail = useDebounce(recruiterEmail, 800)
 
-  // Load timeline + reset recruiter fields when app changes
-  useEffect(() => {
+  // Reset all local state synchronously before the browser paints when the
+  // selected application changes — prevents a one-frame flash of stale/empty content.
+  useLayoutEffect(() => {
     if (!app) return
     if (app.id === prevAppId.current) return
-    prevAppId.current = app.id
-
     setRecruiterName(app.recruiter_name ?? '')
     setRecruiterEmail(app.recruiter_email ?? '')
     setDeleteState('idle')
     setTimeline([])
     setDetailMeta(null)
     setDetailLoading(true)
+  }, [app])
+
+  // Fetch timeline + detail meta after the synchronous reset above has painted.
+  useEffect(() => {
+    if (!app) return
+    if (app.id === prevAppId.current) return
+    prevAppId.current = app.id
 
     fetch(`/api/applications/${app.id}`)
       .then((r) => r.json())

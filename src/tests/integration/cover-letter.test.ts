@@ -225,19 +225,43 @@ describe('cover-letter routes', () => {
     expect(res.status).toBe(400)
   })
 
-  it('PATCH updates content for an owner row', async () => {
-    const updated = { id: 'cover-1', template_type: 'formal', content: 'Updated content' }
+  it('PATCH returns 403 for non-owner row', async () => {
     mockFrom.mockReturnValueOnce({
-      update: vi.fn().mockReturnValue({
+      select: vi.fn().mockReturnValue({
         eq: vi.fn().mockReturnValue({
-          eq: vi.fn().mockReturnValue({
-            select: vi.fn().mockReturnValue({
-              single: vi.fn().mockResolvedValue({ data: updated, error: null }),
-            }),
-          }),
+          single: vi.fn().mockResolvedValue({ data: { user_id: 'user-other' }, error: null }),
         }),
       }),
     })
+
+    const res = await PATCH(request('http://localhost/api/cover-letter/cover-1', { content: 'Updated content' }), {
+      params: Promise.resolve({ id: 'cover-1' }),
+    })
+
+    expect(res.status).toBe(403)
+  })
+
+  it('PATCH updates content for an owner row', async () => {
+    const updated = { id: 'cover-1', template_type: 'formal', content: 'Updated content' }
+    mockFrom
+      .mockReturnValueOnce({
+        select: vi.fn().mockReturnValue({
+          eq: vi.fn().mockReturnValue({
+            single: vi.fn().mockResolvedValue({ data: { user_id: TEST_USER.id }, error: null }),
+          }),
+        }),
+      })
+      .mockReturnValueOnce({
+        update: vi.fn().mockReturnValue({
+          eq: vi.fn().mockReturnValue({
+            eq: vi.fn().mockReturnValue({
+              select: vi.fn().mockReturnValue({
+                single: vi.fn().mockResolvedValue({ data: updated, error: null }),
+              }),
+            }),
+          }),
+        }),
+      })
 
     const res = await PATCH(request('http://localhost/api/cover-letter/cover-1', { content: 'Updated content' }), {
       params: Promise.resolve({ id: 'cover-1' }),
