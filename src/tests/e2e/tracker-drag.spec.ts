@@ -6,6 +6,7 @@ test.describe('Tracker drag workflow', () => {
     await authenticateE2E(context)
 
     await page.goto('/tracker')
+    await page.waitForLoadState('networkidle')
 
     const card = page.getByTestId('application-card-e2e-app-1')
     await expect(card).toBeVisible()
@@ -28,6 +29,7 @@ test.describe('Tracker drag workflow', () => {
     await authenticateE2E(context)
 
     await page.goto('/tracker')
+    await page.waitForLoadState('networkidle')
 
     const savedColumn = page.getByTestId('tracker-column-saved')
     const card = page.getByTestId('application-card-e2e-app-1')

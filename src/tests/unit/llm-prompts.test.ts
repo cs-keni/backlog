@@ -102,6 +102,8 @@ describe('LLM prompt shape', () => {
     expect(payload.messages[0].content).toContain('Tell me about improving a shared frontend system.')
     expect(payload.messages[0].content).toContain('Frontend Engineer at Backlog Labs')
     expect(payload.messages[0].content).toContain('Skills: TypeScript, React')
+    expect(payload.messages[0].content).toContain('STAR-format')
+    expect(payload.messages[0].content).toContain('Respond with JSON only')
   })
 
   it('sends cover-letter prompt with job, profile, and explicit template guidance', async () => {

@@ -299,7 +299,7 @@ export function NotificationSettings({ initialPrefs, recentLogs, vapidPublicKey 
             <span className="text-xs text-zinc-500">Timezone</span>
             <select
               value={prefs.notification_timezone}
-              onChange={e => savePref('notification_timezone', e.target.value)}
+              onBlur={e => savePref('notification_timezone', e.target.value)}
               className="w-full bg-zinc-800 border border-zinc-700 rounded-md px-2.5 py-2 text-sm text-zinc-200 focus:outline-none focus:border-zinc-500 transition-colors"
             >
               {TIMEZONES.map(([value, label]) => (
