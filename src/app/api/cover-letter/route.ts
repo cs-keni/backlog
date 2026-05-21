@@ -1,7 +1,7 @@
 export const maxDuration = 60
 
 import { createClient } from '@/lib/supabase/server'
-import { generateCoverLetter, type CoverLetterTemplate } from '@/lib/llm/cover-letter'
+import type { CoverLetterTemplate } from '@/lib/llm/cover-letter'
 import { hasE2EAuthCookie } from '@/lib/e2e/server'
 
 export async function POST(request: Request) {
@@ -122,6 +122,7 @@ export async function POST(request: Request) {
     .maybeSingle()
 
   // ── Generate with Claude ───────────────────────────────────────────────────
+  const { generateCoverLetter } = await import('@/lib/llm/cover-letter')
   const result = await generateCoverLetter(
     profile.resume_text,
     workResult.data ?? [],

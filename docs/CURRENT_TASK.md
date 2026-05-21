@@ -1,7 +1,7 @@
 # Current Task
 
 **Last updated:** 2026-05-20
-**Status:** All P1–P3 phases complete. Polish Pass in progress — closing the remaining gaps between A- and clean A.
+**Status:** All P1–P3 phases complete. Polish Pass PP-1 through PP-4 implemented; CI verification in progress.
 
 ---
 
@@ -87,6 +87,13 @@ Full grade review completed 2026-05-20. Every section is A- or better. Four gaps
 | **PP-3** LLM prompt unit tests: mock Anthropic SDK at transport via MSW; assert prompt shape (not response content) for STAR builder, cover letter generator, and question generator | **Codex** | M | Interview Prep |
 | **PP-4** E2E depth: flesh out all 5 existing specs to 40–60 LOC each; add at least one error/negative test per spec (bad auth redirect, empty selection, filter with no results, failed drag rollback) | **Codex** | M | E2E |
 
+### Polish Pass implementation status
+
+- **PP-1** implemented: `notification_timezone` migration, settings timezone picker, profile/settings API persistence, worker timezone-aware quiet hours, and dispatcher unit coverage.
+- **PP-2** implemented: company graph integration coverage includes happy path and unauthenticated 401 guard.
+- **PP-3** implemented: prompt-shape unit tests cover STAR builder, cover-letter generator, interview-guide generator, and extension answer-question cache miss.
+- **PP-4** implemented: all 5 E2E specs are now 40–60 LOC with negative/boundary coverage.
+
 ### PP-1 implementation notes (Timezone)
 
 - New migration `supabase/migrations/026_add_notification_timezone.sql`: `ALTER TABLE users ADD COLUMN notification_timezone text DEFAULT 'UTC'`
@@ -138,6 +145,7 @@ Full visual specs for all UI elements are in `docs/GRADE_BOOST_PLAN.md` under `*
 - `023_add_review_difficulty.sql` (to be written — Phase 8b)
 - `024_add_daily_activity.sql` — written; apply in Supabase before relying on DSA new-today counts
 - `025_notification_log_schema.sql` — applied; adds notification status/error and sent-only dedupe index
+- `026_add_notification_timezone.sql` — written; apply in Supabase before relying on per-user notification timezones
 
 ---
 

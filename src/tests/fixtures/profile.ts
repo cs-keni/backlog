@@ -83,6 +83,7 @@ export function makeUserProfile(overrides: Partial<UserProfile> = {}): UserProfi
     notification_sms: false,
     notification_quiet_hours_start: null,
     notification_quiet_hours_end: null,
+    notification_timezone: 'UTC',
     alert_match_threshold: 50,
     gender: null,
     race_ethnicity: null,

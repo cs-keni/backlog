@@ -153,6 +153,7 @@ export interface UserProfile {
   notification_sms: boolean
   notification_quiet_hours_start: string | null
   notification_quiet_hours_end: string | null
+  notification_timezone: string | null
   alert_match_threshold: number
   // EEO self-identification & compensation (used by extension auto-fill)
   gender: string | null

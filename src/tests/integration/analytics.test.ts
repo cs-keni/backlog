@@ -171,6 +171,15 @@ describe('GET /api/analytics/company-graph', () => {
     mockGetUser.mockResolvedValue({ data: { user: TEST_USER } })
   })
 
+  it('returns 401 for unauthenticated request', async () => {
+    mockGetUser.mockResolvedValueOnce({ data: { user: null } })
+
+    const res = await companyGraphGET()
+
+    expect(res.status).toBe(401)
+    expect(await res.json()).toEqual({ error: 'Unauthorized' })
+  })
+
   it('returns company nodes and Jaccard edges', async () => {
     const jobs = [
       { company: 'Alpha', company_id: 'co-alpha', tags: ['react', 'typescript', 'node'] },

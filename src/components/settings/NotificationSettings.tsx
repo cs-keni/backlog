@@ -8,6 +8,7 @@ interface Prefs {
   notification_push: boolean
   notification_quiet_hours_start: string | null
   notification_quiet_hours_end: string | null
+  notification_timezone: string
   alert_match_threshold: number
   email: string
 }
@@ -29,6 +30,39 @@ const CHANNEL_ICONS: Record<string, string> = {
   push: '🔔',
   discord: '💬',
 }
+
+const TIMEZONES = [
+  ['UTC', 'UTC'],
+  ['America/Los_Angeles', 'Pacific Time'],
+  ['America/Denver', 'Mountain Time'],
+  ['America/Chicago', 'Central Time'],
+  ['America/New_York', 'Eastern Time'],
+  ['America/Phoenix', 'Arizona'],
+  ['America/Anchorage', 'Alaska'],
+  ['Pacific/Honolulu', 'Hawaii'],
+  ['America/Toronto', 'Toronto'],
+  ['America/Vancouver', 'Vancouver'],
+  ['America/Mexico_City', 'Mexico City'],
+  ['America/Sao_Paulo', 'Sao Paulo'],
+  ['Europe/London', 'London'],
+  ['Europe/Dublin', 'Dublin'],
+  ['Europe/Paris', 'Paris'],
+  ['Europe/Berlin', 'Berlin'],
+  ['Europe/Madrid', 'Madrid'],
+  ['Europe/Rome', 'Rome'],
+  ['Europe/Amsterdam', 'Amsterdam'],
+  ['Europe/Stockholm', 'Stockholm'],
+  ['Europe/Warsaw', 'Warsaw'],
+  ['Europe/Athens', 'Athens'],
+  ['Asia/Dubai', 'Dubai'],
+  ['Asia/Kolkata', 'India'],
+  ['Asia/Singapore', 'Singapore'],
+  ['Asia/Tokyo', 'Tokyo'],
+  ['Asia/Seoul', 'Seoul'],
+  ['Australia/Perth', 'Perth'],
+  ['Australia/Sydney', 'Sydney'],
+  ['Pacific/Auckland', 'Auckland'],
+] as const
 
 function formatTime(t: string | null): string {
   if (!t) return ''
@@ -258,9 +292,21 @@ export function NotificationSettings({ initialPrefs, recentLogs, vapidPublicKey 
       <section className="space-y-4">
         <div>
           <h2 className="text-sm font-semibold text-zinc-200">Quiet hours</h2>
-          <p className="text-xs text-zinc-500 mt-0.5">No notifications will be sent during this window (UTC)</p>
+          <p className="text-xs text-zinc-500 mt-0.5">No notifications will be sent during this local-time window</p>
         </div>
-        <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 px-4 py-4">
+        <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 px-4 py-4 space-y-4">
+          <label className="block space-y-1.5">
+            <span className="text-xs text-zinc-500">Timezone</span>
+            <select
+              value={prefs.notification_timezone}
+              onChange={e => savePref('notification_timezone', e.target.value)}
+              className="w-full bg-zinc-800 border border-zinc-700 rounded-md px-2.5 py-2 text-sm text-zinc-200 focus:outline-none focus:border-zinc-500 transition-colors"
+            >
+              {TIMEZONES.map(([value, label]) => (
+                <option key={value} value={value}>{label} ({value})</option>
+              ))}
+            </select>
+          </label>
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-2">
               <label className="text-xs text-zinc-500 w-8">From</label>

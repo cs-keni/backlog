@@ -22,6 +22,7 @@ interface UserRow {
   notification_push: boolean
   notification_quiet_hours_start: string | null
   notification_quiet_hours_end: string | null
+  notification_timezone: string | null
   alert_match_threshold: number | null
 }
 
@@ -89,6 +90,7 @@ const USER_SELECT = [
   'notification_push',
   'notification_quiet_hours_start',
   'notification_quiet_hours_end',
+  'notification_timezone',
   'alert_match_threshold',
 ].join(', ')
 
@@ -168,7 +170,7 @@ export async function dispatchNotifications(
 
       if (candidates.length === 0) continue
 
-      if (isInQuietHours(now, user.notification_quiet_hours_start, user.notification_quiet_hours_end)) {
+      if (isInQuietHours(now, user.notification_quiet_hours_start, user.notification_quiet_hours_end, user.notification_timezone)) {
         const currentCandidateIds = candidates
           .map(({ id }) => id)
           .filter((id) => currentJobIds.includes(id))
@@ -515,13 +517,13 @@ export function jaccardScore(jobTags: string[], userSkills: string[]): number {
 }
 
 /**
- * Returns true if the current UTC time falls within the user's quiet hours.
- * Quiet hours are stored as HH:MM:SS strings in UTC.
+ * Returns true if now falls within the user's quiet hours in their local timezone.
  */
 export function isInQuietHours(
   now: Date,
   start: string | null,
-  end: string | null
+  end: string | null,
+  timezone: string | null = 'UTC'
 ): boolean {
   if (!start || !end) return false
 
@@ -530,7 +532,20 @@ export function isInQuietHours(
     return h * 60 + m
   }
 
-  const nowMinutes = now.getUTCHours() * 60 + now.getUTCMinutes()
+  let nowMinutes = now.getUTCHours() * 60 + now.getUTCMinutes()
+  try {
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone: timezone || 'UTC',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    }).formatToParts(now)
+    const hour = Number(parts.find((part) => part.type === 'hour')?.value ?? '0')
+    const minute = Number(parts.find((part) => part.type === 'minute')?.value ?? '0')
+    nowMinutes = hour * 60 + minute
+  } catch {
+    nowMinutes = now.getUTCHours() * 60 + now.getUTCMinutes()
+  }
   const startMinutes = toMinutes(start)
   const endMinutes = toMinutes(end)
 

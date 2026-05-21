@@ -4,6 +4,47 @@
 
 ---
 
+## Session: 2026-05-21 — Polish Pass PP-1 through PP-4 (Codex)
+
+### What changed
+
+- PP-1 Notifications:
+  - Added `supabase/migrations/026_add_notification_timezone.sql`.
+  - Added notification timezone persistence through settings/profile APIs and a timezone selector in notification settings.
+  - Updated worker notification quiet-hour evaluation to compare against each user's IANA timezone.
+  - Added dispatcher unit coverage for timezone-specific pending vs sent behavior.
+- PP-2 Analytics:
+  - Added unauthenticated 401 coverage for `GET /api/analytics/company-graph`; existing happy path already covers graph shape/Jaccard output.
+- PP-3 Interview Prep:
+  - Added `src/tests/unit/llm-prompts.test.ts` for STAR builder, cover-letter generator, interview-guide generator, and extension answer-question prompt shape.
+- PP-4 E2E:
+  - Expanded all 5 existing Playwright specs to 40–60 LOC each with negative/boundary coverage.
+  - Added E2E fixture branch for forced company refresh cooldown.
+  - Deferred Anthropic-backed route imports in resume tailor and cover-letter routes so E2E fixture requests do not compile LLM paths.
+
+### Checks run
+
+- `node node_modules/typescript/bin/tsc --noEmit --pretty false` — passed
+- `npm run test` — 120 passed
+- `npm run test -- src/tests/integration/analytics.test.ts src/tests/unit/llm-prompts.test.ts` — 8 passed
+- `cd worker && node node_modules/vitest/vitest.mjs run tests/unit/dispatcher.test.ts` — 13 passed
+- `cd worker && node ../node_modules/typescript/bin/tsc --noEmit` — passed
+- `cd worker && node node_modules/vitest/vitest.mjs run` — 117 passed
+- `cd extension && npm test` — 84 passed
+- `NEXT_PUBLIC_E2E_TEST_MODE=1 ... npx playwright test --reporter=line --workers=1` — 12 passed
+- `git diff --check` — passed
+
+### Notes / risks
+
+- Apply `supabase/migrations/026_add_notification_timezone.sql` in Supabase before relying on per-user quiet-hour timezones in production.
+- Local Playwright needed elevated execution for localhost binding and `--workers=1`; CI already uses one worker.
+- Local `npm run lint` still fails because the repo has many existing lint errors and generated coverage/extension files are picked up; direct eslint reported pre-existing React Compiler warnings plus existing worker test `any` usage.
+- Local `cd worker && npm test` still fails because the worker Vitest binary wrapper is broken in this workspace; direct `node node_modules/vitest/vitest.mjs run` passed.
+- Browser logs still show pre-existing hydration warnings in feed/tracker (`button` nesting in feed filters and DnD described-by ids), but the E2E suite passes.
+- GitHub Actions still needs to be watched after push.
+
+---
+
 ## Polish Pass plan (Claude Code, 2026-05-20)
 
 All P1–P3 phases are complete. A full grade review surfaced four remaining gaps. Codex owns all four — see `docs/CURRENT_TASK.md` § "Polish Pass" for full specs including migration SQL, file paths, and test patterns. Summary:

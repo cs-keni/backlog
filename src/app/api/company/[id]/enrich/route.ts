@@ -2,6 +2,8 @@ export const maxDuration = 45
 
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { e2eCompany } from '@/lib/e2e/fixtures'
+import { hasE2EAuthCookie } from '@/lib/e2e/server'
 import { enrichCompany } from '@/lib/llm/company-enricher'
 
 const FULL_SELECT = 'id, name, description, mission, notable_products, website_url, headcount_range, funding_stage, tech_stack, enriched_at'
@@ -10,10 +12,6 @@ export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 })
-
   const { id } = await params
   let force = false
   try {
@@ -22,6 +20,23 @@ export async function POST(
   } catch {
     force = false
   }
+
+  if (hasE2EAuthCookie(request)) {
+    if (id !== e2eCompany.id) {
+      return Response.json({ error: 'Company not found' }, { status: 404 })
+    }
+    if (force) {
+      return Response.json(
+        { error: 'Company data was refreshed recently - try again tomorrow' },
+        { status: 429 }
+      )
+    }
+    return Response.json(e2eCompany)
+  }
+
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 })
 
   const { data: company } = await supabase
     .from('company_profiles')

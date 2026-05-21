@@ -26,6 +26,7 @@ interface UserRow {
   notification_push: boolean
   notification_quiet_hours_start: string | null
   notification_quiet_hours_end: string | null
+  notification_timezone: string | null
   alert_match_threshold: number | null
 }
 
@@ -58,6 +59,7 @@ const baseUser: UserRow = {
   notification_push: false,
   notification_quiet_hours_start: null,
   notification_quiet_hours_end: null,
+  notification_timezone: 'UTC',
   alert_match_threshold: 50,
 }
 
@@ -186,6 +188,13 @@ describe('isInQuietHours', () => {
     expect(isInQuietHours(new Date('2026-04-21T10:00:00Z'), '22:00:00', '08:00:00')).toBe(false)
   })
 
+  it('evaluates quiet hours in the user timezone', () => {
+    const now = new Date('2026-04-21T17:00:00Z')
+
+    expect(isInQuietHours(now, '23:00:00', '08:00:00', 'Asia/Tokyo')).toBe(true)
+    expect(isInQuietHours(now, '23:00:00', '08:00:00', 'America/Los_Angeles')).toBe(false)
+  })
+
   it('returns false when either bound is missing', () => {
     expect(isInQuietHours(new Date('2026-04-21T14:00:00Z'), null, '22:00:00')).toBe(false)
     expect(isInQuietHours(new Date('2026-04-21T14:00:00Z'), '10:00:00', null)).toBe(false)
@@ -242,6 +251,52 @@ describe('dispatchNotifications', () => {
     expect(state.notification_log).toMatchObject([
       { user_id: 'user-1', job_id: 'job-1', channel: 'email', status: 'pending' },
     ])
+  })
+
+  it('uses each user timezone before queuing quiet-hour pending rows', async () => {
+    const job = makeNormalizedJob({ tags: ['typescript'] })
+    const { db, state } = makeDb({
+      users: [
+        {
+          ...baseUser,
+          id: 'tokyo-user',
+          email: 'tokyo@example.com',
+          notification_quiet_hours_start: '23:00:00',
+          notification_quiet_hours_end: '08:00:00',
+          notification_timezone: 'Asia/Tokyo',
+        },
+        {
+          ...baseUser,
+          id: 'la-user',
+          email: 'la@example.com',
+          notification_quiet_hours_start: '23:00:00',
+          notification_quiet_hours_end: '08:00:00',
+          notification_timezone: 'America/Los_Angeles',
+        },
+      ],
+    })
+    const sendEmail = vi.fn().mockResolvedValue(undefined)
+
+    const result = await dispatchNotifications(
+      [job],
+      [{ id: 'job-1', url: job.url }],
+      {
+        db,
+        now: new Date('2026-04-21T17:00:00Z'),
+        sendDiscord: vi.fn(),
+        sendEmail,
+      }
+    )
+
+    expect(result.pending).toBe(1)
+    expect(result.sent).toBe(1)
+    expect(sendEmail).toHaveBeenCalledWith('la@example.com', [job], 1)
+    expect(state.notification_log).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ user_id: 'tokyo-user', status: 'pending' }),
+        expect.objectContaining({ user_id: 'la-user', status: 'sent' }),
+      ])
+    )
   })
 
   it('sends pending rows after quiet hours even when no new jobs were written', async () => {

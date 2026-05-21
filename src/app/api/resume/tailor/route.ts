@@ -2,8 +2,6 @@ export const maxDuration = 60
 
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { tailorResume } from '@/lib/llm/resume-tailor'
-import { generateResumePDF } from '@/lib/pdf/resume-generator'
 import { hasE2EAuthCookie } from '@/lib/e2e/server'
 
 export async function POST(request: Request) {
@@ -82,6 +80,7 @@ export async function POST(request: Request) {
     .maybeSingle()
 
   // ── Tailor with Claude ─────────────────────────────────────────────────────
+  const { tailorResume } = await import('@/lib/llm/resume-tailor')
   const tailored = await tailorResume(
     profile.resume_text,
     workResult.data ?? [],
@@ -93,6 +92,7 @@ export async function POST(request: Request) {
   )
 
   // ── Generate PDF ───────────────────────────────────────────────────────────
+  const { generateResumePDF } = await import('@/lib/pdf/resume-generator')
   const pdfBuffer = await generateResumePDF({
     full_name: profile.full_name ?? 'Resume',
     email: profile.email,

@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test'
+import { authenticateE2E } from './helpers'
 
 test.describe('Auth — unauthenticated redirects', () => {
   test('visiting /feed while unauthenticated redirects to /login', async ({
@@ -21,5 +22,27 @@ test.describe('Auth — unauthenticated redirects', () => {
   }) => {
     await page.goto('/')
     await expect(page).toHaveURL(/\/login/)
+  })
+
+  test('visiting /tracker while unauthenticated redirects to /login', async ({
+    page,
+  }) => {
+    await page.goto('/tracker')
+    await expect(page).toHaveURL(/\/login/)
+    await expect(page.getByLabel(/email/i)).toBeVisible()
+  })
+})
+
+test.describe('Auth — authenticated access', () => {
+  test('visiting /feed with an e2e session renders the app route', async ({
+    page,
+    context,
+  }) => {
+    await authenticateE2E(context)
+
+    await page.goto('/feed')
+
+    await expect(page).toHaveURL(/\/feed/)
+    await expect(page.getByRole('heading', { name: 'Job Feed' })).toBeVisible()
   })
 })

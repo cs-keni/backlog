@@ -563,3 +563,35 @@ See `docs/CURRENT_TASK.md`. Implementation of fill.ts, types.ts, Sidebar.tsx, fi
 
 - The profile ownership checks intentionally query by raw row id before mutation instead of relying on `.eq('user_id', user.id)` filtering, so foreign-row attempts return 403 rather than RLS-style 404.
 - The resume route test uses a mocked Request-like object for `formData()` because jsdom/FormData can produce a different Blob realm than the route’s `instanceof Blob` check.
+
+## 2026-05-21 — Polish Pass PP-1 through PP-4 (Codex)
+
+### Implemented
+
+- Added user `notification_timezone` migration and wired notification settings/profile APIs plus the settings timezone picker.
+- Worker dispatcher now evaluates quiet hours in each user's IANA timezone and has timezone-specific unit coverage.
+- Company graph integration coverage now includes unauthenticated 401 behavior.
+- Added LLM prompt-shape tests for STAR generation, cover letters, interview guides, and extension answer-question cache misses.
+- Expanded all five Playwright E2E specs to 40–60 LOC with negative/boundary coverage.
+- Added an E2E fixture path for forced company refresh cooldown responses.
+- Deferred Anthropic-backed imports in resume tailor and cover-letter routes so fixture-mode GET/POST requests do not compile LLM paths.
+
+### Checks
+
+- `node node_modules/typescript/bin/tsc --noEmit --pretty false` — passed
+- `npm run test` — 120 passed
+- `npm run test -- src/tests/integration/analytics.test.ts src/tests/unit/llm-prompts.test.ts` — 8 passed
+- `cd worker && node node_modules/vitest/vitest.mjs run tests/unit/dispatcher.test.ts` — 13 passed
+- `cd worker && node ../node_modules/typescript/bin/tsc --noEmit` — passed
+- `cd worker && node node_modules/vitest/vitest.mjs run` — 117 passed
+- `cd extension && npm test` — 84 passed
+- `NEXT_PUBLIC_E2E_TEST_MODE=1 ... npx playwright test --reporter=line --workers=1` — 12 passed
+- `git diff --check` — passed
+
+### Gotchas
+
+- Migration 026 is written but still needs to be applied in Supabase.
+- Local Playwright should use `--workers=1` for this repo; parallel Next dev workers produced intermittent chunk-load failures in the local WSL workspace.
+- `npm run lint` still fails on existing repo lint debt/generated files; direct eslint also reports existing React Compiler issues outside this pass.
+- `cd worker && npm test` still fails locally because the worker Vitest binary wrapper points at `node_modules/.bin/dist/cli.js`; use `node node_modules/vitest/vitest.mjs run`.
+- Existing browser hydration warnings remain in feed/tracker, but they are not new to this polish pass and do not fail the suite.

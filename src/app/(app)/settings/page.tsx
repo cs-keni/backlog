@@ -11,7 +11,7 @@ export default async function SettingsPage() {
 
   const { data: prefs } = await supabase
     .from('users')
-    .select('notification_email, notification_push, notification_quiet_hours_start, notification_quiet_hours_end, alert_match_threshold, email')
+    .select('notification_email, notification_push, notification_quiet_hours_start, notification_quiet_hours_end, notification_timezone, alert_match_threshold, email')
     .eq('id', user.id)
     .single()
 
@@ -40,6 +40,7 @@ export default async function SettingsPage() {
           notification_push: prefs?.notification_push ?? false,
           notification_quiet_hours_start: prefs?.notification_quiet_hours_start ?? null,
           notification_quiet_hours_end: prefs?.notification_quiet_hours_end ?? null,
+          notification_timezone: prefs?.notification_timezone ?? 'UTC',
           alert_match_threshold: prefs?.alert_match_threshold ?? 0,
           email: prefs?.email ?? user.email ?? '',
         }}

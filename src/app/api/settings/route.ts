@@ -13,6 +13,7 @@ export async function GET() {
       notification_push,
       notification_quiet_hours_start,
       notification_quiet_hours_end,
+      notification_timezone,
       alert_match_threshold
     `)
     .eq('id', user.id)
@@ -40,6 +41,7 @@ export async function PATCH(request: Request) {
     'notification_push',
     'notification_quiet_hours_start',
     'notification_quiet_hours_end',
+    'notification_timezone',
     'alert_match_threshold',
   ]
 
@@ -56,7 +58,7 @@ export async function PATCH(request: Request) {
     .from('users')
     .update(updates)
     .eq('id', user.id)
-    .select('notification_email, notification_push, notification_quiet_hours_start, notification_quiet_hours_end, alert_match_threshold')
+    .select('notification_email, notification_push, notification_quiet_hours_start, notification_quiet_hours_end, notification_timezone, alert_match_threshold')
     .single()
 
   if (error) {

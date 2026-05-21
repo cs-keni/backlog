@@ -36,7 +36,7 @@ export async function PATCH(request: Request) {
     'preferred_locations', 'preferred_salary_min', 'preferred_role_types', 'remote_preference',
     'skills', 'experience_level', 'years_of_experience',
     'notification_email', 'notification_push', 'notification_sms',
-    'notification_quiet_hours_start', 'notification_quiet_hours_end',
+    'notification_quiet_hours_start', 'notification_quiet_hours_end', 'notification_timezone',
     'alert_match_threshold',
     // EEO self-identification & compensation
     'gender', 'race_ethnicity', 'hispanic_latino', 'veteran_status', 'disability_status', 'desired_salary',
