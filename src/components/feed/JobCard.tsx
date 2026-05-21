@@ -5,12 +5,14 @@ import { motion } from 'framer-motion'
 import { Job } from '@/lib/jobs/types'
 import { useToast } from '@/components/ui/Toaster'
 import { freshnessColor, freshnessLabel } from '@/lib/tracker/freshness'
+import { DISMISS_REASONS, type DismissReason } from '@/lib/feed/feedback-filters'
 
 interface JobCardProps {
   job: Job
   isSelected: boolean
   onClick: () => void
   onQuickApply?: (jobId: string) => void
+  onDismiss?: (jobId: string, reason: DismissReason) => void
   index: number
 }
 
@@ -160,11 +162,12 @@ function companyAvatar(name: string): { initials: string; color: string } {
   return { initials, color: AVATAR_COLORS[hash % AVATAR_COLORS.length] }
 }
 
-export function JobCard({ job, isSelected, onClick, onQuickApply, index }: JobCardProps) {
+export function JobCard({ job, isSelected, onClick, onQuickApply, onDismiss, index }: JobCardProps) {
   const { toast } = useToast()
   const logoUrls = getLogoUrls(job.company, job.url)
   const [logoSourceIndex, setLogoSourceIndex] = useState(0)
   const [quickApplyState, setQuickApplyState] = useState<'idle' | 'loading' | 'done'>('idle')
+  const [dismissOpen, setDismissOpen] = useState(false)
   const logoFailed = logoSourceIndex >= logoUrls.length
 
   const salary = formatSalary(job.salary_min, job.salary_max)
@@ -236,6 +239,39 @@ export function JobCard({ job, isSelected, onClick, onQuickApply, index }: JobCa
           <p className="text-xs text-zinc-400 truncate mt-0.5">{job.company}</p>
         </div>
         <div className="flex items-center gap-1.5 shrink-0 mt-0.5">
+          {onDismiss && (
+            <div className="relative">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setDismissOpen((open) => !open)
+                }}
+                className="opacity-0 group-hover:opacity-100 rounded p-0.5 text-zinc-600 transition-all hover:text-red-400"
+                aria-label="Dismiss job"
+                title="Dismiss job"
+              >
+                <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+              {dismissOpen && (
+                <div
+                  onClick={(e) => e.stopPropagation()}
+                  className="absolute right-0 top-5 z-10 w-36 overflow-hidden rounded-lg border border-zinc-700 bg-zinc-950 shadow-xl"
+                >
+                  {DISMISS_REASONS.map((reason) => (
+                    <button
+                      key={reason.value}
+                      onClick={() => onDismiss(job.id, reason.value)}
+                      className="block w-full px-2.5 py-1.5 text-left text-[11px] text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200"
+                    >
+                      {reason.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
           {isNew && (
             <span className="text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/20">
               New

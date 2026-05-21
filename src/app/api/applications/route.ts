@@ -3,6 +3,7 @@ import { verifyApiKeyFromRequest } from '@/lib/auth/api-key'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { hasE2EAuthCookie } from '@/lib/e2e/server'
 import { e2eApplications } from '@/lib/e2e/fixtures'
+import { detectAtsPlatform } from '@/lib/tracker/ats-platform'
 
 export async function GET(request: Request) {
   if (hasE2EAuthCookie(request)) {
@@ -85,7 +86,7 @@ export async function GET(request: Request) {
   const { data, error } = await supabase
     .from('applications')
     .select(`
-      id, status, applied_at, last_updated, notes, recruiter_name, recruiter_email,
+      id, status, applied_at, last_updated, notes, recruiter_name, recruiter_email, ats_platform,
       jobs (
         id, title, company, location, salary_min, salary_max, url, is_remote, tags, fetched_at
       )
@@ -152,27 +153,30 @@ export async function POST(request: Request) {
   // Check if this application already exists (to avoid duplicate timeline rows on re-POST)
   const { data: existing } = await supabase
     .from('applications')
-    .select('id, status')
+    .select('id, status, ats_platform')
     .eq('user_id', user.id)
     .eq('job_id', body.job_id)
     .maybeSingle()
 
   const isNew = !existing
+  const { data: jobForAts } = isNew
+    ? await supabase.from('jobs').select('url').eq('id', body.job_id).single()
+    : { data: null }
+
+  const upsertPayload: Record<string, unknown> = {
+    user_id: user.id,
+    job_id: body.job_id,
+    status: body.status,
+    applied_at: body.status === 'applied' ? new Date().toISOString() : null,
+    last_updated: new Date().toISOString(),
+  }
+  if (isNew) upsertPayload.ats_platform = detectAtsPlatform(jobForAts?.url)
 
   // Upsert — one application row per user+job
   const { data, error } = await supabase
     .from('applications')
-    .upsert(
-      {
-        user_id: user.id,
-        job_id: body.job_id,
-        status: body.status,
-        applied_at: body.status === 'applied' ? new Date().toISOString() : null,
-        last_updated: new Date().toISOString(),
-      },
-      { onConflict: 'user_id,job_id' }
-    )
-    .select('id, status')
+    .upsert(upsertPayload, { onConflict: 'user_id,job_id' })
+    .select('id, status, ats_platform')
     .single()
 
   if (error) {

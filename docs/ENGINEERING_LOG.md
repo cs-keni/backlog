@@ -4,6 +4,27 @@ Reverse-chronological. One entry per meaningful session.
 
 ---
 
+## 2026-05-21 — Wave 3 remaining phases P2/P5/P0/P3 (Codex)
+
+### Implemented
+
+- P2: ATS platform detection, completeness scoring, manual override route/UI, migrations 031/032.
+- P5: job dismiss feedback reasons, feedback persistence, soft filters after 5 matching signals, migration 033.
+- P0: keyword gap prompt/route/cache UI, resume-update invalidation, migration 034.
+- P3: salary comp bands, salary playbook route/UI for offer-stage applications, migration 035.
+
+### Checks
+
+- `node node_modules/typescript/bin/tsc --noEmit --pretty false` — passed
+- `node node_modules/vitest/vitest.mjs run src/tests/unit/ats-completeness.test.ts src/tests/unit/feedback-filters.test.ts src/tests/unit/keyword-gap-prompt.test.ts src/tests/unit/comp-bands.test.ts src/tests/unit/application-checklist.test.ts src/tests/unit/freshness.test.ts src/tests/unit/source-preferences.test.ts src/tests/unit/application-card.test.tsx` — 19 passed
+
+### Gotchas
+
+- Apply migrations 030–035 in Supabase before depending on Wave 3 in production.
+- Salary playbook scripts are generated on demand; comp bands are static in code.
+
+---
+
 ## 2026-05-21 — Wave 3 P6/P8/P1/P7/P4 partial implementation (Codex)
 
 ### Implemented

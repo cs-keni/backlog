@@ -8,6 +8,9 @@ import type { ApplicationWithJob, ApplicationStatus, TimelineEntry } from '@/lib
 import { InterviewKit } from './InterviewKit'
 import { ApplicationChecklist } from './ApplicationChecklist'
 import { ResumeTailor } from './ResumeTailor'
+import { AtsCompleteness } from './AtsCompleteness'
+import { KeywordGap } from './KeywordGap'
+import { SalaryPlaybook } from './SalaryPlaybook'
 import { buildApplicationChecklist } from '@/lib/tracker/application-checklist'
 import { freshnessColor, freshnessLabel } from '@/lib/tracker/freshness'
 
@@ -56,6 +59,7 @@ interface ApplicationDetailMeta {
   hasCoverLetter: boolean
   hasInterviewKit: boolean
   priorApplications: PriorApplication[]
+  atsCompleteness: { score: number; missing: string[] } | null
 }
 
 function formatDate(iso: string) {
@@ -349,6 +353,21 @@ export function ApplicationDetail({ app, onClose, onStatusChange, onUpdate, onDe
               )}
 
               <ResumeTailor jobId={app.jobs.id} />
+
+              {app.ats_platform && (
+                <AtsCompleteness
+                  applicationId={app.id}
+                  platform={app.ats_platform}
+                  score={detailMeta?.atsCompleteness?.score ?? null}
+                  missing={detailMeta?.atsCompleteness?.missing ?? []}
+                />
+              )}
+
+              <KeywordGap applicationId={app.id} />
+
+              {app.status === 'offer' && (
+                <SalaryPlaybook applicationId={app.id} />
+              )}
 
               {/* Recruiter */}
               <div className="space-y-2">

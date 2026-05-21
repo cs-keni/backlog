@@ -16,6 +16,7 @@ function makeApp(overrides: Partial<ApplicationWithJob> = {}): ApplicationWithJo
     notes: null,
     recruiter_name: null,
     recruiter_email: null,
+    ats_platform: null,
     jobs: {
       id: 'job-1',
       title: 'Software Engineer',

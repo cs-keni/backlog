@@ -4,6 +4,37 @@
 
 ---
 
+## Session: 2026-05-21 — Wave 3 remaining phases P2/P5/P0/P3 (Codex)
+
+### What changed
+
+- Implemented P2 per-ATS completeness:
+  - Added migrations `031_applications_ats_platform.sql` and `032_users_ats_profile_fields.sql`.
+  - Added ATS URL detection, completeness scoring, manual platform override route, and Tracker detail UI.
+  - New applications detect ATS platform on insert without overwriting existing/manual rows.
+- Implemented P5 negative relevance feedback:
+  - Added migration `033_job_feedback.sql`.
+  - Added `POST /api/jobs/feedback`, dismiss reason menu on Feed cards, and threshold-based soft filters.
+  - Filters activate only at 5 matching signals for `too_far` and `wrong_stack`.
+- Implemented P0 keyword gap analysis:
+  - Added migration `034_keyword_gaps.sql`, prompt helper, `GET/POST /api/prep/keyword-gap`, and Tracker detail UI.
+  - Resume replacement now invalidates cached keyword gaps.
+- Implemented P3 salary negotiation playbook:
+  - Added migration `035_users_comp_target.sql`.
+  - Added static comp band lookup, `GET/POST /api/prep/salary-playbook`, and offer-only Tracker detail UI.
+
+### Checks run
+
+- `node node_modules/typescript/bin/tsc --noEmit --pretty false` — passed
+- `node node_modules/vitest/vitest.mjs run src/tests/unit/ats-completeness.test.ts src/tests/unit/feedback-filters.test.ts src/tests/unit/keyword-gap-prompt.test.ts src/tests/unit/comp-bands.test.ts src/tests/unit/application-checklist.test.ts src/tests/unit/freshness.test.ts src/tests/unit/source-preferences.test.ts src/tests/unit/application-card.test.tsx` — 19 passed
+
+### Remaining work
+
+- Apply migrations `030` through `035` in Supabase before production use of Wave 3.
+- Broader integration/regression pass is still recommended.
+
+---
+
 ## Session: 2026-05-21 — Wave 3 P6/P8/P1/P7/P4 partial implementation (Codex)
 
 ### What changed

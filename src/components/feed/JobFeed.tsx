@@ -12,6 +12,7 @@ import { FilterSidebar } from './FilterSidebar'
 import { FeedSkeleton } from './JobSkeleton'
 import { useToast } from '@/components/ui/Toaster'
 import { EmptyState } from '@/components/ui/EmptyState'
+import type { DismissReason } from '@/lib/feed/feedback-filters'
 
 interface Cursor {
   cursor: string
@@ -308,6 +309,24 @@ export function JobFeed({ initialJobId }: JobFeedProps) {
     )
   }
 
+  async function handleDismissJob(jobId: string, reason: DismissReason) {
+    const dismissedJob = jobs.find((job) => job.id === jobId)
+    setJobs((prev) => prev.filter((job) => job.id !== jobId))
+    if (selectedJobId === jobId) setSelectedJobId(null)
+    try {
+      const res = await fetch('/api/jobs/feedback', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ job_id: jobId, reason }),
+      })
+      if (!res.ok) throw new Error('Failed')
+      toast({ type: 'success', title: 'Feedback saved', description: 'Learning your preferences' })
+    } catch {
+      if (dismissedJob) setJobs((prev) => [dismissedJob, ...prev])
+      toast({ type: 'error', title: 'Could not save feedback' })
+    }
+  }
+
   // ─── Render ──────────────────────────────────────────────────────────────────
   return (
     <div className="flex h-full overflow-hidden">
@@ -377,6 +396,7 @@ export function JobFeed({ initialJobId }: JobFeedProps) {
                         setFocusedIndex(i)
                       }}
                       onQuickApply={(jobId) => handleApplicationChange(jobId, 'applied')}
+                      onDismiss={handleDismissJob}
                     />
                   </div>
                 ))}

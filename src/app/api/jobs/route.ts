@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { hasE2EAuthCookie } from '@/lib/e2e/server'
 import { e2eJobs } from '@/lib/e2e/fixtures'
 import { hiddenSources, type SourcePreferences } from '@/lib/user/source-preferences'
+import { getActiveFeedbackFilters } from '@/lib/feed/feedback-filters'
 
 export const dynamic = 'force-dynamic'
 
@@ -53,6 +54,7 @@ export async function GET(request: NextRequest) {
     .eq('id', user.id)
     .single()
   const sourcesToHide = hiddenSources(profile?.source_preferences as SourcePreferences | null)
+  const feedbackFilters = await getActiveFeedbackFilters(user.id, supabase as never)
 
   let query = supabase
     .from('jobs')
@@ -120,6 +122,8 @@ export async function GET(request: NextRequest) {
   if (experienceLevel) query = query.eq('experience_level', experienceLevel)
   if (roleType) query = query.eq('role_type', roleType)
   if (sourcesToHide.length > 0) query = query.not('source', 'in', `(${sourcesToHide.join(',')})`)
+  if (feedbackFilters.excludeTooFar) query = query.or('is_remote.eq.true,location.ilike.%remote%')
+  if (feedbackFilters.excludeWrongStack) query = query.not('tags', 'ov', '{PHP,Ruby,WordPress,Drupal}')
   if (dateRange) {
     const cutoff = new Date()
     if (dateRange === '24h') cutoff.setDate(cutoff.getDate() - 1)

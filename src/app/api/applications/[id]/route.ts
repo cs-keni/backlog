@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { hasE2EAuthCookie } from '@/lib/e2e/server'
 import { e2eApplicationById, e2eTimeline } from '@/lib/e2e/fixtures'
+import { computeAtsCompleteness } from '@/lib/tracker/ats-fields'
 
 // GET /api/applications/[id] — returns application + timeline for detail panel
 export async function GET(
@@ -27,7 +28,7 @@ export async function GET(
     supabase
       .from('applications')
       .select(`
-        id, status, applied_at, last_updated, notes, recruiter_name, recruiter_email,
+        id, status, applied_at, last_updated, notes, recruiter_name, recruiter_email, ats_platform,
         jobs (id, title, company, location, salary_min, salary_max, url, is_remote, tags, fetched_at)
       `)
       .eq('id', id)
@@ -40,7 +41,7 @@ export async function GET(
       .order('changed_at', { ascending: true }),
     supabase
       .from('users')
-      .select('resume_text')
+      .select('full_name, email, resume_text, linkedin_url, street_address, phone, work_authorization')
       .eq('id', user.id)
       .single(),
     supabase
@@ -64,9 +65,11 @@ export async function GET(
   }
 
   type AppWithJob = {
+    ats_platform?: string | null
     jobs?: { company?: string | null } | null
   }
-  const company = (appResult.data as AppWithJob).jobs?.company
+  const appData = appResult.data as AppWithJob
+  const company = appData.jobs?.company
   let priorApplications: unknown[] = []
   if (company) {
     const { data: priorApps } = await supabase
@@ -88,6 +91,15 @@ export async function GET(
       hasCoverLetter: Boolean(coverLetterResult.data),
       hasInterviewKit: Boolean(interviewKitResult.data),
       priorApplications,
+      atsCompleteness: computeAtsCompleteness(appData.ats_platform, {
+        full_name: profileResult.data?.full_name ?? null,
+        email: profileResult.data?.email ?? user.email ?? null,
+        resume_text: profileResult.data?.resume_text ?? null,
+        linkedin_url: profileResult.data?.linkedin_url ?? null,
+        street_address: profileResult.data?.street_address ?? null,
+        phone: profileResult.data?.phone ?? null,
+        work_authorization: profileResult.data?.work_authorization ?? null,
+      }),
     },
   })
 }

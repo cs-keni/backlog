@@ -23,10 +23,10 @@ Full spec in `docs/WAVE3_PLAN.md`. Execute in this order:
 | 3 | P1 | Resume tailor UI (verify route contract first) | Implemented locally |
 | 4 | P7 | Job freshness badge (display only) | Implemented locally |
 | 5 | P4 | Source yield feedback loop + user source prefs | Implemented locally — migration 030 written |
-| 6 | P2 | Per-ATS completeness score | Ready — migrations 031, 032 |
-| 7 | P5 | Negative relevance feedback | Ready — migration 033 |
-| 8 | P0 | ATS keyword gap analysis | Ready — migration 034 |
-| 9 | P3 | Salary negotiation playbook | Ready — migration 035 |
+| 6 | P2 | Per-ATS completeness score | Implemented locally — migrations 031, 032 written |
+| 7 | P5 | Negative relevance feedback | Implemented locally — migration 033 written |
+| 8 | P0 | ATS keyword gap analysis | Implemented locally — migration 034 written |
+| 9 | P3 | Salary negotiation playbook | Implemented locally — migration 035 written |
 
 ---
 
@@ -53,11 +53,11 @@ Full spec in `docs/WAVE3_PLAN.md`. Execute in this order:
 | `028_interview_kits.sql` | Written (Wave 2 P4) | Interview day kit |
 | `029_interview_kits_unique.sql` | Written (Wave 2 P4) | Interview kit unique constraint |
 | `030_source_preferences.sql` | Written, not applied (Wave 3 P4) | Source yield prefs |
-| `031_applications_ats_platform.sql` | To write (Wave 3 P2) | ATS completeness |
-| `032_users_ats_profile_fields.sql` | To write (Wave 3 P2) | phone/address/linkedin |
-| `033_job_feedback.sql` | To write (Wave 3 P5) | Negative relevance |
-| `034_keyword_gaps.sql` | To write (Wave 3 P0) | Keyword gap cache |
-| `035_users_comp_target.sql` | To write (Wave 3 P3) | Salary playbook |
+| `031_applications_ats_platform.sql` | Written, not applied (Wave 3 P2) | ATS completeness |
+| `032_users_ats_profile_fields.sql` | Written, not applied (Wave 3 P2) | phone/address/linkedin |
+| `033_job_feedback.sql` | Written, not applied (Wave 3 P5) | Negative relevance |
+| `034_keyword_gaps.sql` | Written, not applied (Wave 3 P0) | Keyword gap cache |
+| `035_users_comp_target.sql` | Written, not applied (Wave 3 P3) | Salary playbook |
 
 ---
 

@@ -87,6 +87,11 @@ export async function POST(request: Request) {
     .update({ is_stale: true })
     .eq('user_id', user.id)
 
+  await supabase
+    .from('keyword_gaps')
+    .delete()
+    .eq('user_id', user.id)
+
   // Image-based PDF — skip analysis, return early
   if (!resumeText || resumeText.length <= 100) {
     return Response.json({

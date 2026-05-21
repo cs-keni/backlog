@@ -73,6 +73,7 @@ export const e2eApplications: ApplicationWithJob[] = [
     notes: null,
     recruiter_name: 'Maya Chen',
     recruiter_email: 'maya@example.com',
+    ats_platform: null,
     jobs: {
       id: 'e2e-job-1',
       title: 'Frontend Platform Engineer',
@@ -97,6 +98,7 @@ export const e2eApplications: ApplicationWithJob[] = [
     notes: null,
     recruiter_name: null,
     recruiter_email: null,
+    ats_platform: null,
     jobs: {
       id: 'e2e-job-2',
       title: 'Backend Integrations Engineer',
@@ -121,6 +123,7 @@ export const e2eApplications: ApplicationWithJob[] = [
     notes: null,
     recruiter_name: null,
     recruiter_email: null,
+    ats_platform: null,
     jobs: {
       id: 'e2e-job-3',
       title: 'Product Infrastructure Engineer',

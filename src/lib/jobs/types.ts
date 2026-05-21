@@ -110,6 +110,7 @@ export interface ApplicationWithJob {
   notes: Record<string, unknown> | null
   recruiter_name: string | null
   recruiter_email: string | null
+  ats_platform: string | null
   jobs: ApplicationJob
 }
 
