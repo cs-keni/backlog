@@ -4,6 +4,31 @@ Reverse-chronological. One entry per meaningful session.
 
 ---
 
+## 2026-05-22 — SD-P0: Question banks + concept primers + validator (Claude Code)
+
+**Commit:** 284a3fa
+
+### What shipped
+
+- `src/lib/prep/prep-types.ts` — PrepQuestion + ConceptPrimer interfaces
+- `src/lib/prep/system-design-bank.ts` — 70 SD questions (sd-001–sd-070), 8 topics
+- `src/lib/prep/ai-engineer-bank.ts` — 60 AI Eng questions (ai-001–ai-060), 7 topics
+- `src/lib/prep/concept-primers.ts` — 32 concept primers covering all SD concept slugs
+- `scripts/validate-prep-bank.ts` — CI validation script (IDs, format, concept coverage)
+- `scripts/mock-server-only.cjs` — Node stub for running banks outside Next.js runtime
+
+All bank files guard with `import 'server-only'`. Validator passes clean. 105 AI-specific
+concept slugs are missing primers (expected — P1 ships without them; they're reference
+content, not blockers).
+
+### Next: Codex picks up SD-P1
+
+All P0 content is committed. Codex can now implement P1–P5 per CURRENT_TASK.md.
+
+### Test count: 241 (unchanged — content only, no new routes)
+
+---
+
 ## 2026-05-22 — Interview Prep Expansion: CEO + Eng review (Claude Code)
 
 **Commit:** fbfaeba (planning session — no code committed)
