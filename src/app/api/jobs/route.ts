@@ -4,6 +4,7 @@ import { hasE2EAuthCookie } from '@/lib/e2e/server'
 import { e2eJobs } from '@/lib/e2e/fixtures'
 import { hiddenSources, type SourcePreferences } from '@/lib/user/source-preferences'
 import { getActiveFeedbackFilters } from '@/lib/feed/feedback-filters'
+import { TITLE_BLOCKLIST, titleIsBlocked } from '@/lib/feed/title-blocklist'
 
 export const dynamic = 'force-dynamic'
 
@@ -13,6 +14,7 @@ export async function GET(request: NextRequest) {
     const search = searchParams.get('search')?.toLowerCase()
     const isRemote = searchParams.get('is_remote')
     const jobs = e2eJobs.filter((job) => {
+      if (titleIsBlocked(job.title)) return false
       if (search && !`${job.title} ${job.company}`.toLowerCase().includes(search)) return false
       if (isRemote === 'true' && !job.is_remote) return false
       if (isRemote === 'false' && job.is_remote) return false
@@ -124,6 +126,9 @@ export async function GET(request: NextRequest) {
   if (sourcesToHide.length > 0) query = query.not('source', 'in', `(${sourcesToHide.join(',')})`)
   if (feedbackFilters.excludeTooFar) query = query.or('is_remote.eq.true,location.ilike.%remote%')
   if (feedbackFilters.excludeWrongStack) query = query.not('tags', 'ov', '{PHP,Ruby,WordPress,Drupal}')
+  for (const pattern of TITLE_BLOCKLIST) {
+    query = query.not('title', 'ilike', pattern)
+  }
   if (dateRange) {
     const cutoff = new Date()
     if (dateRange === '24h') cutoff.setDate(cutoff.getDate() - 1)
