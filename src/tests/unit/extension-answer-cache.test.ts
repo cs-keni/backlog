@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { normalizeQuestionForCache } from '@/app/api/extension/answer-question/route'
+import { normalizeQuestionForCache } from '@/lib/extension/normalize-question'
 
 describe('normalizeQuestionForCache', () => {
   it('normalizes punctuation, casing, and whitespace', () => {

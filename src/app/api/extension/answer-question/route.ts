@@ -1,4 +1,5 @@
 import { verifyApiKeyFromRequest } from '@/lib/auth/api-key'
+import { normalizeQuestionForCache } from '@/lib/extension/normalize-question'
 import { createClient } from '@supabase/supabase-js'
 import Anthropic from '@anthropic-ai/sdk'
 
@@ -8,14 +9,6 @@ const SYSTEM_PROMPT = `You are helping a job applicant answer an open-ended appl
 Write a concise, professional answer (2–4 sentences) based on the applicant's profile.
 Focus on concrete facts from their background. Do not fabricate experiences or skills they don't have.
 Return only the answer text — no greeting, no preamble, no explanation.`
-
-export function normalizeQuestionForCache(question: string): string {
-  return question
-    .toLowerCase()
-    .replace(/[^a-z0-9\s]/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim()
-}
 
 function buildUserPrompt(
   question: string,
