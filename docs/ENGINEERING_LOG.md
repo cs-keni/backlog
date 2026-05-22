@@ -915,3 +915,25 @@ See `docs/CURRENT_TASK.md`. Implementation of fill.ts, types.ts, Sidebar.tsx, fi
 - `npm run lint` still fails on existing repo lint debt/generated files; direct eslint also reports existing React Compiler issues outside this pass.
 - `cd worker && npm test` still fails locally because the worker Vitest binary wrapper points at `node_modules/.bin/dist/cli.js`; use `node node_modules/vitest/vitest.mjs run`.
 - Existing browser hydration warnings remain in feed/tracker, but they are not new to this polish pass and do not fail the suite.
+
+## 2026-05-22 — Interview Prep Expansion SD-P1 through SD-P5 (Codex)
+
+### Implemented
+
+- Added question progress, prep review, and prep practice response migrations (`036`–`038`) with RLS and bank/question prefix checks.
+- Added question bank, progress upsert, prep review queue, and AI coach API routes for system design and AI engineer banks.
+- `/prep` now has a General Prep section above job-specific prep with a unified progress dashboard, company spotlight, spaced repetition queue, SD/AI bank accordions, concept primers, and AI coach evaluation.
+- Added company spotlight and AI role-detection helpers plus route/unit tests.
+- Added a Vitest alias for `server-only` so static server-only prep content can be imported in route tests.
+
+### Checks
+
+- `npx tsx --require ./scripts/mock-server-only.cjs scripts/validate-prep-bank.ts` — passed with expected P0 warnings.
+- `node node_modules/typescript/bin/tsc --noEmit --pretty false` — passed.
+- `node node_modules/vitest/vitest.mjs run src/tests/ --reporter=dot` — 259 passed.
+- `git diff --check` — passed.
+
+### Gotchas
+
+- The prep bank validator needs `tsx`; first sandboxed `npx` attempt failed on network (`EAI_AGAIN`), then passed after approved `npx tsx` network access.
+- Supabase migrations 028–038 still need to be applied before relying on persistence in production.

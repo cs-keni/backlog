@@ -9,6 +9,12 @@ import { QuestionBank } from './QuestionBank'
 import { StarResponseSection } from './StarResponseSection'
 import { CompanyIntelligence } from './CompanyIntelligence'
 import { StoryBank } from './StoryBank'
+import { SystemDesignBank } from './SystemDesignBank'
+import { AIEngineerBank } from './AIEngineerBank'
+import { PrepReviewQueue } from './PrepReviewQueue'
+import { UnifiedProgressDashboard } from './UnifiedProgressDashboard'
+import { CompanySpotlight } from './CompanySpotlight'
+import { hasAIEngineerApplications } from '@/lib/prep/role-detection'
 import type { StarResponse, CompanyProfile } from '@/lib/jobs/types'
 
 interface JobSummary {
@@ -269,6 +275,48 @@ function PrepView({ jobId }: PrepViewProps) {
 
 type PrepTab = 'prep' | 'stories'
 
+function GeneralPrep() {
+  const [activeTitles, setActiveTitles] = useState<string[]>([])
+
+  useEffect(() => {
+    fetch('/api/applications')
+      .then(r => r.ok ? r.json() : [])
+      .then((data: ApplicationSummary[]) => {
+        setActiveTitles(
+          data
+            .filter(app => ['phone_screen', 'technical', 'final'].includes(app.status))
+            .map(app => app.jobs.title)
+        )
+      })
+      .catch(() => {})
+  }, [])
+
+  const aiFirst = hasAIEngineerApplications(activeTitles)
+
+  return (
+    <div className="p-6 space-y-8 max-w-3xl">
+      <div className="space-y-1">
+        <h1 className="text-base font-semibold text-zinc-100">General Prep</h1>
+        <p className="text-sm text-zinc-500">Question banks, spaced repetition, concept primers, and practice evaluation.</p>
+      </div>
+      <UnifiedProgressDashboard />
+      <PrepReviewQueue />
+      <CompanySpotlight />
+      {aiFirst ? (
+        <>
+          <AIEngineerBank />
+          <SystemDesignBank />
+        </>
+      ) : (
+        <>
+          <SystemDesignBank />
+          <AIEngineerBank />
+        </>
+      )}
+    </div>
+  )
+}
+
 export function PrepClient({ jobId }: { jobId: string | null }) {
   const [tab, setTab] = useState<PrepTab>('prep')
 
@@ -297,7 +345,12 @@ export function PrepClient({ jobId }: { jobId: string | null }) {
       {/* Content */}
       <div className="flex-1 overflow-y-auto">
         {tab === 'prep' ? (
-          jobId ? <PrepView jobId={jobId} /> : <ApplicationPicker />
+          <div>
+            <GeneralPrep />
+            <div className="border-t border-zinc-800">
+              {jobId ? <PrepView jobId={jobId} /> : <ApplicationPicker />}
+            </div>
+          </div>
         ) : (
           <div className="p-6 max-w-2xl">
             <StoryBank />

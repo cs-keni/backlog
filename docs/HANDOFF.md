@@ -4,6 +4,37 @@
 
 ---
 
+## Session: 2026-05-22 — SD-P1 through SD-P5 complete (Codex)
+
+### What changed
+
+- Added migrations `036_question_progress.sql`, `037_prep_reviews.sql`, and `038_prep_practice_responses.sql`.
+- Added prep bank/progress/review/practice APIs:
+  - `GET /api/prep/question-bank`
+  - `GET/POST /api/prep/question-progress`
+  - `GET /api/prep/prep-reviews`
+  - `PATCH /api/prep/prep-reviews/[id]`
+  - `POST /api/prep/prep-practice`
+- Added SD/AI prep UI on `/prep`: general prep dashboard, company spotlight, SR review queue, role-based bank ordering, accordion banks, concept primer modal, and AI coach panel.
+- Added prep helper logic for bank lookup, company spotlight matching, and AI role detection.
+- Added focused integration/unit tests for the new prep routes and helper logic.
+- Added Vitest `server-only` alias so server-only static bank modules can be imported in route tests.
+
+### Checks run
+
+- `npx tsx --require ./scripts/mock-server-only.cjs scripts/validate-prep-bank.ts` — passed (expected warnings for short company tags and 105 AI-specific concept slugs without primers)
+- `node node_modules/typescript/bin/tsc --noEmit --pretty false` — passed
+- `node node_modules/vitest/vitest.mjs run src/tests/integration/question-bank.test.ts src/tests/integration/question-progress.test.ts src/tests/integration/prep-reviews.test.ts src/tests/integration/prep-practice.test.ts src/tests/unit/prep-spotlight.test.ts src/tests/unit/prep-role-detection.test.ts --reporter=dot` — 18 passed
+- `node node_modules/vitest/vitest.mjs run src/tests/ --reporter=dot` — 259 passed
+- `git diff --check` — passed
+
+### Remaining work
+
+- Apply Supabase migrations 028–038 before production use of Wave 2/3 and Interview Prep Expansion persistence.
+- Optional follow-up: richer markdown rendering/focus trap behavior for concept primers if the modal becomes heavily used.
+
+---
+
 ## Session: 2026-05-22 — SD-P0 complete: question banks + concept primers + validator (Claude Code)
 
 **Commit:** 284a3fa

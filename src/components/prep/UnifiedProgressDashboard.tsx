@@ -1,0 +1,100 @@
+'use client'
+
+import { useEffect, useMemo, useState } from 'react'
+
+interface ProgressRow {
+  question_id: string
+  bank: 'system-design' | 'ai-engineer'
+  status: 'unstudied' | 'studied' | 'needs-review'
+}
+
+interface SolveRow {
+  id: string
+}
+
+function MiniRing({ label, value, href }: { label: string; value: number; href: string }) {
+  const pct = Math.max(0, Math.min(100, value))
+  return (
+    <button
+      onClick={() => document.getElementById(href)?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+      className="rounded-lg border border-zinc-800 bg-zinc-950/60 px-4 py-3 text-left hover:border-zinc-700"
+    >
+      <div className="flex items-center gap-3">
+        <div
+          className="grid h-12 w-12 place-items-center rounded-full"
+          style={{ background: `conic-gradient(#818cf8 ${pct}%, #27272a ${pct}%)` }}
+        >
+          <div className="grid h-9 w-9 place-items-center rounded-full bg-zinc-950">
+            <span className="text-[11px] font-semibold tabular-nums text-zinc-200">{Math.round(pct)}%</span>
+          </div>
+        </div>
+        <div>
+          <p className="text-sm font-medium text-zinc-200">{label}</p>
+          <p className="text-[11px] text-zinc-600">Open section</p>
+        </div>
+      </div>
+    </button>
+  )
+}
+
+export function UnifiedProgressDashboard() {
+  const [progressRows, setProgressRows] = useState<ProgressRow[]>([])
+  const [solves, setSolves] = useState<SolveRow[]>([])
+  const [loading, setLoading] = useState(true)
+
+  async function load() {
+    setLoading(true)
+    try {
+      const [progressRes, solvesRes] = await Promise.all([
+        fetch('/api/prep/question-progress'),
+        fetch('/api/dsa/solves'),
+      ])
+      if (progressRes.ok) setProgressRows(await progressRes.json() as ProgressRow[])
+      if (solvesRes.ok) setSolves(await solvesRes.json() as SolveRow[])
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    load()
+    function onChanged() {
+      void load()
+    }
+    window.addEventListener('prep-progress-changed', onChanged)
+    return () => window.removeEventListener('prep-progress-changed', onChanged)
+  }, [])
+
+  const stats = useMemo(() => {
+    const covered = (bank: ProgressRow['bank']) =>
+      progressRows.filter((row) =>
+        row.bank === bank && (row.status === 'studied' || row.status === 'needs-review')
+      ).length
+    return {
+      dsa: (solves.length / 150) * 100,
+      sd: (covered('system-design') / 70) * 100,
+      ai: (covered('ai-engineer') / 60) * 100,
+    }
+  }, [progressRows, solves.length])
+
+  return (
+    <section className="space-y-3">
+      <div>
+        <h2 className="text-sm font-semibold text-zinc-100">Prep Progress</h2>
+        <p className="mt-1 text-xs text-zinc-500">DSA, system design, and AI engineer coverage.</p>
+      </div>
+      {loading ? (
+        <div className="grid gap-2 sm:grid-cols-3">
+          {[1, 2, 3].map((item) => <div key={item} className="h-20 rounded-lg bg-zinc-800/40 animate-pulse" />)}
+        </div>
+      ) : (
+        <div className="grid gap-2 sm:grid-cols-3">
+          <MiniRing label="DSA" value={stats.dsa} href="dsa-link" />
+          <MiniRing label="System Design" value={stats.sd} href="system-design" />
+          <MiniRing label="AI Engineer" value={stats.ai} href="ai-engineer" />
+        </div>
+      )}
+      <div id="dsa-link" />
+    </section>
+  )
+}

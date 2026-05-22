@@ -1,7 +1,7 @@
 # Current Task
 
 **Last updated:** 2026-05-22
-**Status:** Planning complete. Interview Prep Expansion ready for implementation.
+**Status:** SD-P1 through SD-P5 implemented by Codex; checks passed.
 
 ---
 
@@ -37,11 +37,11 @@ Add two curated question banks (System Design: 70q, AI Engineer: 60q) to the Bac
 | Phase | What | Who | Status |
 |-------|------|-----|--------|
 | **SD-P0** | Content: 130 questions + 40 primers + `scripts/validate-prep-bank.ts` | **Claude** | Pending |
-| **SD-P1** | Migrations 036 + bank API + progress API + accordion UI | **Codex** | Blocked on P0 |
-| **SD-P2** | Company spotlight, role detection, page restructure | **Codex** | Blocked on P1 |
-| **SD-P3** | SR queue (prep-reviews) + Easy/Hard + migration 037 | **Codex** | Blocked on P1 |
-| **SD-P4** | Concept primers + unified progress dashboard | **Codex** | Blocked on P1 |
-| **SD-P5** | AI coach mode + migration 038 | **Codex** | Blocked on P1 |
+| **SD-P1** | Migrations 036 + bank API + progress API + accordion UI | **Codex** | Done |
+| **SD-P2** | Company spotlight, role detection, page restructure | **Codex** | Done |
+| **SD-P3** | SR queue (prep-reviews) + Easy/Hard + migration 037 | **Codex** | Done |
+| **SD-P4** | Concept primers + unified progress dashboard | **Codex** | Done |
+| **SD-P5** | AI coach mode + migration 038 | **Codex** | Done |
 
 Ship order: P0 → P1 → (P2 + P3 + P4 in parallel) → P5.
 
