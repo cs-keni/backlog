@@ -4,6 +4,28 @@
 
 ---
 
+## Session: 2026-05-22 — Interview Prep Expansion: CEO + Eng review complete (Claude Code)
+
+### What changed
+
+- **CEO plan created:** `~/.gstack/projects/cs-keni-backlog/ceo-plans/2026-05-22-interview-prep-expansion.md` — full spec for SD (70q) + AI Eng (60q) banks, spaced repetition, company spotlight, AI coach. All 6 scope decisions accepted.
+- **Engineering review:** 13 issues resolved across architecture, code quality, tests, and performance. Key fixes: SR timezone (remove `DEFAULT CURRENT_DATE`), bank/question_id CHECK constraints, `import 'server-only'` on bank files, AI coach rate limit + length cap, content validation moved to P0/CI, XML prompt injection delimiters.
+- **CURRENT_TASK.md:** Full implementation spec written for all 6 phases with detailed migration SQL, API route contracts, UI component specs, and test file targets.
+- **TODOS.md:** Added URL state deep-linking and user-reported interview data as follow-up items.
+- **No code written yet** — planning and spec only.
+
+### Phase assignment
+
+- **Claude (next):** SD-P0 — generate 130 questions + 40 concept primers, write `scripts/validate-prep-bank.ts`, add to CI.
+- **Codex (after P0):** SD-P1 through SD-P5 — all migrations, API routes, UI components, and integration tests per CURRENT_TASK.md spec.
+
+### Remaining work
+
+- Apply Supabase migrations 028–035 before production use of Wave 2/3 features.
+- SD-P0 content (Claude) → SD-P1+ implementation (Codex).
+
+---
+
 ## Session: 2026-05-21 — Flash fix + cover-letter 403 (Claude Code)
 
 ### What changed

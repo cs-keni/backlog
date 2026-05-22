@@ -71,3 +71,21 @@ Deferred tasks and known issues. Each item has enough context to pick up months 
 **Why:** Direct competitor feature (Teal does this). High perceived value for ATS-heavy companies.
 **How to apply:** Diff job description keywords against resume text using TF-IDF or simple word set overlap. Highlight top 5-10 missing terms.
 **Effort:** M.
+
+---
+
+## Interview Prep (SD + AI Eng Banks) — Post-Ship
+
+### URL state / deep-linking for /prep page
+**What:** Add `?bank=`, `?topic=`, and `?question=` URL params to the prep page so users can bookmark and share specific prep content. Example: `/prep?bank=ai-engineer&topic=rag-architecture`.
+**Why:** Deferred from the P1 scope review (eng review 2026-05-22). The feature ships without deep-linking; first version works, but users can't share a specific question or topic, and browser back navigates out of /prep instead of returning to the question list.
+**How to apply:** Add `useSearchParams` to `PrepClient.tsx` (or a wrapper server component). Pass bank, topic, and question state as URL params. Update `SystemDesignBank.tsx` and `AIEngineerBank.tsx` to read `?topic=` on mount. Implement in a single PR after P1 is stable.
+**Depends on:** P1 shipped and stable.
+**Effort:** S.
+
+### User-reported interview questions (company intelligence sourcing)
+**What:** After a user completes an interview, prompt them to report which questions they were asked. Aggregate reports to validate or improve company tags in the question banks.
+**Why:** The company spotlight (P2) uses hand-authored company tags. These are honest ('domain-relevant') but not sourced from real interview data. User reports would close this gap over time: Backlog users are the exact population with fresh interview intelligence. Even 10 reports per company would significantly improve tag accuracy.
+**How to apply:** Add a post-interview prompt in ApplicationDetail when status moves to `interviewed` or `offer`. Simple form: "Were you asked any of these questions? [checkboxes from company-tagged SD/AI Eng questions]". Store responses in a `question_sightings` table (user_id, question_id, company_id, reported_at). After N sightings, promote the tag to 'verified'. Display 'verified' badge on spotlight.
+**Depends on:** P2 (company spotlight) shipped. Moderate moderation concern.
+**Effort:** M.

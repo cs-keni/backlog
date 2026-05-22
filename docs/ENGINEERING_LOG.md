@@ -4,6 +4,26 @@ Reverse-chronological. One entry per meaningful session.
 
 ---
 
+## 2026-05-22 — Interview Prep Expansion: CEO + Eng review (Claude Code)
+
+**Commit:** fbfaeba (planning session — no code committed)
+
+### What shipped
+
+- Full CEO plan + engineering review for SD + AI Eng bank feature.
+- 13 architectural decisions locked: SR timezone fix, bank CHECK constraints, server-only boundary, AI coach guardrails, content validation timing, prompt injection mitigation, caching, indexes, company spotlight copy.
+- CURRENT_TASK.md rewritten with full implementation spec for all 6 phases.
+- TODOS.md: added URL state deep-linking + user-reported interview data items.
+
+### Phase assignment
+
+- **Claude:** SD-P0 (content: 130q + 40 primers + validate script)
+- **Codex:** SD-P1–P5 (all implementation after P0 lands)
+
+### Test count: 241 (unchanged — planning only)
+
+---
+
 ## 2026-05-21 — Post-QW4 fixes: skeleton flash + cover-letter 403 (Claude Code)
 
 **Commit:** 7a10237
