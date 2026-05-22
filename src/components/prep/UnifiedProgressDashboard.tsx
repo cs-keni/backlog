@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
+import Link from 'next/link'
 
 interface ProgressRow {
   question_id: string
@@ -12,27 +13,39 @@ interface SolveRow {
   id: string
 }
 
-function MiniRing({ label, value, href }: { label: string; value: number; href: string }) {
+function MiniRing({ label, value, scrollTarget, href }: {
+  label: string
+  value: number
+  scrollTarget?: string
+  href?: string
+}) {
   const pct = Math.max(0, Math.min(100, value))
-  return (
-    <button
-      onClick={() => document.getElementById(href)?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
-      className="rounded-lg border border-zinc-800 bg-zinc-950/60 px-4 py-3 text-left hover:border-zinc-700"
-    >
-      <div className="flex items-center gap-3">
-        <div
-          className="grid h-12 w-12 place-items-center rounded-full"
-          style={{ background: `conic-gradient(#818cf8 ${pct}%, #27272a ${pct}%)` }}
-        >
-          <div className="grid h-9 w-9 place-items-center rounded-full bg-zinc-950">
-            <span className="text-[11px] font-semibold tabular-nums text-zinc-200">{Math.round(pct)}%</span>
-          </div>
-        </div>
-        <div>
-          <p className="text-sm font-medium text-zinc-200">{label}</p>
-          <p className="text-[11px] text-zinc-600">Open section</p>
+  const inner = (
+    <div className="flex items-center gap-3">
+      <div
+        className="grid h-12 w-12 place-items-center rounded-full"
+        style={{ background: `conic-gradient(#818cf8 ${pct}%, #27272a ${pct}%)` }}
+      >
+        <div className="grid h-9 w-9 place-items-center rounded-full bg-zinc-950">
+          <span className="text-[11px] font-semibold tabular-nums text-zinc-200">{Math.round(pct)}%</span>
         </div>
       </div>
+      <div>
+        <p className="text-sm font-medium text-zinc-200">{label}</p>
+        <p className="text-[11px] text-zinc-600">{href ? 'Go to section' : 'Jump to section'}</p>
+      </div>
+    </div>
+  )
+  const cls = "rounded-lg border border-zinc-800 bg-zinc-950/60 px-4 py-3 text-left hover:border-zinc-700"
+  if (href) {
+    return <Link href={href} className={cls}>{inner}</Link>
+  }
+  return (
+    <button
+      onClick={() => scrollTarget && document.getElementById(scrollTarget)?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+      className={cls}
+    >
+      {inner}
     </button>
   )
 }
@@ -89,12 +102,11 @@ export function UnifiedProgressDashboard() {
         </div>
       ) : (
         <div className="grid gap-2 sm:grid-cols-3">
-          <MiniRing label="DSA" value={stats.dsa} href="dsa-link" />
-          <MiniRing label="System Design" value={stats.sd} href="system-design" />
-          <MiniRing label="AI Engineer" value={stats.ai} href="ai-engineer" />
+          <MiniRing label="DSA" value={stats.dsa} href="/dsa" />
+          <MiniRing label="System Design" value={stats.sd} scrollTarget="system-design" />
+          <MiniRing label="AI Engineer" value={stats.ai} scrollTarget="ai-engineer" />
         </div>
       )}
-      <div id="dsa-link" />
     </section>
   )
 }

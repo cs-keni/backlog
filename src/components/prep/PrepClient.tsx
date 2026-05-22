@@ -346,10 +346,21 @@ export function PrepClient({ jobId }: { jobId: string | null }) {
       <div className="flex-1 overflow-y-auto">
         {tab === 'prep' ? (
           <div>
-            <GeneralPrep />
-            <div className="border-t border-zinc-800">
-              {jobId ? <PrepView jobId={jobId} /> : <ApplicationPicker />}
-            </div>
+            {jobId ? (
+              <>
+                <PrepView jobId={jobId} />
+                <div className="border-t border-zinc-800">
+                  <GeneralPrep />
+                </div>
+              </>
+            ) : (
+              <>
+                <GeneralPrep />
+                <div className="border-t border-zinc-800">
+                  <ApplicationPicker />
+                </div>
+              </>
+            )}
           </div>
         ) : (
           <div className="p-6 max-w-2xl">
