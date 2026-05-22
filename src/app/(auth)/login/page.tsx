@@ -5,6 +5,7 @@ import { useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { motion } from 'framer-motion'
 import { createClient } from '@/lib/supabase/client'
+import { STAY_SIGNED_IN_KEY } from '@/components/auth/IdleLogout'
 
 function LoginForm() {
   const router = useRouter()
@@ -14,6 +15,7 @@ function LoginForm() {
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [staySignedIn, setStaySignedIn] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -34,8 +36,13 @@ function LoginForm() {
       return
     }
 
-    // Reset idle timeout so IdleLogout doesn't immediately sign us out
-    localStorage.setItem('backlog_last_seen', Date.now().toString())
+    if (staySignedIn) {
+      localStorage.setItem(STAY_SIGNED_IN_KEY, 'true')
+    } else {
+      localStorage.removeItem(STAY_SIGNED_IN_KEY)
+      // Reset idle timeout so IdleLogout doesn't immediately sign us out
+      localStorage.setItem('backlog_last_seen', Date.now().toString())
+    }
 
     router.push(redirectedFrom)
     router.refresh()
@@ -81,6 +88,24 @@ function LoginForm() {
           placeholder="••••••••"
           disabled={loading}
         />
+      </div>
+
+      {/* Remember me */}
+      <div className="flex items-center gap-2">
+        <input
+          id="stay-signed-in"
+          type="checkbox"
+          checked={staySignedIn}
+          onChange={(e) => setStaySignedIn(e.target.checked)}
+          disabled={loading}
+          className="h-3.5 w-3.5 cursor-pointer rounded border-zinc-600 bg-zinc-800 accent-zinc-400 disabled:opacity-50"
+        />
+        <label
+          htmlFor="stay-signed-in"
+          className="cursor-pointer select-none text-xs text-zinc-400"
+        >
+          Keep me signed in
+        </label>
       </div>
 
       {/* Error message */}

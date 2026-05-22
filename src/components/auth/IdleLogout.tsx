@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 
 const IDLE_TIMEOUT_MS = 10 * 60 * 1000
 const LAST_SEEN_KEY = 'backlog_last_seen'
+export const STAY_SIGNED_IN_KEY = 'backlog_stay_signed_in'
 
 export function IdleLogout() {
   const router = useRouter()
@@ -26,6 +27,8 @@ export function IdleLogout() {
   }, [router, updateLastSeen])
 
   useEffect(() => {
+    if (localStorage.getItem(STAY_SIGNED_IN_KEY) === 'true') return
+
     const handleFocus = () => void checkIdle()
 
     void checkIdle()

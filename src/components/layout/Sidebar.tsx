@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
 import { createClient } from '@/lib/supabase/client'
+import { STAY_SIGNED_IN_KEY } from '@/components/auth/IdleLogout'
 
 interface NavItem {
   href: string
@@ -97,6 +98,7 @@ export default function Sidebar({ userEmail, onOpenPalette }: SidebarProps) {
   const router = useRouter()
 
   const handleLogout = async () => {
+    localStorage.removeItem(STAY_SIGNED_IN_KEY)
     const supabase = createClient()
     await supabase.auth.signOut()
     router.push('/login')

@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { NotificationSettings } from '@/components/settings/NotificationSettings'
 import { ApiKeySettings } from '@/components/settings/ApiKeySettings'
+import { SecuritySettings } from '@/components/settings/SecuritySettings'
 
 export const dynamic = 'force-dynamic'
 
@@ -31,6 +32,10 @@ export default async function SettingsPage() {
       </div>
 
       <ApiKeySettings />
+
+      <div className="border-t border-zinc-800" />
+
+      <SecuritySettings />
 
       <div className="border-t border-zinc-800" />
 

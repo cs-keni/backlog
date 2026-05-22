@@ -5,6 +5,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
+import { STAY_SIGNED_IN_KEY } from '@/components/auth/IdleLogout'
 import { CommandPalette } from '@/components/ui/CommandPalette'
 import { KeyboardShortcutsModal } from '@/components/ui/KeyboardShortcutsModal'
 import Sidebar from './Sidebar'
@@ -107,6 +108,7 @@ export function AppShell({ children, userEmail }: AppShellProps) {
   }, [paletteOpen, shortcutsOpen, mobileMenuOpen])
 
   const handleMobileLogout = async () => {
+    localStorage.removeItem(STAY_SIGNED_IN_KEY)
     const supabase = createClient()
     await supabase.auth.signOut()
     router.push('/login')
