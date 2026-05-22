@@ -85,7 +85,7 @@ export function UnifiedProgressDashboard() {
       ).length
     return {
       dsa: (solves.length / 150) * 100,
-      sd: (covered('system-design') / 70) * 100,
+      sd: (covered('system-design') / 124) * 100,
       ai: (covered('ai-engineer') / 60) * 100,
     }
   }, [progressRows, solves.length])

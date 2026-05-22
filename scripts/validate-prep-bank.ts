@@ -154,7 +154,7 @@ function checkConceptCoverage(primerIds: Set<string>) {
 
 console.log('Validating question banks and concept primers...\n')
 
-validateQuestionBank(SYSTEM_DESIGN_BANK, 'system-design', 'sd', 70)
+validateQuestionBank(SYSTEM_DESIGN_BANK, 'system-design', 'sd', 124)
 validateQuestionBank(AI_ENGINEER_BANK, 'ai-engineer', 'ai', 60)
 const primerIds = validatePrimers()
 checkConceptCoverage(primerIds)

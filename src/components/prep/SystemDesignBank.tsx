@@ -7,7 +7,7 @@ export function SystemDesignBank() {
     <PrepBankAccordion
       bank="system-design"
       title="System Design Bank"
-      description="Caching, databases, queues, distributed systems, APIs, storage, and service architecture."
+      description="Caching, databases, queues, distributed systems, APIs, storage, microservices, security, search, notifications, data infrastructure, and observability."
     />
   )
 }

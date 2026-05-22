@@ -785,4 +785,515 @@ The LLM generates a reasoning trace (thought), then emits a tool call (action). 
 For high-stakes actions (delete database, send email), pause and request user confirmation before executing.`,
     keywords: ['agent', 'react', 'tool-use', 'orchestration', 'memory', 'langchain'],
   },
+
+  // ─── Security & Auth ───────────────────────────────────────────────────────
+
+  {
+    id: 'zero-trust',
+    title: 'Zero-Trust Architecture',
+    summary: 'A security model that removes implicit network trust — every request must be authenticated and authorized regardless of origin.',
+    body: `**Core principle: "Never trust, always verify."**
+No request gets implicit trust because it came from inside the corporate network. Every call is authenticated and authorized as if it originated from a public network.
+
+**Key components**
+- *Identity-centric access*: workload identity via SPIFFE/SPIRE — each service gets a short-lived X.509 certificate (SVID); humans authenticate via strong MFA + device posture check.
+- *Microsegmentation*: network default-deny; service A is explicitly permitted to call service B on port 8080 POST /api/orders only. All other paths blocked.
+- *mTLS between services*: both sides present certificates; eliminates credential stuffing between internal services.
+- *Short-lived credentials*: certificates and tokens expire in hours, not years; rotation is automatic.
+
+**Continuous verification**
+Trust is not assumed at login and then held indefinitely. Device posture (patch level, disk encryption), user risk score, and session context are re-evaluated on sensitive operations throughout a session.
+
+**Contrast with perimeter model**
+Classic VPN model: once inside the perimeter (the VPN), everything is trusted. Zero-trust treats the perimeter as irrelevant — breach the VPN and you still can't reach anything without valid identity and authorization.`,
+    keywords: ['zero-trust', 'mtls', 'spiffe', 'spire', 'microsegmentation', 'iam'],
+  },
+  {
+    id: 'oauth-pkce',
+    title: 'OAuth 2.0 Authorization Code Flow with PKCE',
+    summary: 'The secure OAuth flow for public clients (SPAs, mobile apps) that cannot safely hold a client secret.',
+    body: `**Why PKCE?**
+The original authorization code flow requires a client_secret to exchange the code for tokens. Public clients (browser SPAs, mobile apps) cannot safely store a secret — anyone can inspect the app. PKCE replaces the secret with a per-request cryptographic proof.
+
+**The flow**
+1. App generates a random *code_verifier* (43–128 URL-safe chars).
+2. App hashes it: *code_challenge* = BASE64URL(SHA-256(code_verifier)).
+3. Redirect to /authorize with response_type=code, code_challenge, code_challenge_method=S256, state (CSRF token).
+4. After user authenticates, IdP redirects back with an *authorization code*.
+5. App POSTs the code + original code_verifier to /token. IdP verifies that SHA-256(verifier) == challenge. Issues access_token + refresh_token.
+
+**Token storage**
+- Access token: in memory only (not localStorage — XSS risk). Short-lived (15 min–1 hr).
+- Refresh token: in an HttpOnly, Secure, SameSite=Strict cookie. Inaccessible to JavaScript.
+
+**Refresh token rotation**
+Each use of the refresh token issues a new refresh token and invalidates the old one. If an old token is replayed (attacker stole it), revoke the entire token family — all sessions for that user are terminated.`,
+    keywords: ['oauth', 'pkce', 'authorization-code', 'refresh-token', 'spa', 'oidc'],
+  },
+  {
+    id: 'rbac',
+    title: 'Role-Based Access Control (RBAC)',
+    summary: 'An authorization model where permissions are grouped into roles, and users are assigned roles rather than individual permissions.',
+    body: `**Core model**
+- *Permission*: a (resource, action) pair — e.g., (invoices, read) or (users, delete).
+- *Role*: a named bundle of permissions — e.g., "billing_admin" can read+write invoices but not delete users.
+- *Role assignment*: a user is assigned one or more roles; their effective permissions are the union of all role permissions.
+
+**Multi-tenant scoping**
+In B2B SaaS, role assignments are tenant-scoped. A user who is "admin" in Org A has no elevated privileges in Org B. Every authorization check includes org_id: \`hasPermission(user_id, org_id, resource, action)\`.
+
+**Hierarchical roles**
+Org-level roles (owner > admin > member) plus resource-level roles (project:editor, project:viewer). Resource roles can override org defaults for a specific project.
+
+**ABAC extension (Attribute-Based)**
+When static role membership isn't fine-grained enough, extend with attribute checks at policy evaluation time: check user.department == resource.owner_department, or time_of_day is business hours. ABAC is more expressive but harder to audit.
+
+**Principle of least privilege**
+Assign the minimum set of permissions required for a role to function. Review and rotate role assignments regularly.`,
+    keywords: ['rbac', 'abac', 'authorization', 'permissions', 'multi-tenant', 'least-privilege'],
+  },
+  {
+    id: 'jwt-refresh-rotation',
+    title: 'JWT and Refresh Token Rotation',
+    summary: 'How short-lived JWTs and rotating refresh tokens balance stateless auth with revocability.',
+    body: `**The core tension**
+JWTs are self-contained and verified by signature alone — no DB lookup required. But this makes them hard to revoke: a stolen JWT is valid until expiry.
+
+**Hybrid approach**
+- *Access token* (JWT): 15-minute lifetime. Used on every API request. Stateless verification. If stolen, attacker has a 15-minute window.
+- *Refresh token* (opaque): 30-day lifetime. Stored in an HttpOnly cookie. Exchanged for a new access token when the old one expires. Revocable because it's stored in the DB.
+
+**Refresh token rotation**
+Every time the refresh token is used, it is immediately invalidated and replaced with a new one. Both the old and new tokens are tracked.
+
+*Reuse detection*: if an old (already-rotated) refresh token is presented, it means the token family was stolen and replayed. The system revokes the entire family — all active sessions for that user are terminated. The attacker and the legitimate user are both kicked out.
+
+**JWT revocation (when needed)**
+For situations requiring immediate access token revocation (user banned, password changed): maintain a Redis deny-list keyed by jti (JWT ID claim). Check deny-list on every token validation. Use token_version in the user record to invalidate all tokens issued before a given timestamp — avoids a per-token deny-list.`,
+    keywords: ['jwt', 'refresh-token', 'rotation', 'revocation', 'stateless-auth', 'session'],
+  },
+  {
+    id: 'secrets-management',
+    title: 'Secrets Management (Vault Pattern)',
+    summary: 'Centralized, audited storage for credentials, API keys, and certificates with support for dynamic secrets.',
+    body: `**The problem with static secrets**
+Secrets checked into source code, hardcoded in env vars, or stored in plain text in a DB are breach risks. They're also painful to rotate — you have to find every place the secret is used and update them all.
+
+**Vault architecture**
+- *Encrypted storage*: secrets encrypted at rest with AES-256-GCM. The data encryption key (DEK) is itself wrapped by a master key held in an HSM or split via Shamir's Secret Sharing.
+- *Access control*: policies grant named roles access to secret paths (app/database/*). Services authenticate with their workload identity (AWS IAM role, K8s ServiceAccount) to get a short-lived Vault token.
+- *Audit log*: every secret read/write/delete emits a structured event. Append-only, tamper-evident. Required for SOC 2 and PCI-DSS.
+
+**Dynamic secrets (the key innovation)**
+Instead of storing a static database password, Vault calls the database on demand: \`CREATE ROLE app_service_xyz_20240115 WITH PASSWORD 'random' TTL 1h;\`. The credential is unique per issuance, expires automatically, and is revoked when the TTL ends. No long-lived password ever exists.
+
+**Secret rotation**
+Vault can rotate static secrets (API keys for external services) on a schedule. Applications that watch a Vault lease receive the new value automatically — no restart required.`,
+    keywords: ['vault', 'secrets', 'dynamic-secrets', 'hsm', 'credential-rotation', 'audit-log'],
+  },
+
+  // ─── Search ────────────────────────────────────────────────────────────────
+
+  {
+    id: 'inverted-index',
+    title: 'Inverted Index',
+    summary: 'The core data structure of every full-text search engine: a map from terms to the documents that contain them.',
+    body: `**Forward vs inverted index**
+- *Forward index*: document → list of terms it contains. Good for "what terms are in document X?"
+- *Inverted index*: term → list of documents containing that term (the postings list). Good for "which documents contain term Y?" — the query all search engines need to answer.
+
+**Postings list**
+For each term, the postings list stores a sorted array of (doc_id, term_frequency, [positions]) tuples. Sorted order enables fast intersection of multiple postings lists for AND queries via merge-join.
+
+**Query execution**
+1. Tokenize query ("fast search") → ["fast", "search"].
+2. Look up each term's postings list.
+3. Intersect lists (AND): merge-join on sorted doc IDs.
+4. Score each candidate with BM25.
+5. Return top-K by score.
+
+**Segment architecture (Lucene)**
+The index is built from immutable *segments*. New documents create a new segment. Background *merge* combines small segments into larger ones (reducing the number of postings list lookups per query). Deletes are recorded as tombstones and cleaned up during merge.
+
+**Why immutable segments?**
+Immutability makes segments trivially cacheable and enables concurrent reads without locks. Compaction (merge) is the only write path.`,
+    keywords: ['inverted-index', 'postings-list', 'tokenization', 'lucene', 'full-text-search', 'elasticsearch'],
+  },
+  {
+    id: 'bm25',
+    title: 'BM25 Ranking Algorithm',
+    summary: 'The dominant relevance scoring function for full-text search, used by Elasticsearch, Solr, and most production search engines.',
+    body: `**TF-IDF foundation**
+BM25 extends TF-IDF. The core intuition: a term is relevant to a document (TF = term frequency) and rare across all documents (IDF = inverse document frequency). Rare terms that appear often in a document signal relevance.
+
+**BM25 improvements over TF-IDF**
+
+*TF saturation*: in TF-IDF, a document mentioning "search" 100 times scores 10× higher than one mentioning it 10 times. BM25 uses a saturation function: the marginal value of additional occurrences diminishes. The k1 parameter (typically 1.2–2.0) controls how quickly TF saturates.
+
+*Document length normalization*: a long document mentioning "search" once scores lower than a short document mentioning it once — the same term density means more in a focused document. The b parameter (0 = no normalization, 1 = full normalization) controls this.
+
+**BM25 formula**
+\`score(D, Q) = Σ IDF(t) × (TF(t,D) × (k1+1)) / (TF(t,D) + k1 × (1 - b + b × |D|/avgDL))\`
+
+**BM25 in practice**
+Default in Elasticsearch (replaced TF-IDF in 5.x). Works well for keyword queries, exact matches, and named entities. Struggles with synonyms and semantic similarity — supplement with vector search for those cases.`,
+    keywords: ['bm25', 'tf-idf', 'relevance-ranking', 'elasticsearch', 'lucene', 'search'],
+  },
+  {
+    id: 'ann-search',
+    title: 'Approximate Nearest Neighbor (ANN) Search',
+    summary: 'Algorithms for finding the closest vectors to a query vector in a high-dimensional space without scanning all vectors.',
+    body: `**Why approximate?**
+Exact nearest neighbor search in high-dimensional space requires computing distance to every vector — O(N × D) for N vectors of dimension D. At 100M vectors with D=1536 (OpenAI embedding size), that's 150 billion multiplications per query. ANN trades a small accuracy loss for orders-of-magnitude speedup.
+
+**HNSW (Hierarchical Navigable Small World)**
+The most widely used ANN algorithm. Builds a multi-layer graph where each node connects to its nearest neighbors. Search navigates from the top (coarsest) layer down, greedy-walking toward the query vector. Query time: O(log N). Used by Weaviate, Qdrant, and pgvector.
+
+**IVF (Inverted File Index)**
+Clusters vectors into K centroids offline (k-means). At query time, find the nprobe closest centroids, then scan only the vectors assigned to those clusters. Faster index build than HNSW, slightly lower recall at same speed.
+
+**Product Quantization (PQ)**
+Compresses each vector by splitting it into subvectors and quantizing each subvector to a codebook entry. Reduces memory 8–32× at a small accuracy cost. Often combined with IVF (IVF-PQ).
+
+**Hybrid search**
+ANN retrieval handles semantic similarity but misses exact keyword matches (product codes, names). Combine with BM25 keyword retrieval and merge ranked lists via Reciprocal Rank Fusion (RRF) for best-of-both-worlds precision.`,
+    keywords: ['ann', 'hnsw', 'vector-search', 'embeddings', 'similarity-search', 'pinecone', 'weaviate'],
+  },
+  {
+    id: 'reciprocal-rank-fusion',
+    title: 'Reciprocal Rank Fusion (RRF)',
+    summary: 'A simple, robust algorithm for merging multiple ranked lists without requiring score normalization.',
+    body: `**The problem**
+Hybrid search produces two ranked lists: one from BM25 (keyword), one from ANN (semantic). Their scores are on completely different scales — you can't just add them.
+
+**RRF formula**
+\`RRF_score(doc) = Σ 1 / (k + rank_in_list)\`
+
+For each ranked list, score every document by its reciprocal rank. Sum across all lists. Re-rank by combined score. k=60 is the standard constant (softens the impact of top-ranked documents; prevents any single list from dominating).
+
+**Example**
+A document ranked #1 in BM25 and #5 in ANN:
+- BM25 contribution: 1/(60+1) ≈ 0.0164
+- ANN contribution: 1/(60+5) ≈ 0.0154
+- RRF score: 0.0318
+
+A document ranked #3 in BM25 and #3 in ANN:
+- Both: 1/(60+3) ≈ 0.0159 each → 0.0317
+
+The document that consistently appears in both lists often beats the one ranked first in only one list.
+
+**Why RRF is preferred over score fusion**
+- No normalization required — works with any scoring system.
+- Robust to outlier scores in one list.
+- Simple to implement and explain.
+- Competitive with learned fusion methods in most benchmarks.
+
+**When to use a re-ranker instead**
+RRF is a fast, unsupervised merge. For higher precision, pass the top-100 RRF results through a cross-encoder re-ranker (reads the full (query, doc) pair) at the cost of ~50ms extra latency.`,
+    keywords: ['rrf', 'hybrid-search', 'rank-fusion', 'bm25', 'vector-search', 'reranking'],
+  },
+
+  // ─── Notifications ─────────────────────────────────────────────────────────
+
+  {
+    id: 'notification-fanout',
+    title: 'Notification Fan-Out: Write vs Read',
+    summary: 'The architectural choice between pre-computing notifications at write time vs assembling them at read time.',
+    body: `**Fan-out on write (push model)**
+When an event occurs, immediately write a notification or feed entry to every recipient's queue or table. Reading the feed is O(1) per user.
+
+*Problem*: a celebrity with 50M followers posts a tweet. Fan-out creates 50M writes — at even 1ms each, that's 50,000 seconds. In practice, workers parallelize this, but it still creates a huge write amplification spike.
+
+**Fan-out on read (pull model)**
+Store the event once. Each user's feed query merges the events they care about at read time (follow graph lookup → fetch events from each followed user).
+
+*Problem*: reading the feed is expensive. O(followed_count) lookups and merges per page load. At high social graph density, this doesn't scale.
+
+**Hybrid approach (used by Twitter, Instagram)**
+- Regular users (≤~1M followers): fan-out on write. Their posts are immediately pushed to follower feeds.
+- Celebrity accounts (>~1M followers): fan-out on read. Their timeline is fetched separately at read time and merged into the requesting user's feed.
+- Threshold is tunable. A user who crosses the threshold gets migrated from write to read fan-out.
+
+**Implementation**
+Pre-computed feeds are stored in Redis sorted sets (score = timestamp). Reads fetch entries by score range. Celebrity timelines are queried separately and merged client-side or in the API layer.`,
+    keywords: ['fan-out', 'feed', 'notifications', 'celebrity-problem', 'write-amplification', 'redis'],
+  },
+  {
+    id: 'webhook-delivery',
+    title: 'Webhook Delivery Guarantees',
+    summary: 'Patterns for reliable at-least-once webhook delivery with retries, signing, and backpressure.',
+    body: `**At-least-once delivery**
+The gold standard for webhooks. You cannot guarantee exactly-once (the endpoint might accept the delivery but crash before returning 200). Design for idempotent receivers and deliver at least once.
+
+**Transactional outbox pattern**
+Write the webhook event to an outbox table in the *same database transaction* as the triggering business operation. A background worker reads undelivered events and POSTs to the endpoint. This ensures no events are silently lost even if the app crashes between the business write and the HTTP call.
+
+**Retry strategy**
+- Exponential backoff with jitter: 5s, 12s, 30s, 1m, 5m, 30m, 2h, 8h, 24h.
+- Jitter prevents thundering herd (all retries firing simultaneously).
+- Give up after 72 hours; mark permanently failed; alert the customer via dashboard.
+- On 410 Gone: the endpoint was intentionally removed — do not retry, deactivate the webhook.
+
+**Payload signing**
+\`X-Webhook-Signature: sha256=HMAC_SHA256(body, secret)\`
+
+Customers verify the signature before processing the payload. Prevents spoofed webhooks from third parties and ensures payload integrity. Rotate the signing secret without downtime by supporting a grace period where both old and new secrets are valid.
+
+**Ordering**
+Do not guarantee ordering. Include event_id (idempotency key) and sequence_number in every payload. Advise receivers to deduplicate by event_id and handle out-of-order delivery gracefully.`,
+    keywords: ['webhook', 'at-least-once', 'outbox', 'retry', 'hmac', 'idempotency'],
+  },
+  {
+    id: 'apns-fcm',
+    title: 'APNs & FCM — Mobile Push Notification Delivery',
+    summary: 'The Apple (APNs) and Google (FCM) gateway services that handle last-mile delivery of push notifications to mobile devices.',
+    body: `**Architecture overview**
+Your backend → APNs/FCM gateway → Apple/Google infrastructure → user device. You never communicate directly with the device. The platform vendors handle queuing, delivery, and persistence when devices are offline.
+
+**Device tokens**
+Each app installation registers and receives a device token. Tokens are opaque — they encode routing information the platform uses internally. Tokens can change (app reinstall, OS upgrade). Your system must handle token updates and removals.
+
+**Token lifecycle**
+- When APNs returns HTTP 410 (device token invalid), immediately remove the token from your DB. Continuing to send to invalid tokens damages your APNs reputation.
+- When a user reinstalls the app, the old token becomes invalid and a new one is issued. Your app must re-register the new token on every launch.
+
+**Collapse keys (APNs: apns-collapse-id, FCM: collapse_key)**
+If you send 5 notifications to a device while it's offline and the first 4 are stale by the time the device reconnects, collapse keys let the platform deliver only the most recent. Use for notifications that supersede prior state ("you have 47 unread messages").
+
+**Priority**
+- High priority: APNs sends immediately, wakes the device. Use for user-facing alerts.
+- Low priority: APNs batches, delivers opportunistically. Use for silent background updates (data sync, badge updates).
+
+**Fan-out at scale**
+You push to APNs/FCM — they handle per-device routing. Your bottleneck is generating the per-device messages and calling the gateway. Use a queue (Kafka) + worker fleet to parallelize fan-out; keep per-device latency under 100ms; APNs HTTP/2 multiplexing allows 1000 concurrent streams per connection.`,
+    keywords: ['apns', 'fcm', 'push-notifications', 'mobile', 'device-token', 'collapse-key'],
+  },
+
+  // ─── Data Infrastructure ──────────────────────────────────────────────────
+
+  {
+    id: 'lambda-architecture',
+    title: 'Lambda Architecture',
+    summary: 'A data pipeline pattern with separate batch and streaming layers that are merged at query time for accuracy + low latency.',
+    body: `**Three layers**
+
+*Batch layer (high accuracy, high latency)*
+A periodic Spark/Hadoop job reprocesses all historical data. Corrects past errors, handles late-arriving data. Output: pre-computed batch views (aggregates in a serving store). Latency: hours to days.
+
+*Speed layer (low accuracy, low latency)*
+A streaming job (Kafka + Flink/Spark Streaming) processes only recent data — data since the last batch run. Output: real-time views. Latency: seconds.
+
+*Serving layer*
+Merges batch views and real-time views at query time. For any time range in the batch window, use the batch view; for recent data, supplement with the real-time view.
+
+**When it works**
+- You need both historical accuracy and real-time freshness.
+- Your batch and streaming computations are stable and rarely change.
+- Teams have the operational capacity to run two separate pipeline stacks.
+
+**The fundamental problem: dual maintenance**
+The same business logic must be implemented twice — once in batch (Spark SQL) and once in streaming (Flink). When logic changes, both must be updated in sync. This is the primary motivation for Kappa architecture, which eliminates the batch layer by making the streaming layer capable of full reprocessing.`,
+    keywords: ['lambda-architecture', 'batch-processing', 'stream-processing', 'spark', 'flink', 'kafka'],
+  },
+  {
+    id: 'kappa-architecture',
+    title: 'Kappa Architecture',
+    summary: 'A simplified data architecture that uses a single stream-processing pipeline for both real-time and historical data.',
+    body: `**Core idea**
+Eliminate the batch layer. Use one streaming pipeline (Kafka + Flink) for everything. Kafka's immutable, replayable log replaces HDFS as the source of truth for historical data.
+
+**Reprocessing without a batch layer**
+When logic changes or a bug needs fixing:
+1. Spin up a new Flink job with the updated code.
+2. Point it at the Kafka topic from offset 0 (beginning of history).
+3. Write output to a new table/index (not the live one).
+4. Once the new job has caught up, atomically swap serving to the new table.
+5. Decommission the old job and old table.
+
+This replaces a full batch reprocessing cycle — same outcome, no separate batch infrastructure.
+
+**Data retention**
+Kafka log retention must be long enough for full replay. For years of data, use Kafka + S3 tiered storage (Kafka log is the index, S3 holds the cold segments). Compacted topics reduce storage for entity-keyed streams.
+
+**Flink state**
+Stateful Flink operators (keyed by user_id, account_id) maintain running aggregates across the event stream. State is checkpointed to S3 periodically. On replay, Flink restores state from the checkpoint nearest to the replay start offset.
+
+**Trade-offs vs Lambda**
+- ✅ Single code path — no dual maintenance
+- ✅ Simpler ops — one compute framework
+- ❌ Full-history replay can be slow for complex stateful aggregations
+- ❌ Kafka retention at petabyte scale requires tiered storage infrastructure`,
+    keywords: ['kappa-architecture', 'kafka', 'flink', 'stream-processing', 'reprocessing', 'stateful'],
+  },
+  {
+    id: 'cdc-debezium',
+    title: 'Change Data Capture (CDC) with Debezium',
+    summary: 'Streaming database changes as events by reading the database\'s write-ahead log — zero application code changes required.',
+    body: `**How it works**
+Databases write every mutation to a Write-Ahead Log (WAL) before applying it — this is how crash recovery works. Debezium taps into this log via logical replication and converts each row-level change into a structured event.
+
+**Postgres setup**
+1. Set \`wal_level = logical\` in postgresql.conf.
+2. Debezium connector creates a replication slot.
+3. Postgres streams WAL changes to the slot.
+4. Debezium publishes events to a Kafka topic per table.
+
+**Event format**
+Each event includes:
+- \`op\`: "c" (create), "u" (update), "d" (delete), "r" (read/snapshot)
+- \`before\`: row state before the change (null for inserts)
+- \`after\`: row state after the change (null for deletes)
+- \`ts_ms\`: wall clock timestamp of the change
+- \`lsn\`: log sequence number for ordering guarantees
+
+**Downstream use cases**
+- Search index sync (Elasticsearch)
+- Cache invalidation (Redis)
+- Data warehouse replication
+- Audit log population
+- Event sourcing for downstream microservices
+
+**The replication slot risk**
+A Postgres replication slot holds WAL segments until the consumer acknowledges them. If the consumer goes offline for hours, WAL accumulates on the primary disk and can cause the DB to run out of disk space — this is a production-stopping incident. Monitor slot lag aggressively; drop stale slots immediately if the consumer is permanently down.`,
+    keywords: ['cdc', 'debezium', 'wal', 'replication', 'kafka', 'postgres', 'change-events'],
+  },
+  {
+    id: 'medallion-architecture',
+    title: 'Medallion Architecture (Bronze / Silver / Gold)',
+    summary: 'A layered data lake organization where data progressively improves in quality and business readiness from raw to analytics-ready.',
+    body: `**The three layers**
+
+*Bronze (raw)*
+Exact copy of source data as received. Never modified. Append-only. Retains all history — including duplicates, nulls, and formatting inconsistencies. PII is present but access-controlled. The source of truth for reprocessing.
+
+*Silver (cleaned)*
+Deduplication, type casting, null handling, PII masking/tokenization, join with reference data (e.g., merchant categories). Validated against schema contracts. Partitioned by (entity_type, dt) for query efficiency. Queryable by analysts with PII removed.
+
+*Gold (business-ready)*
+Pre-joined, pre-aggregated tables optimized for specific use cases (BI dashboards, ML feature tables, executive KPI feeds). Built by dbt or Spark jobs that read from Silver. Refreshed on a schedule or incrementally. Named by business domain (finance.daily_revenue, fraud.risk_features).
+
+**Why the separation matters**
+- Bronze as insurance: if transformation logic was wrong, re-derive Silver and Gold from Bronze without re-fetching data.
+- Silver as the truth: downstream teams agree on a single cleaned, typed version of each entity — no siloed per-team cleaning logic.
+- Gold as purpose-built: each Gold table is optimized for its consumers, not a one-size-fits-all schema.
+
+**Tools**
+Delta Lake or Apache Iceberg as the table format (ACID transactions, schema evolution, time-travel queries on top of S3). dbt for Gold layer transformations. Apache Spark or Databricks for Silver processing.`,
+    keywords: ['medallion', 'data-lake', 'bronze-silver-gold', 'delta-lake', 'dbt', 'data-warehouse'],
+  },
+  {
+    id: 'feature-store',
+    title: 'Feature Store',
+    summary: 'A centralized system for computing, storing, and serving ML features consistently for both model training and real-time inference.',
+    body: `**The problem**
+Without a feature store, each ML team re-implements the same features (user 30-day spend, session activity) independently. Features used in training are computed differently than features served in production. This causes *training-serving skew* — the model performs worse in production than in evaluation.
+
+**Two stores**
+
+*Offline store* (for training)
+Historical feature values for all entities over time. Stored in a data warehouse or object storage (S3 Parquet). Batch access patterns. High throughput, latency is acceptable.
+
+*Online store* (for inference)
+Current feature values for live entities. Stored in a low-latency DB (Redis, DynamoDB, Cassandra). Sub-10ms reads. Updated continuously by streaming pipelines.
+
+**Point-in-time correctness**
+Training examples must use only features that were available at the time of the label event — no leaking future information. Feature stores enforce this with *time-travel queries*: "give me the feature values for user 123 as of 2024-01-15T10:30:00Z."
+
+**Feature computation pipelines**
+- Batch features (user 30-day purchase history): Spark job, daily refresh, writes to offline + online stores.
+- Streaming features (last-5-min session activity): Flink job, real-time, writes only to online store with TTL.
+
+**Serving API**
+Inference service sends entity IDs → feature server fetches from online store → assembles feature vector → model scores → response in <50ms total. Feature definitions are registered once and shared across teams.`,
+    keywords: ['feature-store', 'ml', 'training-serving-skew', 'point-in-time', 'feast', 'tecton'],
+  },
+
+  // ─── Observability ─────────────────────────────────────────────────────────
+
+  {
+    id: 'prometheus-scrape',
+    title: 'Prometheus Pull-Based Metrics Collection',
+    summary: 'How Prometheus collects metrics by scraping HTTP endpoints, and the constraints this model imposes on cardinality and storage.',
+    body: `**Pull model**
+Prometheus scrapes a /metrics HTTP endpoint on each registered target at a configurable interval (default 15s). Targets expose metrics in a plain-text exposition format (or Protobuf). The scrape itself is a health signal — if a scrape fails, Prometheus knows the target is down.
+
+**Metric types**
+- *Counter*: monotonically increasing value (requests_total, errors_total). Use rate() in PromQL to get per-second rate.
+- *Gauge*: current value that can go up or down (memory_usage_bytes, queue_depth).
+- *Histogram*: samples observations into pre-defined buckets (request_duration_seconds{le="0.1"}). Use histogram_quantile() to estimate percentiles.
+- *Summary*: pre-computed quantiles on the client. Less flexible than histograms for aggregation.
+
+**Cardinality**
+The number of unique label value combinations determines the number of time series. Every new label value creates a new time series in the TSDB. Common traps:
+- user_id as a label: millions of series → OOM.
+- request_id as a label: unbounded cardinality → crash.
+Keep high-cardinality identifiers in *logs and traces*, not in metric labels.
+
+**Service discovery**
+Prometheus discovers targets dynamically via Kubernetes pod annotations (\`prometheus.io/scrape: "true"\`), Consul, or EC2 tags. No manual target registration.
+
+**Push gateway**
+For short-lived jobs (batch scripts, cron jobs) that don't live long enough to be scraped: push metrics to the Prometheus Pushgateway before exit. Pushgateway holds the last pushed value and exposes it for scraping.`,
+    keywords: ['prometheus', 'metrics', 'scrape', 'cardinality', 'tsdb', 'grafana', 'prom-ql'],
+  },
+  {
+    id: 'slo-error-budget',
+    title: 'SLOs and Error Budgets',
+    summary: 'A framework for setting measurable reliability targets and quantifying how much unreliability a service is allowed.',
+    body: `**Definitions**
+
+*SLI (Service Level Indicator)*: the metric you actually measure. Must be observable from a client-facing perspective. Example: "proportion of requests completed in <500ms and returning HTTP 2xx over the last 30 days."
+
+*SLO (Service Level Objective)*: the target you commit to. Example: "SLI >= 99.9%." This is an internal target, not a customer promise (that's an SLA).
+
+*Error budget*: 100% - SLO = allowed unreliability. A 99.9% SLO gives you 0.1% budget = 43.8 minutes/month of acceptable downtime. The budget quantifies how much you can move fast (deploys, experiments) before reliability becomes the priority.
+
+**Error budget policy**
+- Budget has headroom: deploy freely, take on technical risk, run experiments.
+- Budget is 50% consumed: slow down releases, fix flaky deploys.
+- Budget is exhausted: freeze new features, focus exclusively on reliability.
+
+**Burn rate alerts**
+Burn rate = current error rate / budget error rate. Burn rate > 1 means you'll exhaust the budget before the window ends.
+
+- Critical (page): burn rate > 14× over 5 minutes AND 1 hour → 2% of budget in 1 hour.
+- Warning (ticket): burn rate > 6× over 30 minutes AND 6 hours → 5% of budget in 6 hours.
+
+Multi-window checks (both short and long window must exceed threshold) dramatically reduce false positives compared to single-window alerts.`,
+    keywords: ['slo', 'sli', 'sla', 'error-budget', 'burn-rate', 'reliability', 'prometheus'],
+  },
+  {
+    id: 'opentelemetry',
+    title: 'OpenTelemetry (OTel)',
+    summary: 'A vendor-neutral observability framework providing a single set of APIs and SDKs for traces, metrics, and logs.',
+    body: `**Why OpenTelemetry?**
+Before OTel, every observability vendor (Datadog, New Relic, Jaeger) had its own SDK. Migrating backends meant updating every instrumented service. OTel decouples instrumentation from backend — instrument once, route anywhere.
+
+**The three pillars**
+
+*Traces*: spans representing units of work across services, stitched together by trace_id and parent_span_id. OTel SDK creates and propagates trace context via the W3C \`traceparent\` header.
+
+*Metrics*: counters, gauges, and histograms using the OTel Metrics API. Exporters convert to Prometheus format or OTLP for backends like Grafana Mimir.
+
+*Logs*: structured log records correlated to traces via trace_id and span_id fields. OTel logging bridges existing logging frameworks (SLF4J, Winston) into the OTel pipeline.
+
+**Auto-instrumentation**
+Language-specific OTel agents (Java, Python, Node.js) patch popular frameworks at startup — HTTP clients, database drivers, gRPC, message queue clients all emit spans automatically. Teams get distributed traces without writing a line of instrumentation code.
+
+**OTel Collector**
+A standalone process (sidecar or DaemonSet) that:
+1. Receives telemetry via OTLP (gRPC or HTTP).
+2. Processes: sample (tail-based), filter attributes, scrub PII.
+3. Exports to one or more backends simultaneously (Jaeger + Grafana + S3).
+
+This keeps the pipeline configurable — add a new backend by adding an exporter to the Collector config, no code changes.
+
+**Migration path**
+1. Deploy Collector in pass-through mode (receive OTel, export to existing vendor).
+2. Add auto-instrumentation to services.
+3. Validate parity with existing vendor data.
+4. Add sampling rules in Collector.
+5. Migrate to cheaper self-hosted backends (Jaeger, Prometheus).`,
+    keywords: ['opentelemetry', 'otel', 'distributed-tracing', 'metrics', 'logs', 'vendor-neutral', 'otlp'],
+  },
 ]

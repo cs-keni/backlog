@@ -1351,6 +1351,144 @@ A lightweight LeetCode study tracker integrated into Backlog. Tracks which NeetC
 
 ---
 
+### Phase 20 — System Design Bank Upgrade
+
+> Expand the SD prep bank from 70 → ~124 questions by adding 5 new topic areas and cleaning up the weakest existing topic (microservices). The new topics cover gaps that appear in 60%+ of senior SWE system design loops: security/auth, search infrastructure, notification systems, data infrastructure, and observability. No DB changes, no migrations, no new routes — pure content + validator updates.
+
+#### 20a — Microservices Cleanup
+
+The current 8-question microservices section has two issues:
+- **sd-063** ("What problems do microservices solve?") is vocabulary trivia, not a design problem — cut it
+- **sd-067** (distributed tracing design) conceptually belongs in the new Observability section — keep it in microservices but ensure the Observability section covers the *infrastructure design* angle (Jaeger/Prometheus from the ground up) rather than duplicating the same question
+
+Result: 7 tight microservices questions (circuit breaker, service mesh, service discovery, blue-green, saga, health checks) + 1 replacement question with real design depth.
+
+- [x] Remove `sd-063` from `system-design-bank.ts`
+- [x] Add `sd-063` replacement: "How would you incrementally decompose a monolith into microservices without a big-bang rewrite?" (strangler fig pattern, anti-corruption layer, branch by abstraction)
+- [x] Renumber IDs if needed to keep sequential (or leave gap — validator handles it)
+
+#### 20b — Security & Auth Design (12 questions, sd-071–sd-082)
+
+Highest-priority gap. Auth design comes up in nearly every senior loop.
+
+Questions to cover:
+- OAuth 2.0 authorization code flow with PKCE — design a secure login system
+- JWT vs opaque session tokens — stateless auth tradeoffs, refresh token rotation
+- API key management system — generation, hashing, scoping, rotation, rate limiting by tier
+- Design a multi-tenant RBAC system — roles, permissions, resource scoping
+- Zero-trust network architecture — never trust, always verify; mTLS, short-lived certs
+- Design a single sign-on (SSO) system — SAML vs OIDC, identity provider integration
+- Rate limiting by identity — token bucket vs sliding window, per-user vs per-IP vs per-API-key
+- Design a secrets management system (Vault-like) — storage, rotation, audit log
+- OAuth token revocation and session invalidation at scale
+- Design a bot detection and fraud prevention layer
+- mTLS between microservices — certificate rotation without downtime
+- Design an audit logging system — tamper-evident, compliance-ready
+
+Concept primers to add: `zero-trust`, `oauth-pkce`, `rbac`, `jwt-refresh-rotation`, `secrets-management`
+
+- [x] Add 12 questions (sd-071–sd-082) to `system-design-bank.ts`
+- [x] Add 5 concept primers to `concept-primers.ts`
+
+#### 20c — Search Infrastructure (10 questions, sd-083–sd-092)
+
+Questions to cover:
+- Design a full-text search engine — inverted index, tokenization, stemming
+- Elasticsearch cluster architecture — shards, replicas, primary vs replica routing
+- Relevance ranking — TF-IDF vs BM25, personalized ranking with click signals
+- Real-time vs batch index updates — near-real-time search (NRT), index refresh intervals
+- Design a typeahead/autocomplete system at scale (distinct from full-text search)
+- Hybrid search — combining BM25 keyword + vector similarity (ANN), reciprocal rank fusion
+- Faceted search and aggregations — how Elasticsearch aggregations work under load
+- Multi-tenant search — per-tenant indexes vs filtered shared index
+- Search result deduplication — near-duplicate detection with MinHash/LSH
+- Design a search ranking pipeline — offline training, feature stores, A/B testing serving
+
+Concept primers to add: `inverted-index`, `bm25`, `ann-search`, `reciprocal-rank-fusion`
+
+- [x] Add 10 questions (sd-083–sd-092) to `system-design-bank.ts`
+- [x] Add 4 concept primers to `concept-primers.ts`
+
+#### 20d — Notification Systems (10 questions, sd-093–sd-102)
+
+Questions to cover:
+- Design a push notification system at scale (APNs/FCM fanout, fan-out on write vs read)
+- Email delivery infrastructure — SMTP, bounce handling, DKIM/SPF, sending reputation
+- Design an in-app notification feed — unread counts, WebSocket vs SSE vs polling
+- SMS delivery and carrier routing — Twilio-style aggregation, delivery receipts
+- Notification deduplication — idempotency keys, dedup window, cross-channel dedup
+- Design a notification preferences system — per-channel opt-outs, do-not-disturb windows, frequency caps
+- Notification fanout for social graphs — celebrity problem, write fan-out vs read fan-out
+- Transactional vs marketing email separation — dedicated IPs, reputation isolation
+- Design a webhook delivery system — retries, ordering guarantees, payload signing
+- Real-time activity feed (likes/comments) — design for 100M daily active users
+
+Concept primers to add: `notification-fanout`, `webhook-delivery`, `apns-fcm`
+
+- [x] Add 10 questions (sd-093–sd-102) to `system-design-bank.ts`
+- [x] Add 3 concept primers to `concept-primers.ts`
+
+#### 20e — Data Infrastructure (12 questions, sd-103–sd-114)
+
+Questions to cover:
+- Lambda architecture — batch layer + speed layer + serving layer, when to use vs avoid
+- Kappa architecture — stream-only processing, Kafka as the source of truth
+- ETL vs ELT — push complexity into the warehouse vs transform in-flight
+- Design a data warehouse ingestion pipeline — Firehose/Kinesis → S3 → Redshift/BigQuery
+- Change data capture (CDC) with Debezium — how it hooks into Postgres WAL, downstream consumers
+- Data lake architecture — raw zone, curated zone, medallion architecture (bronze/silver/gold)
+- Design a real-time analytics dashboard (sub-second query latency on streaming data)
+- Star schema vs denormalized OLAP tables — modeling for analytical queries
+- Data lineage and catalog systems — tracking where data came from, impact analysis
+- Design a feature store for ML — online (low-latency) vs offline (batch training) stores
+- Slowly changing dimensions (SCD) — handling entity updates in a historical warehouse
+- Backfilling historical data after a schema change — safe patterns, dual-write, migration jobs
+
+Concept primers to add: `lambda-architecture`, `kappa-architecture`, `cdc-debezium`, `medallion-architecture`, `feature-store`
+
+- [x] Add 12 questions (sd-103–sd-114) to `system-design-bank.ts`
+- [x] Add 5 concept primers to `concept-primers.ts`
+
+#### 20f — Observability Infrastructure (10 questions, sd-115–sd-124)
+
+Questions to cover:
+- Design a metrics collection system (Prometheus-like) — pull vs push, cardinality limits, storage
+- Long-term metrics storage — Thanos/Cortex for Prometheus federation, downsampling
+- Distributed tracing infrastructure — Jaeger/Zipkin architecture, storage backend, query patterns
+- Log aggregation pipeline — Fluentd/Logstash → Elasticsearch/Loki, structured logging
+- Design an alerting system — threshold vs anomaly detection, routing to on-call (PagerDuty-style)
+- SLO/SLI/error budget tracking — calculating error budgets from metrics, burn rate alerts
+- Synthetic monitoring and health checks — active probes vs passive observability
+- OpenTelemetry adoption — unified traces/metrics/logs, instrumentation strategy
+- Design a cost attribution system for cloud spend — tagging, per-team chargebacks
+- Incident correlation — linking metrics anomalies + traces + logs during an outage
+
+Concept primers to add: `prometheus-scrape`, `slo-error-budget`, `opentelemetry`
+
+- [x] Add 10 questions (sd-115–sd-124) to `system-design-bank.ts`
+- [x] Add 3 concept primers to `concept-primers.ts`
+
+#### 20g — Validator + UI Updates
+
+- [x] Update `scripts/validate-prep-bank.ts` — change SD question count check from `70` to `124`
+- [x] Update `UnifiedProgressDashboard.tsx` — change SD ring denominator from `70` to `124`
+- [x] Update `SystemDesignBank.tsx` description to include all new topic areas
+
+#### Summary
+
+| Topic | New Qs | IDs | New Primers |
+|---|---|---|---|
+| Microservices cleanup | ±0 (cut 1 + add 1) | sd-063 replaced | 0 |
+| Security & Auth | 12 | sd-071–sd-082 | 5 |
+| Search Infrastructure | 10 | sd-083–sd-092 | 4 |
+| Notification Systems | 10 | sd-093–sd-102 | 3 |
+| Data Infrastructure | 12 | sd-103–sd-114 | 5 |
+| Observability | 10 | sd-115–sd-124 | 3 |
+| **Total new** | **54** | | **20 primers** |
+| **Bank total** | **124** | | |
+
+---
+
 ## Future / Long-Term
 
 - [ ] Additional job sources: LinkedIn, Indeed, Glassdoor (when scraping strategy is solid)
