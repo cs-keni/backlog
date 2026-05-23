@@ -191,15 +191,20 @@ export function ProblemLogger({ solves, today, track, onSolveLogged }: ProblemLo
                 </svg>
               )}
               <a
-                href={problem.leetcodeUrl}
+                href={problem.leetcodePremium ? problem.url : problem.leetcodeUrl}
                 target="_blank"
                 rel="noopener noreferrer"
                 onClick={(e) => e.stopPropagation()}
-                title="Open on LeetCode"
+                title={problem.leetcodePremium ? 'Open on NeetCode (LeetCode Premium required)' : 'Open on LeetCode'}
                 className="shrink-0 text-zinc-600 hover:text-yellow-400 transition-colors"
               >
                 <ExternalLinkIcon />
               </a>
+              {problem.leetcodePremium && (
+                <span className="shrink-0 text-[9px] font-medium px-1 py-0.5 rounded bg-amber-500/10 text-amber-500 border border-amber-500/20">
+                  Premium
+                </span>
+              )}
             </div>
             <div className="flex items-center gap-1.5 mt-0.5">
               {groups === null && (

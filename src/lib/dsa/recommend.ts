@@ -12,7 +12,7 @@ export function isValidPattern(p: string): p is Pattern {
 
 function getTrackProblems(track: DsaTrack): NeetcodeProblem[] {
   const allowed = TRACK_PROBLEMS[track]
-  return NEETCODE_250.filter(problem => allowed.has(problem.slug))
+  return NEETCODE_250.filter(problem => allowed.has(problem.slug) && !problem.leetcodePremium)
 }
 
 export function getActiveCategory(solves: LcSolveWithReviews[], track: DsaTrack = '150'): Pattern | null {

@@ -19,7 +19,6 @@ export const NEETCODE_150_LC: LcProblem[] = [
   { lcSlug: 'top-k-frequent-elements',                                         difficulty: 'medium' },
   { lcSlug: 'product-of-array-except-self',                                    difficulty: 'medium' },
   { lcSlug: 'valid-sudoku',                                                    difficulty: 'medium' },
-  { lcSlug: 'encode-and-decode-strings',                                       difficulty: 'medium' },
   { lcSlug: 'longest-consecutive-sequence',                                    difficulty: 'medium' },
 
   // Two Pointers (5)
@@ -114,14 +113,11 @@ export const NEETCODE_150_LC: LcProblem[] = [
   { lcSlug: 'number-of-islands',                                               difficulty: 'medium' },
   { lcSlug: 'max-area-of-island',                                              difficulty: 'medium' },
   { lcSlug: 'clone-graph',                                                     difficulty: 'medium' },
-  { lcSlug: 'walls-and-gates',                                                 difficulty: 'medium' },
   { lcSlug: 'rotting-oranges',                                                 difficulty: 'medium' },
   { lcSlug: 'pacific-atlantic-water-flow',                                     difficulty: 'medium' },
   { lcSlug: 'surrounded-regions',                                              difficulty: 'medium' },
   { lcSlug: 'course-schedule',                                                 difficulty: 'medium' },
   { lcSlug: 'course-schedule-ii',                                              difficulty: 'medium' },
-  { lcSlug: 'graph-valid-tree',                                                difficulty: 'medium' },
-  { lcSlug: 'number-of-connected-components-in-an-undirected-graph',           difficulty: 'medium' },
   { lcSlug: 'redundant-connection',                                            difficulty: 'medium' },
   { lcSlug: 'word-ladder',                                                     difficulty: 'hard'   },
 
@@ -130,7 +126,6 @@ export const NEETCODE_150_LC: LcProblem[] = [
   { lcSlug: 'min-cost-to-connect-all-points',                                  difficulty: 'medium' },
   { lcSlug: 'network-delay-time',                                              difficulty: 'medium' },
   { lcSlug: 'swim-in-rising-water',                                            difficulty: 'hard'   },
-  { lcSlug: 'alien-dictionary',                                                difficulty: 'hard'   },
   { lcSlug: 'cheapest-flights-within-k-stops',                                 difficulty: 'medium' },
 
   // 1D Dynamic Programming (12)
@@ -174,8 +169,6 @@ export const NEETCODE_150_LC: LcProblem[] = [
   { lcSlug: 'insert-interval',                                                 difficulty: 'medium' },
   { lcSlug: 'merge-intervals',                                                 difficulty: 'medium' },
   { lcSlug: 'non-overlapping-intervals',                                       difficulty: 'medium' },
-  { lcSlug: 'meeting-rooms',                                                   difficulty: 'easy'   },
-  { lcSlug: 'meeting-rooms-ii',                                                difficulty: 'medium' },
   { lcSlug: 'minimum-interval-to-include-each-query',                          difficulty: 'hard'   },
 
   // Math & Geometry (8)

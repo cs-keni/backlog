@@ -1,8 +1,25 @@
-import { createClient } from '@supabase/supabase-js'
+import { createClient as createServiceClient } from '@supabase/supabase-js'
+import { createClient } from '@/lib/supabase/server'
 import { verifyApiKeyFromRequest } from '@/lib/auth/api-key'
 
 const VALID_PHASES = ['read', 'brute_force', 'pattern', 'code'] as const
 const VALID_LANGUAGES = ['python', 'java', 'js'] as const
+
+export async function GET() {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const { data, error } = await supabase
+    .from('lc_attempts')
+    .select('problem_slug, phase_reached, time_spent_sec, hint_count, language, nudge_count, timeline, created_at')
+    .eq('user_id', user.id)
+    .order('created_at', { ascending: false })
+    .limit(50)
+
+  if (error) return Response.json({ error: 'Database error' }, { status: 500 })
+  return Response.json(data ?? [])
+}
 
 export async function POST(request: Request) {
   const auth = await verifyApiKeyFromRequest(request)
@@ -40,7 +57,7 @@ export async function POST(request: Request) {
     return Response.json({ error: 'Invalid language' }, { status: 400 })
   }
 
-  const supabase = createClient(
+  const supabase = createServiceClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   )

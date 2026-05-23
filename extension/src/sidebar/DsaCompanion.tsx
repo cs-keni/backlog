@@ -46,6 +46,7 @@ export function DsaCompanion({ slug, difficulty, tabId }: DsaCompanionProps) {
   const phaseTimingsRef = useRef<Partial<Record<DsaPhase, number>>>({})
   const nudgeCountRef = useRef(0)
   const nudgeActiveRef = useRef(false)
+  const pausedSinceRef = useRef<number | null>(null)
 
   const phaseLimit = PHASE_DURATIONS[phase][difficulty] // minutes
   const progress = phaseProgress(elapsed, phaseLimit)
@@ -66,6 +67,7 @@ export function DsaCompanion({ slug, difficulty, tabId }: DsaCompanionProps) {
   useEffect(() => {
     if (done) return
     const id = setInterval(() => {
+      if (pausedSinceRef.current !== null) return
       const now = Date.now()
       const phaseElapsed = Math.floor((now - phaseStartRef.current) / 1000)
       setElapsed(phaseElapsed)
@@ -112,11 +114,17 @@ export function DsaCompanion({ slug, difficulty, tabId }: DsaCompanionProps) {
     return () => clearInterval(id)
   }, [done, tabId, buildCurrentAttempt])
 
-  // ── visibilitychange → save to storage (NOT post) ─────────────────────────
+  // ── visibilitychange → pause timer + save to storage ─────────────────────
   useEffect(() => {
     const onVisibility = () => {
       if (document.visibilityState === 'hidden') {
+        pausedSinceRef.current = Date.now()
         void saveDsaAttempt(tabId, buildCurrentAttempt())
+      } else if (document.visibilityState === 'visible' && pausedSinceRef.current !== null) {
+        // Shift phaseStart forward by the pause duration so elapsed doesn't count dead time
+        const pausedMs = Date.now() - pausedSinceRef.current
+        phaseStartRef.current += pausedMs
+        pausedSinceRef.current = null
       }
     }
     document.addEventListener('visibilitychange', onVisibility)
@@ -175,6 +183,24 @@ export function DsaCompanion({ slug, difficulty, tabId }: DsaCompanionProps) {
     const attempt = buildCurrentAttempt()
     await postDsaAttempt(attempt)
     await clearDsaAttempt(tabId)
+  }
+
+  function handleReset() {
+    attemptIdRef.current = crypto.randomUUID()
+    phaseRef.current = 'read'
+    phaseTimingsRef.current = {}
+    nudgeCountRef.current = 0
+    nudgeActiveRef.current = false
+    pausedSinceRef.current = null
+    totalTimeRef.current = 0
+    hintCountRef.current = 0
+    phaseStartRef.current = Date.now()
+    lastKeystrokeRef.current = Date.now()
+    setPhase('read')
+    setElapsed(0)
+    setRevealedLayers([])
+    setShowNudge(false)
+    setDone(false)
   }
 
   // ── Render ─────────────────────────────────────────────────────────────────
@@ -319,8 +345,19 @@ export function DsaCompanion({ slug, difficulty, tabId }: DsaCompanionProps) {
           Done — log attempt
         </button>
       ) : (
-        <div style={{ textAlign: 'center', padding: '4px 0' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', alignItems: 'center' }}>
           <span style={{ fontSize: '12px', color: '#34d399' }}>Attempt logged!</span>
+          <button
+            onClick={handleReset}
+            style={{
+              padding: '6px 14px',
+              background: 'transparent', color: '#71717a',
+              border: '1px solid #3f3f46', borderRadius: '6px',
+              fontSize: '11px', cursor: 'pointer', transition: 'all 0.15s',
+            }}
+          >
+            Practice again
+          </button>
         </div>
       )}
     </div>

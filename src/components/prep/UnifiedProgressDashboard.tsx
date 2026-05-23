@@ -53,17 +53,23 @@ function MiniRing({ label, value, scrollTarget, href }: {
 export function UnifiedProgressDashboard() {
   const [progressRows, setProgressRows] = useState<ProgressRow[]>([])
   const [solves, setSolves] = useState<SolveRow[]>([])
+  const [dsaTotal, setDsaTotal] = useState(143) // non-premium 150-track default
   const [loading, setLoading] = useState(true)
 
   async function load() {
     setLoading(true)
     try {
-      const [progressRes, solvesRes] = await Promise.all([
+      const [progressRes, solvesRes, trackRes] = await Promise.all([
         fetch('/api/prep/question-progress'),
         fetch('/api/dsa/solves'),
+        fetch('/api/dsa/track'),
       ])
       if (progressRes.ok) setProgressRows(await progressRes.json() as ProgressRow[])
       if (solvesRes.ok) setSolves(await solvesRes.json() as SolveRow[])
+      if (trackRes.ok) {
+        const { total } = await trackRes.json() as { track: string; total: number }
+        if (typeof total === 'number' && total > 0) setDsaTotal(total)
+      }
     } finally {
       setLoading(false)
     }
@@ -84,11 +90,11 @@ export function UnifiedProgressDashboard() {
         row.bank === bank && (row.status === 'studied' || row.status === 'needs-review')
       ).length
     return {
-      dsa: (solves.length / 150) * 100,
+      dsa: (solves.length / dsaTotal) * 100,
       sd: (covered('system-design') / 124) * 100,
       ai: (covered('ai-engineer') / 60) * 100,
     }
-  }, [progressRows, solves.length])
+  }, [progressRows, solves.length, dsaTotal])
 
   return (
     <section className="space-y-3">

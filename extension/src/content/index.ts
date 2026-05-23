@@ -70,6 +70,10 @@ function tryUpdateDsaPanel(url: string): void {
   }
   // Notify already-injected sidebar.js of the navigation via DOM event
   window.dispatchEvent(new CustomEvent('backlog:dsa-update', { detail: cachedPageInfo }))
+  // Also inject/reveal sidebar if this is a tracked problem and sidebar isn't open yet
+  if (problem) {
+    try { chrome.runtime.sendMessage({ type: 'AUTO_INJECT_SIDEBAR' } as ExtensionMessage) } catch { /* context invalidated */ }
+  }
 }
 
 // ─── Navigation re-trigger ────────────────────────────────────────────────────

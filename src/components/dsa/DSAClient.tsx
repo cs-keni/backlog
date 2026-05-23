@@ -9,6 +9,7 @@ import type { DsaTrack } from '@/lib/dsa/neetcode150'
 import { TodayPanel } from './TodayPanel'
 import { CalendarView } from './CalendarView'
 import { ProblemLogger } from './ProblemLogger'
+import { PracticeHistoryPanel } from './PracticeHistoryPanel'
 
 interface DSAClientProps {
   initialSolves: LcSolveWithReviews[]
@@ -17,12 +18,13 @@ interface DSAClientProps {
   openTechnicalApps: { company: string; applied_at: string | null }[]
 }
 
-type MobileTab = 'today' | 'calendar' | 'problems'
+type MobileTab = 'today' | 'calendar' | 'problems' | 'practice'
 
 const MOBILE_TABS: { id: MobileTab; label: string }[] = [
   { id: 'today', label: 'Today' },
   { id: 'calendar', label: 'Calendar' },
   { id: 'problems', label: 'Problems' },
+  { id: 'practice', label: 'Practice' },
 ]
 
 const TRACKS: DsaTrack[] = ['75', '150', '250']
@@ -155,6 +157,14 @@ export function DSAClient({
             <ProblemLogger solves={filteredSolves} today={today} track={track} onSolveLogged={handleSolveLogged} />
           </div>
         </div>
+        <div className="w-72 shrink-0 border-l border-zinc-800 overflow-y-auto">
+          <div className="p-4 border-b border-zinc-800">
+            <h2 className="text-xs font-semibold text-zinc-400 uppercase tracking-wide">Practice Sessions</h2>
+          </div>
+          <div className="p-4">
+            <PracticeHistoryPanel />
+          </div>
+        </div>
       </div>
 
       {/* ── Mobile layout (<md) ─────────────────────────────────────────────── */}
@@ -208,6 +218,11 @@ export function DSAClient({
           {mobileTab === 'problems' && (
             <div className="overflow-y-auto h-full">
               <ProblemLogger solves={filteredSolves} today={today} track={track} onSolveLogged={handleSolveLogged} />
+            </div>
+          )}
+          {mobileTab === 'practice' && (
+            <div className="overflow-y-auto h-full p-4">
+              <PracticeHistoryPanel />
             </div>
           )}
         </div>
