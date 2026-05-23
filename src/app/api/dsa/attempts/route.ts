@@ -23,6 +23,8 @@ export async function POST(request: Request) {
     hint_count,
     hint_layers_revealed,
     language,
+    phase_timings,
+    nudge_count,
   } = body
 
   if (!attempt_id || typeof attempt_id !== 'string') {
@@ -53,6 +55,10 @@ export async function POST(request: Request) {
       hint_count: typeof hint_count === 'number' ? hint_count : 0,
       hint_layers_revealed: Array.isArray(hint_layers_revealed) ? hint_layers_revealed : [],
       language,
+      nudge_count: typeof nudge_count === 'number' ? nudge_count : 0,
+      timeline: phase_timings != null && typeof phase_timings === 'object'
+        ? { phase_timings }
+        : null,
     },
     { onConflict: 'attempt_id' }
   )

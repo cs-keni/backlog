@@ -58,7 +58,9 @@ export function buildAttempt(
   timeSpentSec: number,
   hintCount: number,
   hintLayersRevealed: number[],
-  language: DsaLanguage
+  language: DsaLanguage,
+  phaseTimings: Partial<Record<DsaPhase, number>>,
+  nudgeCount: number
 ): DsaAttempt {
   return {
     attempt_id: attemptId,
@@ -68,5 +70,7 @@ export function buildAttempt(
     hint_count: hintCount,
     hint_layers_revealed: hintLayersRevealed,
     language,
+    phase_timings: phaseTimings,
+    nudge_count: nudgeCount,
   }
 }

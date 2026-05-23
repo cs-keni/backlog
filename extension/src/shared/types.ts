@@ -28,6 +28,8 @@ export interface DsaAttempt {
   hint_count: number
   hint_layers_revealed: number[]
   language: DsaLanguage
+  phase_timings: Partial<Record<DsaPhase, number>>
+  nudge_count: number
 }
 
 // ─── Profile ──────────────────────────────────────────────────────────────────

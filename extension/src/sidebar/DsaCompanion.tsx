@@ -32,7 +32,6 @@ export function DsaCompanion({ slug, difficulty, tabId }: DsaCompanionProps) {
   const [hints, setHints] = useState<ProblemHints | null | 'unavailable'>(null)
   const [phase, setPhase] = useState<DsaPhase>('read')
   const [elapsed, setElapsed] = useState(0)     // seconds in current phase
-  const [totalTime, setTotalTime] = useState(0)  // seconds across all phases
   const [revealedLayers, setRevealedLayers] = useState<number[]>([])
   const [language, setLanguage] = useState<DsaLanguage>('python')
   const [showNudge, setShowNudge] = useState(false)
@@ -42,6 +41,11 @@ export function DsaCompanion({ slug, difficulty, tabId }: DsaCompanionProps) {
   const lastKeystrokeRef = useRef(Date.now())
   const phaseStartRef = useRef(Date.now())
   const hintCountRef = useRef(0)
+  const phaseRef = useRef<DsaPhase>('read')
+  const totalTimeRef = useRef(0)
+  const phaseTimingsRef = useRef<Partial<Record<DsaPhase, number>>>({})
+  const nudgeCountRef = useRef(0)
+  const nudgeActiveRef = useRef(false)
 
   const phaseLimit = PHASE_DURATIONS[phase][difficulty] // minutes
   const progress = phaseProgress(elapsed, phaseLimit)
@@ -65,13 +69,17 @@ export function DsaCompanion({ slug, difficulty, tabId }: DsaCompanionProps) {
       const now = Date.now()
       const phaseElapsed = Math.floor((now - phaseStartRef.current) / 1000)
       setElapsed(phaseElapsed)
-      setTotalTime((t) => t + 1)
+      totalTimeRef.current += 1
 
       // Inactivity nudge: elapsed > INACTIVITY_THRESHOLD_PERCENT% of phase limit
       // AND no keystroke in that same window
       const thresholdSec = (phaseLimit * 60 * INACTIVITY_THRESHOLD_PERCENT) / 100
       const keystrokeAge = (now - lastKeystrokeRef.current) / 1000
       if (phaseElapsed >= thresholdSec && keystrokeAge >= thresholdSec) {
+        if (!nudgeActiveRef.current) {
+          nudgeCountRef.current += 1
+          nudgeActiveRef.current = true
+        }
         setShowNudge(true)
       }
     }, 1000)
@@ -82,6 +90,7 @@ export function DsaCompanion({ slug, difficulty, tabId }: DsaCompanionProps) {
   useEffect(() => {
     const onKey = () => {
       lastKeystrokeRef.current = Date.now()
+      nudgeActiveRef.current = false
       setShowNudge(false)
     }
     document.addEventListener('keydown', onKey)
@@ -90,9 +99,10 @@ export function DsaCompanion({ slug, difficulty, tabId }: DsaCompanionProps) {
 
   // ── Auto-save to chrome.storage.local every 30s ───────────────────────────
   const buildCurrentAttempt = useCallback(() => buildAttempt(
-    attemptIdRef.current, slug, phase, totalTime,
-    hintCountRef.current, revealedLayers, language
-  ), [slug, phase, totalTime, revealedLayers, language])
+    attemptIdRef.current, slug, phaseRef.current, totalTimeRef.current,
+    hintCountRef.current, revealedLayers, language,
+    { ...phaseTimingsRef.current }, nudgeCountRef.current
+  ), [slug, revealedLayers, language])
 
   useEffect(() => {
     if (done) return
@@ -118,10 +128,13 @@ export function DsaCompanion({ slug, difficulty, tabId }: DsaCompanionProps) {
   // causes React to unmount this instance (triggering cleanup) and mount a new one.
   useEffect(() => {
     return () => {
-      // Cleanup: post the attempt when this component unmounts (new problem or tab close)
+      // Capture final phase timing before posting
+      const finalPhaseElapsed = Math.floor((Date.now() - phaseStartRef.current) / 1000)
+      const timings = { ...phaseTimingsRef.current, [phaseRef.current]: finalPhaseElapsed }
       const attempt = buildAttempt(
-        attemptIdRef.current, slug, phase, totalTime,
-        hintCountRef.current, revealedLayers, language
+        attemptIdRef.current, slug, phaseRef.current, totalTimeRef.current,
+        hintCountRef.current, revealedLayers, language,
+        timings, nudgeCountRef.current
       )
       void postDsaAttempt(attempt)
       void clearDsaAttempt(tabId)
@@ -135,10 +148,15 @@ export function DsaCompanion({ slug, difficulty, tabId }: DsaCompanionProps) {
   function advancePhase() {
     const idx = DSA_PHASES.indexOf(phase)
     if (idx >= DSA_PHASES.length - 1) return
+    // Record time spent in the phase we're leaving
+    phaseTimingsRef.current[phase] = elapsed
+    const nextPhase = DSA_PHASES[idx + 1]
+    phaseRef.current = nextPhase
     phaseStartRef.current = Date.now()
-    setPhase(DSA_PHASES[idx + 1])
+    setPhase(nextPhase)
     setElapsed(0)
     setShowNudge(false)
+    nudgeActiveRef.current = false
     lastKeystrokeRef.current = Date.now()
   }
 
@@ -151,6 +169,9 @@ export function DsaCompanion({ slug, difficulty, tabId }: DsaCompanionProps) {
 
   async function handleDone() {
     setDone(true)
+    // Capture final phase timing before building the attempt
+    const finalPhaseElapsed = Math.floor((Date.now() - phaseStartRef.current) / 1000)
+    phaseTimingsRef.current[phaseRef.current] = finalPhaseElapsed
     const attempt = buildCurrentAttempt()
     await postDsaAttempt(attempt)
     await clearDsaAttempt(tabId)
