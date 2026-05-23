@@ -35,12 +35,11 @@ const UNIVERSAL_RUBRIC: Record<PrepBank, RubricItem[]> = {
 
 interface PrepSelfRubricProps {
   bank: PrepBank
-  problemRubric?: string[]
 }
 
-export function PrepSelfRubric({ bank, problemRubric }: PrepSelfRubricProps) {
+export function PrepSelfRubric({ bank }: PrepSelfRubricProps) {
   const universal = UNIVERSAL_RUBRIC[bank]
-  const total = universal.length + (problemRubric?.length ?? 0)
+  const total = universal.length
 
   const [checked, setChecked] = useState<Set<string>>(new Set())
 
@@ -75,24 +74,6 @@ export function PrepSelfRubric({ bank, problemRubric }: PrepSelfRubricProps) {
           />
         ))}
       </div>
-
-      {problemRubric && problemRubric.length > 0 && (
-        <div className="space-y-1 border-t border-zinc-800 pt-3">
-          <p className="mb-1.5 text-[11px] uppercase tracking-wide text-zinc-600">Problem-specific</p>
-          {problemRubric.map((label, i) => {
-            const id = `problem-${i}`
-            return (
-              <RubricRow
-                key={id}
-                id={id}
-                label={label}
-                checked={checked.has(id)}
-                onToggle={toggle}
-              />
-            )
-          })}
-        </div>
-      )}
 
       <div className="pt-1 space-y-1.5">
         <div className="h-1 rounded-full bg-zinc-800 overflow-hidden">

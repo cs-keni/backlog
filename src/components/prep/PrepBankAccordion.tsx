@@ -52,6 +52,7 @@ export function PrepBankAccordion({ bank, title, description }: PrepBankAccordio
   const [loading, setLoading] = useState(true)
   const [openTopics, setOpenTopics] = useState<Set<string>>(new Set())
   const [openQuestionId, setOpenQuestionId] = useState<string | null>(null)
+  const [revealedHints, setRevealedHints] = useState<Set<string>>(new Set())
   const [selectedPrimer, setSelectedPrimer] = useState<ConceptPrimer | null>(null)
   const [savingId, setSavingId] = useState<string | null>(null)
 
@@ -215,13 +216,8 @@ export function PrepBankAccordion({ bank, title, description }: PrepBankAccordio
 
                             {questionOpen && (
                               <div className="mt-4 space-y-4">
-                                <div className="space-y-2">
-                                  {question.hints.map((hint) => (
-                                    <p key={hint} className="text-sm leading-6 text-zinc-400">
-                                      <span className="text-zinc-600">• </span>{hint}
-                                    </p>
-                                  ))}
-                                </div>
+                                <PrepSelfRubric bank={bank} />
+
                                 <div className="flex flex-wrap gap-2">
                                   {question.concepts.map((concept) => (
                                     <button
@@ -236,7 +232,26 @@ export function PrepBankAccordion({ bank, title, description }: PrepBankAccordio
                                     </button>
                                   ))}
                                 </div>
-                                <PrepSelfRubric bank={bank} problemRubric={question.rubric} />
+
+                                <div>
+                                  {revealedHints.has(question.id) ? (
+                                    <div className="space-y-2">
+                                      <p className="text-[11px] uppercase tracking-wide text-zinc-600">Hints</p>
+                                      {question.hints.map((hint) => (
+                                        <p key={hint} className="text-sm leading-6 text-zinc-400">
+                                          <span className="text-zinc-600">• </span>{hint}
+                                        </p>
+                                      ))}
+                                    </div>
+                                  ) : (
+                                    <button
+                                      onClick={() => setRevealedHints((prev) => new Set([...prev, question.id]))}
+                                      className="text-xs text-zinc-500 underline underline-offset-2 hover:text-zinc-300"
+                                    >
+                                      Reveal hints
+                                    </button>
+                                  )}
+                                </div>
 
                                 <div className="flex flex-wrap gap-2">
                                   <button
