@@ -212,3 +212,4 @@ export type ExtensionMessage =
   | { type: 'SUBMIT_ATTEMPTED'; payload: { url: string; jobTitle: string | null; company: string | null; ats: AtsType } }
   | { type: 'SCAN_FORM'; payload: FullProfile }
   | { type: 'APPLY_SCANNED'; payload: { fields: Array<{ selector: string; value: string }> } }
+  | { type: 'AUTO_INJECT_SIDEBAR' }

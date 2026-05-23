@@ -1,7 +1,6 @@
 import { extractPageInfo, detectLeetCodeProblem } from './detect'
 import { fillForm, applyFieldValues, fillWorkdayComboboxes, fillFileInputs } from './fill'
 import { detectNextButton, detectPageType } from './detect'
-import { injectSidebar, updateSidebarPage } from '../sidebar/inject'
 import type { ExtensionMessage, FillResult, PageInfo, PageTypeInfo, JobContext } from '../shared/types'
 
 // Guard: don't run sidebar injection or message handlers in iframes.
@@ -43,7 +42,8 @@ function tryInjectDsaPanel(url: string): void {
   if (!IS_TOP_FRAME) return
   const problem = detectLeetCodeProblem(url)
   if (!problem) return
-  const dsaPage: PageInfo = {
+  // Store DSA info so GET_PAGE_INFO returns it when sidebar.js initializes
+  cachedPageInfo = {
     ats: null,
     jobTitle: null,
     company: null,
@@ -52,13 +52,14 @@ function tryInjectDsaPanel(url: string): void {
     dsaSlug: problem.lcSlug,
     dsaDifficulty: problem.difficulty,
   }
-  injectSidebar(dsaPage)
+  // Ask background to inject sidebar.js — same mechanism as toolbar click
+  try { chrome.runtime.sendMessage({ type: 'AUTO_INJECT_SIDEBAR' } as ExtensionMessage) } catch { /* context invalidated */ }
 }
 
 function tryUpdateDsaPanel(url: string): void {
   if (!IS_TOP_FRAME) return
   const problem = detectLeetCodeProblem(url)
-  const dsaPage: PageInfo = {
+  cachedPageInfo = {
     ats: null,
     jobTitle: null,
     company: null,
@@ -67,7 +68,8 @@ function tryUpdateDsaPanel(url: string): void {
     dsaSlug: problem?.lcSlug,
     dsaDifficulty: problem?.difficulty,
   }
-  updateSidebarPage(dsaPage)
+  // Notify already-injected sidebar.js of the navigation via DOM event
+  window.dispatchEvent(new CustomEvent('backlog:dsa-update', { detail: cachedPageInfo }))
 }
 
 // ─── Navigation re-trigger ────────────────────────────────────────────────────

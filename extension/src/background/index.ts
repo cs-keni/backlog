@@ -319,6 +319,28 @@ chrome.runtime.onMessage.addListener((message: ExtensionMessage, sender, sendRes
     }
     return false
   }
+
+  if (message.type === 'AUTO_INJECT_SIDEBAR') {
+    const tabId = sender.tab?.id
+    if (!tabId) return false
+    // If sidebar already exists, show it (in case it was collapsed); otherwise inject
+    chrome.scripting.executeScript({
+      target: { tabId },
+      func: () => {
+        const host = document.getElementById('backlog-sidebar-host')
+        if (!host?.shadowRoot) return false
+        const inner = host.shadowRoot.getElementById('backlog-sidebar-inner')
+        if (!inner) return false
+        if (inner.style.display === 'none') inner.style.display = ''
+        return true
+      },
+    }).then((results) => {
+      if (!results[0]?.result) {
+        return chrome.scripting.executeScript({ target: { tabId }, files: ['sidebar.js'] })
+      }
+    }).catch(() => {})
+    return false
+  }
 })
 
 // ─── DSA attempt flush ────────────────────────────────────────────────────────
