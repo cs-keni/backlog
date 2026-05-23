@@ -321,11 +321,36 @@ chrome.runtime.onMessage.addListener((message: ExtensionMessage, sender, sendRes
   }
 })
 
+// ─── DSA attempt flush ────────────────────────────────────────────────────────
+// On tab close, read any pending DSA attempt from chrome.storage.local and POST it.
+// chrome.storage.local persists across service worker restarts, so this is reliable.
+
+async function flushDsaAttempt(tabId: number): Promise<void> {
+  const key = `dsa_attempt_${tabId}`
+  try {
+    const result = await chrome.storage.local.get(key)
+    const attempt = result[key]
+    if (!attempt) return
+
+    const apiKey = await getApiKey()
+    if (apiKey) {
+      await fetch(`${BACKLOG_URL}/api/dsa/attempts`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
+        body: JSON.stringify(attempt),
+      })
+    }
+  } catch { /* best-effort */ } finally {
+    try { await chrome.storage.local.remove(`dsa_attempt_${tabId}`) } catch { /* ignore */ }
+  }
+}
+
 // ─── Tab lifecycle ────────────────────────────────────────────────────────────
 
 // Clean up session state when a tab is closed to prevent state bleed
 chrome.tabs.onRemoved.addListener((tabId) => {
   void clearTabState(tabId)
+  void flushDsaAttempt(tabId)
 })
 
 // Trigger auto-advance fill on full-page navigation (non-SPA)

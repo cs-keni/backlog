@@ -1,7 +1,13 @@
-import { extractPageInfo } from './detect'
+import { extractPageInfo, detectLeetCodeProblem } from './detect'
 import { fillForm, applyFieldValues, fillWorkdayComboboxes, fillFileInputs } from './fill'
 import { detectNextButton, detectPageType } from './detect'
+import { injectSidebar, updateSidebarPage } from '../sidebar/inject'
 import type { ExtensionMessage, FillResult, PageInfo, PageTypeInfo, JobContext } from '../shared/types'
+
+// Guard: don't run sidebar injection or message handlers in iframes.
+// navigation.ts patches pushState in all frames, but sidebar injection and
+// chrome.runtime message listeners must only run in the top-level frame.
+const IS_TOP_FRAME = window === window.top
 
 // Cache detection result so the popup always gets the latest known state.
 // Greenhouse and other ATS forms often render asynchronously via JS, so the
@@ -21,31 +27,68 @@ function refreshCache(): PageInfo {
   return cachedPageInfo
 }
 
-// Watch for dynamically injected forms (Greenhouse embed, SPA routing, etc.)
-try {
-  const observer = new MutationObserver(() => {
-    if (!cachedPageInfo.isJobPage) refreshCache()
-  })
-  if (document.body) observer.observe(document.body, { childList: true, subtree: true })
-} catch { /* ignore */ }
+if (IS_TOP_FRAME) {
+  // Watch for dynamically injected forms (Greenhouse embed, SPA routing, etc.)
+  try {
+    const observer = new MutationObserver(() => {
+      if (!cachedPageInfo.isJobPage) refreshCache()
+    })
+    if (document.body) observer.observe(document.body, { childList: true, subtree: true })
+  } catch { /* ignore */ }
+}
+
+// ─── DSA auto-injection ───────────────────────────────────────────────────────
+
+function tryInjectDsaPanel(url: string): void {
+  if (!IS_TOP_FRAME) return
+  const problem = detectLeetCodeProblem(url)
+  if (!problem) return
+  const dsaPage: PageInfo = {
+    ats: null,
+    jobTitle: null,
+    company: null,
+    jobDescription: null,
+    isJobPage: false,
+    dsaSlug: problem.lcSlug,
+    dsaDifficulty: problem.difficulty,
+  }
+  injectSidebar(dsaPage)
+}
+
+function tryUpdateDsaPanel(url: string): void {
+  if (!IS_TOP_FRAME) return
+  const problem = detectLeetCodeProblem(url)
+  const dsaPage: PageInfo = {
+    ats: null,
+    jobTitle: null,
+    company: null,
+    jobDescription: null,
+    isJobPage: false,
+    dsaSlug: problem?.lcSlug,
+    dsaDifficulty: problem?.difficulty,
+  }
+  updateSidebarPage(dsaPage)
+}
 
 // ─── Navigation re-trigger ────────────────────────────────────────────────────
 // Listen for the custom event dispatched by navigation.ts (world: MAIN).
 // On SPA navigation, reset the detection cache and notify the background.
 window.addEventListener('backlog:navigation', (e) => {
+  if (!IS_TOP_FRAME) return
   const url = (e as CustomEvent<{ url: string }>).detail?.url ?? location.href
   submissionWatched = false
   cachedPageInfo = { ats: null, jobTitle: null, company: null, jobDescription: null, isJobPage: false }
   // Small delay to allow the new page DOM to settle
   setTimeout(() => {
     refreshCache()
+    tryUpdateDsaPanel(url)
     try { chrome.runtime.sendMessage({ type: 'PAGE_NAVIGATED', payload: { url } } as ExtensionMessage) } catch { /* context invalidated */ }
   }, 300)
 })
 
 // ─── Message handler ──────────────────────────────────────────────────────────
 
-chrome.runtime.onMessage.addListener((message: ExtensionMessage, _sender, sendResponse) => {
+if (IS_TOP_FRAME) chrome.runtime.onMessage.addListener((message: ExtensionMessage, _sender, sendResponse) => {
   // ── GET_PAGE_INFO ──────────────────────────────────────────────────────────
   if (message.type === 'GET_PAGE_INFO') {
     sendResponse(refreshCache())
@@ -171,4 +214,7 @@ function watchForSubmission() {
 }
 
 // Initial check (catches pages where the form is already in the DOM)
-refreshCache()
+if (IS_TOP_FRAME) {
+  refreshCache()
+  tryInjectDsaPanel(window.location.href)
+}

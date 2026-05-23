@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import {
   getApiKey, setApiKey, fetchProfile, analyzePage, answerQuestion, improveSkills, addJob,
 } from '../shared/api'
+import { DsaCompanion } from './DsaCompanion'
 import { computeFills, applyFills, applyFieldValues, getLabelForInput, fillWorkdayComboboxes, fillFileInputs } from '../content/fill'
 import { detectNextButton, detectPageType } from '../content/detect'
 import type {
@@ -133,6 +134,7 @@ export function Sidebar({ initialPage }: { initialPage: PageInfo }) {
   const [improvingSkills, setImprovingSkills] = useState(false)
   const [page, setPage] = useState<PageInfo>(initialPage)
   const [jobContext, setJobContext] = useState<JobContext | null>(null)
+  const [tabId, setTabId] = useState<number>(0)
   const tabIdRef = useRef<number>(0)
   const cancelledRef = useRef(false)
   const lastProfileRef = useRef<FullProfile | null>(null)
@@ -154,6 +156,7 @@ export function Sidebar({ initialPage }: { initialPage: PageInfo }) {
       if (!key) { setState({ status: 'no-key' }); return }
 
       tabIdRef.current = await getTabId()
+      setTabId(tabIdRef.current)
       const tabState = await getTabState(tabIdRef.current)
       setJobContext(tabState?.jobContext ?? null)
       const profile = await fetchProfile()
@@ -509,95 +512,111 @@ export function Sidebar({ initialPage }: { initialPage: PageInfo }) {
 
       {/* ── Scrollable body ── */}
       <div className="sidebar-scroll" style={{ flex: 1, overflowY: 'auto', padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-        {jobContext && <JobContextBadge context={jobContext} />}
 
-        {state.status === 'loading' && <LoadingState />}
-
-        {state.status === 'no-key' && <NoKeyState onConnected={init} />}
-
-        {state.status === 'error' && (
-          <ErrorState
-            message={state.message}
-            debug={lastDebugRef.current}
-            onRetry={() => { setState({ status: 'loading' }); void init() }}
+        {/* DSA Companion mode — shown when on a NeetCode 150 LeetCode problem */}
+        {page.dsaSlug && page.dsaDifficulty && (
+          <DsaCompanion
+            key={page.dsaSlug}
+            slug={page.dsaSlug}
+            difficulty={page.dsaDifficulty}
+            tabId={tabId}
           />
         )}
 
-        {(state.status === 'ready' || state.status === 'filling' || state.status === 'scanning' || state.status === 'scan-preview' || state.status === 'review' || state.status === 'added') && (
+        {/* Job application mode — shown when NOT on a DSA page */}
+        {!page.dsaSlug && (
           <>
-            {state.status !== 'added' && (() => {
-              const profile = 'profile' in state ? state.profile : null
-              if (!profile) return null
-              return <ProfileCard profile={profile} />
-            })()}
+            {jobContext && <JobContextBadge context={jobContext} />}
 
-            {page.isJobPage && (
-              <JobCard page={page} />
+            {state.status === 'loading' && <LoadingState />}
+
+            {state.status === 'no-key' && <NoKeyState onConnected={init} />}
+
+            {state.status === 'error' && (
+              <ErrorState
+                message={state.message}
+                debug={lastDebugRef.current}
+                onRetry={() => { setState({ status: 'loading' }); void init() }}
+              />
             )}
 
-            {!page.isJobPage && state.status === 'ready' && (
-              <p style={{ fontSize: '11px', color: '#71717a', padding: '4px 0' }}>
-                Navigate to a job application to use Auto-fill.
-              </p>
+            {(state.status === 'ready' || state.status === 'filling' || state.status === 'scanning' || state.status === 'scan-preview' || state.status === 'review' || state.status === 'added') && (
+              <>
+                {state.status !== 'added' && (() => {
+                  const profile = 'profile' in state ? state.profile : null
+                  if (!profile) return null
+                  return <ProfileCard profile={profile} />
+                })()}
+
+                {page.isJobPage && (
+                  <JobCard page={page} />
+                )}
+
+                {!page.isJobPage && state.status === 'ready' && (
+                  <p style={{ fontSize: '11px', color: '#71717a', padding: '4px 0' }}>
+                    Navigate to a job application to use Auto-fill.
+                  </p>
+                )}
+              </>
+            )}
+
+            {state.status === 'ready' && (
+              <ReadyActions
+                page={page}
+                autoAdvance={autoAdvance}
+                onAutoAdvanceChange={setAutoAdvance}
+                skillsField={skillsField}
+                improvingSkills={improvingSkills}
+                onScan={handleScan}
+                onAutoFill={autoFill}
+                onImproveSkills={handleImproveSkills}
+                onAddToBacklog={handleAddToBacklog}
+              />
+            )}
+
+            {state.status === 'scanning' && (
+              <ScanningState />
+            )}
+
+            {state.status === 'scan-preview' && (
+              <ScanPreviewState
+                fields={state.fields}
+                page={state.page}
+                onApply={handleApplyScanned}
+                onCancel={() => setState({ status: 'ready', profile: state.profile, page: state.page })}
+              />
+            )}
+
+            {state.status === 'filling' && (
+              <FillingState
+                stage={state.stage}
+                onCancel={() => {
+                  cancelledRef.current = true
+                  const profile = lastProfileRef.current
+                  if (profile) {
+                    setState({ status: 'ready', profile, page })
+                  } else {
+                    setState({ status: 'loading' })
+                    void init()
+                  }
+                }}
+              />
+            )}
+
+            {state.status === 'review' && (
+              <ReviewState
+                filled={state.filled}
+                skipped={state.skipped}
+                aiUnavailable={state.aiUnavailable}
+                debug={lastDebugRef.current}
+                onDone={() => setState({ status: 'ready', profile: state.profile, page: state.page })}
+              />
+            )}
+
+            {state.status === 'added' && (
+              <AddedState duplicate={(state as Extract<SidebarState, { status: 'added' }>).duplicate} />
             )}
           </>
-        )}
-
-        {state.status === 'ready' && (
-          <ReadyActions
-            page={page}
-            autoAdvance={autoAdvance}
-            onAutoAdvanceChange={setAutoAdvance}
-            skillsField={skillsField}
-            improvingSkills={improvingSkills}
-            onScan={handleScan}
-            onAutoFill={autoFill}
-            onImproveSkills={handleImproveSkills}
-            onAddToBacklog={handleAddToBacklog}
-          />
-        )}
-
-        {state.status === 'scanning' && (
-          <ScanningState />
-        )}
-
-        {state.status === 'scan-preview' && (
-          <ScanPreviewState
-            fields={state.fields}
-            page={state.page}
-            onApply={handleApplyScanned}
-            onCancel={() => setState({ status: 'ready', profile: state.profile, page: state.page })}
-          />
-        )}
-
-        {state.status === 'filling' && (
-          <FillingState
-            stage={state.stage}
-            onCancel={() => {
-              cancelledRef.current = true
-              const profile = lastProfileRef.current
-              if (profile) {
-                setState({ status: 'ready', profile, page })
-              } else {
-                setState({ status: 'loading' })
-                void init()
-              }
-            }}
-          />
-        )}
-
-        {state.status === 'review' && (
-          <ReviewState
-            filled={state.filled}
-            skipped={state.skipped}
-            aiUnavailable={state.aiUnavailable}
-            debug={lastDebugRef.current}
-            onDone={() => setState({ status: 'ready', profile: state.profile, page: state.page })}
-          />
-        )}
-
-        {state.status === 'added' && (
-          <AddedState duplicate={(state as Extract<SidebarState, { status: 'added' }>).duplicate} />
         )}
       </div>
     </div>

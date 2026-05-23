@@ -1,5 +1,5 @@
 import { BACKLOG_URL } from './config'
-import type { FullProfile } from './types'
+import type { FullProfile, ProblemHints, DsaAttempt } from './types'
 
 const STORAGE_KEY = 'backlog_api_key'
 
@@ -138,4 +138,28 @@ export async function addJob(payload: {
   })
   if (!res.ok) throw new Error(`Add job failed: ${res.status}`)
   return res.json() as Promise<{ job: { id: string }; duplicate: boolean }>
+}
+
+// ─── DSA Companion ────────────────────────────────────────────────────────────
+
+export async function fetchDsaHints(slug: string): Promise<ProblemHints | null> {
+  try {
+    const res = await apiFetch(`/api/dsa/hints/${encodeURIComponent(slug)}`)
+    if (res.status === 404) return null
+    if (!res.ok) throw new Error(`Hints fetch failed: ${res.status}`)
+    return res.json() as Promise<ProblemHints>
+  } catch {
+    return null
+  }
+}
+
+export async function postDsaAttempt(attempt: DsaAttempt): Promise<void> {
+  try {
+    await apiFetch('/api/dsa/attempts', {
+      method: 'POST',
+      body: JSON.stringify(attempt),
+    })
+  } catch {
+    // best-effort; caller handles storage cleanup regardless
+  }
 }

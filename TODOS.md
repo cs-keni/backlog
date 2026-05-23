@@ -4,6 +4,17 @@ Deferred tasks and known issues. Each item has enough context to pick up months 
 
 ---
 
+## DSA Companion / Phase 2
+
+### Complete problem-specific hints for all NeetCode 150 problems
+**What:** Write problem-specific ProblemHints entries (Layer 1-4) for all 150 NeetCode problems. Phase 1 ships with 20 hints (one per pattern), meaning problems in the same pattern share generic hints. That's a cheat sheet, not coaching.
+**Why:** "One per pattern" means `two-sum` and `top-k-frequent-elements` show the same "use a dict" Layer 2 hint. Problem-specific hints (e.g., for top-k: "use a min-heap of size k, not a full sort") are what make this a coaching tool. This is the content dependency that makes Phase 2 useful.
+**How to apply:** For each problem not yet covered, write a `ProblemHints` entry keyed on the LeetCode URL slug (e.g., `contains-duplicate`, not `duplicate-integer`). The Zod schema in `src/lib/dsa/hints.ts` and `hints.test.ts` will catch malformed entries automatically on CI.
+**Depends on:** Phase 1 DSA Companion shipped. hints.test.ts with Zod validation must pass before adding bulk content.
+**Effort:** Content work, not engineering. Roughly 30-60 min per pattern group; ~4-5 hours total for the remaining 130 problems.
+
+---
+
 ## Extension / Phase 10A
 
 ### Haiku API timeout + fallback (CRITICAL)

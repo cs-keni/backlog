@@ -1,5 +1,25 @@
 import type { AtsType, PageInfo, PageTypeInfo } from '../shared/types'
 import { queryShadowAll } from '../shared/domUtils'
+import { detectLcProblem } from '../shared/leetcode-problems'
+import type { LcProblem } from '../shared/leetcode-problems'
+
+// ─── LeetCode problem detection ───────────────────────────────────────────────
+// Extracts the problem slug from a LeetCode URL and checks if it's in the
+// NeetCode 150 list. Returns null for non-problem pages or off-list problems.
+
+export function detectLeetCodeProblem(url: string): LcProblem | null {
+  try {
+    const parsed = new URL(url)
+    if (!parsed.hostname.includes('leetcode.com')) return null
+    // LeetCode problem URLs: /problems/:slug/ or /problems/:slug/description/ etc.
+    const match = parsed.pathname.match(/^\/problems\/([^/]+)/)
+    if (!match) return null
+    const slug = match[1]
+    return detectLcProblem(slug)
+  } catch {
+    return null
+  }
+}
 
 export function detectAts(url: string): AtsType {
   if (/boards\.greenhouse\.io/.test(url) || /[?&]gh_jid=/.test(url)) return 'greenhouse'

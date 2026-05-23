@@ -1,3 +1,35 @@
+// ─── DSA Companion ────────────────────────────────────────────────────────────
+
+export type DsaPhase = 'read' | 'brute_force' | 'pattern' | 'code'
+export type DsaLanguage = 'python' | 'java' | 'js'
+
+export interface ProblemHints {
+  slug: string
+  layer1: string
+  layer2: {
+    python: string
+    java: string
+    js: string
+    description: string
+  }
+  layer3: {
+    algorithm: string
+    timeComplexity: string
+    spaceComplexity: string
+  }
+  layer4: string
+}
+
+export interface DsaAttempt {
+  attempt_id: string
+  problem_slug: string
+  phase_reached: DsaPhase
+  time_spent_sec: number
+  hint_count: number
+  hint_layers_revealed: number[]
+  language: DsaLanguage
+}
+
 // ─── Profile ──────────────────────────────────────────────────────────────────
 
 export interface UserProfile {
@@ -75,6 +107,8 @@ export interface PageInfo {
   company: string | null
   jobDescription: string | null
   isJobPage: boolean
+  dsaSlug?: string
+  dsaDifficulty?: 'easy' | 'medium' | 'hard'
 }
 
 export interface FilledField {
