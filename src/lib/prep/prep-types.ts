@@ -6,6 +6,7 @@ export interface PrepQuestion {
   hints: string[]
   concepts: string[]
   companies?: string[]
+  rubric?: string[]
 }
 
 export interface ConceptPrimer {

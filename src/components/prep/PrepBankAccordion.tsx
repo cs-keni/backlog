@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import type { ConceptPrimer, PrepQuestion } from '@/lib/prep/prep-types'
 import { ConceptPrimerModal } from './ConceptPrimerModal'
 import { PrepCoachPanel } from './PrepCoachPanel'
+import { PrepSelfRubric } from './PrepSelfRubric'
 
 type PrepBank = 'system-design' | 'ai-engineer'
 type QuestionStatus = 'unstudied' | 'studied' | 'needs-review'
@@ -235,6 +236,8 @@ export function PrepBankAccordion({ bank, title, description }: PrepBankAccordio
                                     </button>
                                   ))}
                                 </div>
+                                <PrepSelfRubric bank={bank} problemRubric={question.rubric} />
+
                                 <div className="flex flex-wrap gap-2">
                                   <button
                                     disabled={savingId === question.id}
