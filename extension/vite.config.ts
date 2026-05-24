@@ -11,8 +11,9 @@ function chromeExtensionPlugin() {
       mkdirSync('dist', { recursive: true })
       // Flatten popup HTML from dist/src/popup/ to dist/
       try { copyFileSync('dist/src/popup/index.html', 'dist/popup.html') } catch { /* already flat */ }
-      // Copy manifest
+      // Copy manifest and icons
       copyFileSync('public/manifest.json', 'dist/manifest.json')
+      try { copyFileSync('public/icon128.png', 'dist/icon128.png') } catch { /* icon optional */ }
     },
   }
 }
@@ -25,7 +26,6 @@ export default defineConfig({
     rollupOptions: {
       input: {
         popup: resolve(__dirname, 'src/popup/index.html'),
-        content: resolve(__dirname, 'src/content/index.ts'),
         navigation: resolve(__dirname, 'src/content/navigation.ts'),
         background: resolve(__dirname, 'src/background/index.ts'),
       },

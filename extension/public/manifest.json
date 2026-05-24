@@ -34,8 +34,14 @@
       "world": "MAIN"
     }
   ],
+  "icons": {
+    "128": "icon128.png"
+  },
   "action": {
-    "default_title": "Toggle Backlog sidebar"
+    "default_title": "Toggle Backlog sidebar",
+    "default_icon": {
+      "128": "icon128.png"
+    }
   },
   "web_accessible_resources": [
     {

@@ -155,10 +155,17 @@ export function Sidebar({ initialPage }: { initialPage: PageInfo }) {
       const key = await getApiKey()
       if (!key) { setState({ status: 'no-key' }); return }
 
-      tabIdRef.current = await getTabId()
-      setTabId(tabIdRef.current)
-      const tabState = await getTabState(tabIdRef.current)
-      setJobContext(tabState?.jobContext ?? null)
+      // Tab state uses chrome.storage.session which can throw in partially-sandboxed
+      // contexts (e.g. Workday iframes after extension reload). Treat as non-fatal.
+      try {
+        tabIdRef.current = await getTabId()
+        setTabId(tabIdRef.current)
+        const tabState = await getTabState(tabIdRef.current)
+        setJobContext(tabState?.jobContext ?? null)
+      } catch {
+        // Proceed without session state — fill will still work
+      }
+
       const profile = await fetchProfile()
       setSkillsField(findSkillsField())
       setState({ status: 'ready', profile, page })
