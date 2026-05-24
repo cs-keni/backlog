@@ -1,6 +1,8 @@
 import { PORTAL_COMPANIES } from './companies'
 import { fetchGreenhouseJobs } from './greenhouse'
 import { fetchLeverJobs } from './lever'
+import { fetchWorkdayJobs, WORKDAY_TENANTS } from './workday'
+import { fetchUsaJobs } from './usajobs'
 import type { NormalizedJob } from '../llm/normalizer'
 
 const CONCURRENCY = 6 // simultaneous company fetches
@@ -10,6 +12,7 @@ const CONCURRENCY = 6 // simultaneous company fetches
 export async function scanPortals(): Promise<NormalizedJob[]> {
   const allJobs: NormalizedJob[] = []
 
+  // Private-sector ATS portals (Greenhouse + Lever)
   for (let i = 0; i < PORTAL_COMPANIES.length; i += CONCURRENCY) {
     const batch = PORTAL_COMPANIES.slice(i, i + CONCURRENCY)
     const results = await Promise.all(
@@ -29,6 +32,23 @@ export async function scanPortals(): Promise<NormalizedJob[]> {
     for (const batch_jobs of results) allJobs.push(...batch_jobs)
   }
 
-  console.log(`[portals] Scan complete — ${allJobs.length} total jobs fetched across ${PORTAL_COMPANIES.length} companies`)
+  // State/local government jobs via Workday CXS API
+  for (let i = 0; i < WORKDAY_TENANTS.length; i += CONCURRENCY) {
+    const batch = WORKDAY_TENANTS.slice(i, i + CONCURRENCY)
+    const results = await Promise.allSettled(batch.map(tenant => fetchWorkdayJobs(tenant)))
+    for (const result of results) {
+      if (result.status === 'fulfilled') allJobs.push(...result.value)
+    }
+  }
+
+  // Federal government jobs via USAJobs.gov API
+  try {
+    const federalJobs = await fetchUsaJobs()
+    allJobs.push(...federalJobs)
+  } catch (err) {
+    console.warn('[portals] USAJobs fetch failed:', err)
+  }
+
+  console.log(`[portals] Scan complete — ${allJobs.length} total jobs fetched across ${PORTAL_COMPANIES.length} companies + ${WORKDAY_TENANTS.length} Workday tenants + USAJobs`)
   return allJobs
 }
