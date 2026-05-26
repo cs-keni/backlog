@@ -92,15 +92,15 @@ server.listen(PORT, () => {
 })
 
 // ── Cron ─────────────────────────────────────────────────────────────────────
-// Every 8 hours: "0 */8 * * *"
+// Every 12 hours: "0 */12 * * *"
 
 console.log('[startup] Backlog worker starting...')
 
 // Run once immediately on startup so we don't wait for the first cron tick
 runAndNotify().catch(console.error)
 
-cron.schedule('0 */8 * * *', () => {
+cron.schedule('0 */12 * * *', () => {
   runAndNotify().catch(console.error)
 })
 
-console.log('[startup] Cron scheduled — aggregating every 8 hours')
+console.log('[startup] Cron scheduled — aggregating every 12 hours')
