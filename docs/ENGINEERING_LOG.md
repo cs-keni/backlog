@@ -6,7 +6,7 @@ Reverse-chronological. One entry per meaningful session.
 
 ## 2026-06-05 — Fix extension false-positive "applied" detection (Claude Code)
 
-**Commit:** not yet committed
+**Commit:** 9f1153b
 
 ### What happened
 
@@ -72,12 +72,75 @@ landed within 1ms of each other with different scraped URLs.
 
 ### Next
 
-- The ~27 phantom records already in the live DB are untouched by this fix (it only stops
-  *new* false positives). Asked the user whether they'd like a one-off cleanup query to
-  remove the `hide_from_feed: true` stubs + linked `applied` applications with junk titles.
+- ~~The ~27 phantom records already in the live DB are untouched by this fix~~ — cleaned up
+  in a follow-up pass, see the entry directly below.
 - Spot-check in a live browser session would help confirm the fix end-to-end, but the
   underlying bug only reproduces against real third-party ATS pages — covered here via
   targeted unit/regression tests instead.
+
+---
+
+## 2026-06-05 — One-off cleanup of phantom "applied" records (Claude Code)
+
+**Commit:** (pending — committed alongside this log entry)
+
+### What happened
+
+Follow-up to the false-positive fix above: the live DB still held ~29 phantom
+`hide_from_feed: true` job stubs + linked `applied` applications created by the bug before
+it was patched. Re-querying live data (joined `jobs` ↔ `applications`, full URL/title/status
+inspection) showed the situation was **not** "27 obvious junk rows" as first assumed —
+several were genuine, actively-tracked applications:
+
+- TikTok ("Software Engineer, Insider Risk") had been manually progressed to `status: technical`.
+- Six separate Mastercard "Software Engineer II" submissions shared one generic confirmation
+  page title ("Apply Today | Mastercard jobs") but had six distinct `jobId` query params —
+  six real applications, not duplicates.
+- Two clusters (HR Block job 42434 ×7 records, GDMS job 72592 ×4 records) were genuinely
+  ONE real multi-step application each, fired repeatedly by the (now-fixed) detector bug as
+  the user clicked through login → candidate info → questions → forms.
+
+Blind deletion on title pattern alone would have destroyed real application history. Findings
+were categorized into five groups and presented to the user for a judgment call on the
+duplicate clusters and one ambiguous standalone stub (GDMS job 72580, "Enter Your
+Information" — no confirmation record exists for it, so it can't be told apart from an
+in-progress real application).
+
+### What shipped
+
+- `scripts/cleanup-phantom-applications.mjs` — one-off ESM script (follows the
+  `create-qa-user.mjs` convention: `node --env-file=.env.local scripts/<name>.mjs`,
+  `@supabase/supabase-js` admin client from `.env.local` creds). Hardcodes the exact
+  `(jobId, appId, expectedTitle)` triples to delete, **re-verifies each one live** (title,
+  `hide_from_feed`, FK linkage) immediately before deleting and aborts the entire run with no
+  changes if anything has shifted since the list was compiled. Deletes `applications` rows
+  before `jobs` rows (FK: `applications.job_id → jobs.id`).
+- Ran it after user confirmation ("delete junk + collapse duplicates to one each"). Removed
+  **14** phantom `jobs`+`applications` pairs:
+  - 5 unambiguous junk stubs: 4× the user's own `github.com` pages (repo, settings, profile)
+    + 1× a Wells Fargo "join our talent community" signup page — none were applications.
+  - 6 HR Block duplicate stubs collapsed to 1 (kept `b78e19ba-d0cd-4483-9a18-9c18a0dc515a`,
+    "Associate Software Engineer, Seasonal" — the cleanest-titled candidate-info-page record).
+  - 3 GDMS-72592 duplicate stubs collapsed to 1 (kept
+    `e3a23411-2c25-4084-8e67-4f9a58293a5f`, "Entry Level Software Engineer" — the
+    cleanest-titled questions-page record).
+- Left untouched: TikTok, Absci, all 6 Mastercard records, Trimble, Busigence, micro1.ai,
+  Jacobs (all genuine applications with merely-generic scraped titles), and the ambiguous
+  GDMS-72580 stub.
+
+### Verification
+
+- Script's pre-delete verification pass printed `OK` for all 14 records (title + linkage
+  matched expectations) before any row was touched; live run completed with
+  `Deleted 14 application row(s)` / `Deleted 14 job row(s)`.
+- Net effect: 29 phantom stubs → 15 remaining (14 genuine applications + 1 ambiguous stub
+  intentionally left for the user to resolve manually later).
+
+### Next
+
+- The ambiguous GDMS-72580 "Enter Your Information" stub remains — the user can resolve it
+  manually via the Applications tracker UI once they recall whether they actually applied to
+  that posting.
 
 ---
 

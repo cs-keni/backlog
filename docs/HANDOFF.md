@@ -44,12 +44,52 @@ the detection pipeline at every stage it was leaking:
 
 ### Next
 
-- **Not a code task, but worth raising with the user:** the ~27 already-created phantom
-  records are still live in the DB (`jobs.hide_from_feed = true` + linked `applications`
-  rows with `status = 'applied'`). This fix only stops new ones — a one-off cleanup query
-  may be wanted.
+- ~~The ~27 already-created phantom records are still live in the DB~~ — cleaned up via
+  `scripts/cleanup-phantom-applications.mjs`, see the session entry directly below.
 - If you touch `maybeDetectSubmitted`/`markTabApplied` again, keep the lock-then-clear
   ordering — removing either reopens the duplicate-stub race.
+
+---
+
+## Session: 2026-06-05 — One-off cleanup of phantom "applied" records (Claude Code)
+
+### What changed
+
+Ran `scripts/cleanup-phantom-applications.mjs` (new script, follows the
+`create-qa-user.mjs` convention — ESM, `node --env-file=.env.local scripts/<name>.mjs`,
+admin Supabase client from `.env.local`) to remove the phantom records left over from the
+bug fixed in the session above. **Important nuance for anyone who finds more of these
+later:** the live data was far messier than "N obviously-junk rows" — some apparent
+duplicates were actually distinct real applications (6 Mastercard submissions sharing one
+generic confirmation-page title, distinguished only by a `jobId` query param), and some
+clusters genuinely were one real multi-step application re-stubbed at every step (HR Block
+×7, GDMS-72592 ×4). **Never delete on title-pattern alone — always join `applications` and
+check `status`/`applied_at`/`jobId` per record first**, or you risk destroying real
+application-tracking history (irreversible — there's no soft-delete on these tables).
+
+The script hardcodes verified `(jobId, appId, expectedTitle)` triples and **re-checks each
+one live immediately before deleting**, aborting the whole run with zero changes if anything
+doesn't match (title changed, FK unlinked, `hide_from_feed` flipped). It deletes
+`applications` before `jobs` (FK: `applications.job_id → jobs.id`).
+
+Result: 14 phantom `jobs`+`applications` pairs removed (5 junk + 9 collapsed duplicates),
+15 records remain (14 genuine applications, 1 intentionally-left ambiguous stub — GDMS job
+72580 "Enter Your Information", which has no confirmation record and could be a real
+in-progress application or another (pre-fix) misfire).
+
+### Checks run
+
+- Script's built-in pre-delete verification printed `OK` for all 14 targeted records
+  (title, `hide_from_feed`, FK linkage all matched) before any row was touched.
+- Confirmed final counts: `Deleted 14 application row(s)` / `Deleted 14 job row(s)`.
+
+### Next
+
+- The ambiguous GDMS-72580 stub is left for the user to resolve manually (Applications
+  tracker UI) once they recall whether they actually submitted that application.
+- The script is a one-off — it's safe to leave in `scripts/` as a reference for the
+  verify-before-delete pattern, but it will hard-fail (by design) if run again since the
+  records it targets no longer exist.
 
 ---
 
