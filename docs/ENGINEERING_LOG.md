@@ -6,7 +6,7 @@ Reverse-chronological. One entry per meaningful session.
 
 ## 2026-06-06 — Discord source-mix ring chart (Claude Code)
 
-**Commit:** (pending — committed alongside this log entry)
+**Commit:** a2e275d
 
 ### What happened
 
