@@ -82,7 +82,7 @@ landed within 1ms of each other with different scraped URLs.
 
 ## 2026-06-05 — One-off cleanup of phantom "applied" records (Claude Code)
 
-**Commit:** (pending — committed alongside this log entry)
+**Commit:** 29a11bf
 
 ### What happened
 
