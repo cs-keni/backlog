@@ -41,6 +41,7 @@ export interface Job {
   salary_max: number | null
   url: string
   source: 'github' | 'portal' | 'manual'
+  source_detail: string | null
   posted_at: string
   fetched_at: string
   description: string | null

@@ -16,6 +16,7 @@ export function makeJob(overrides: Partial<Job> = {}): Job {
     salary_max: 160000,
     url: `https://boards.greenhouse.io/acme/jobs/${id}`,
     source: 'github',
+    source_detail: 'github_repo',
     posted_at: new Date().toISOString(),
     fetched_at: new Date().toISOString(),
     description: 'Build great software.',

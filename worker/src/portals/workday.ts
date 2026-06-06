@@ -118,6 +118,7 @@ export async function fetchWorkdayJobs(tenant: WorkdayTenant): Promise<Normalize
       url: jobUrl,
       posted_at: parsePostedOn(job.postedOn),
       description: null,
+      discoverySource: 'workday',
     }
   })
 

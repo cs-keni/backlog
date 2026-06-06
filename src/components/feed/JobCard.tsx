@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { Job } from '@/lib/jobs/types'
 import { useToast } from '@/components/ui/Toaster'
+import { getDiscoverySource } from '@/lib/jobs/discovery-source'
 import { freshnessColor, freshnessLabel } from '@/lib/tracker/freshness'
 import { DISMISS_REASONS, type DismissReason } from '@/lib/feed/feedback-filters'
 
@@ -175,6 +176,7 @@ export function JobCard({ job, isSelected, onClick, onQuickApply, onDismiss, ind
   const { label: timeLabel, isNew } = timeAgo(job.posted_at ?? job.fetched_at)
   const postingFreshness = freshnessLabel(job.fetched_at)
   const postingFreshnessColor = freshnessColor(job.fetched_at)
+  const discoverySource = getDiscoverySource(job.source_detail, job.source)
   const application = job.applications?.[0]
   const avatar = companyAvatar(job.company)
 
@@ -317,6 +319,13 @@ export function JobCard({ job, isSelected, onClick, onQuickApply, onDismiss, ind
             </span>
           </>
         )}
+        <span
+          className="inline-flex items-center gap-1 text-[10px] text-zinc-600"
+          title={`Found via ${discoverySource.label}`}
+        >
+          <span aria-hidden="true">{discoverySource.icon}</span>
+          {discoverySource.label}
+        </span>
         <span className="text-zinc-700 ml-auto text-xs">{timeLabel}</span>
       </div>
 

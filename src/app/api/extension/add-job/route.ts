@@ -58,6 +58,7 @@ export async function POST(request: Request) {
       description: body.description ?? null,
       location: body.location ?? null,
       source: 'manual',
+      source_detail: 'extension',
       posted_at: new Date().toISOString(),
       fetched_at: new Date().toISOString(),
     })

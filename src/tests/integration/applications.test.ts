@@ -480,6 +480,7 @@ describe('POST /api/extension/apply', () => {
       title: 'Software Engineer',
       company: 'Example Co',
       source: 'manual',
+      source_detail: 'extension',
       hide_from_feed: true,
       posted_at: expect.any(String),
       fetched_at: expect.any(String),

@@ -140,6 +140,7 @@ function normalizeUsaJob(item: UsaJobsPosition): NormalizedJob | null {
     url: applyUrl,
     posted_at: d.PositionStartDate ?? null,
     description,
+    discoverySource: 'usajobs',
   }
 }
 

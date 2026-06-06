@@ -62,6 +62,7 @@ export async function fetchGreenhouseJobs(
       url: job.absolute_url,
       posted_at: job.updated_at ?? null,
       description: null, // Greenhouse full descriptions require a second API call per job — backfiller will handle
+      discoverySource: 'greenhouse',
     }
   })
 

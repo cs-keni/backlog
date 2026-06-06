@@ -4,6 +4,51 @@ Reverse-chronological. One entry per meaningful session.
 
 ---
 
+## 2026-06-05 — Job discovery source badges + granular feed-breakdown analytics (Claude Code)
+
+**Commit:** not yet committed (pending user go-ahead)
+
+### What shipped
+
+- New nullable `jobs.source_detail` column (`supabase/migrations/041_add_job_source_detail.sql`,
+  **not yet applied to the live DB — apply manually via the Supabase dashboard**) tagging the
+  exact discovery channel: `github_repo`, `brave_search`, `greenhouse`, `lever`, `workday`,
+  `usajobs`, `manual_url`, `manual_entry`, `extension`.
+- `src/lib/jobs/discovery-source.ts` — single source of truth mapping each channel to a
+  label/icon/color/group, with graceful fallback for legacy rows (`source_detail IS NULL`).
+- Worker: each portal fetcher (`greenhouse.ts`/`lever.ts`/`workday.ts`/`usajobs.ts`) now tags
+  its `NormalizedJob`s with `discoverySource`; `writeJobs()` writes
+  `source_detail: job.discoverySource ?? defaultSourceDetail`; `aggregator.ts` passes
+  `'github_repo'` / `'brave_search'` defaults for the single-channel aggregators.
+- Frontend: discovery badge shown on `JobCard` (feed) and `JobDetail` (detail panel chip);
+  all manual job-creation routes (`jobs/manual`, `jobs/from-url`, `extension/add-job`,
+  `extension/apply`) now write `source_detail`.
+- Analytics: replaced the old 3-bucket `sourceBreakdown` (`github`/`portal`/`manual`) with a
+  granular per-channel breakdown (`FeedBreakdown` in `SourceYield.tsx`) showing real
+  percentages per discovery channel. `sourceYield`/`SourcePreferences`/`ConversionStats`
+  intentionally left on the coarse 3-bucket system (out of scope per user's "upgrade existing
+  panel" choice — that referred only to "Feed breakdown").
+- Backfill: queried live DB, found legacy split `{ github: 3747, manual: 125, portal: 7 }`;
+  the 7 "portal" rows had inconsistent URL domains, so backfilling would be guesswork —
+  left `source_detail` NULL for legacy rows and rely on `getDiscoverySource()`'s fallback.
+
+### Verification
+
+- `tsc --noEmit` clean on both the frontend and `worker/` projects.
+- Worker suite: 116/117 pass — the 1 failure (`normalizer.test.ts` "omits unsupported
+  temperature override for gpt-5-nano") is a pre-existing vitest mock-constructor
+  incompatibility, reproduced identically on `main` with these changes stashed out.
+- Frontend integration suite: 166/167 pass — the 1 failure (`question-bank.test.ts`
+  expecting 70 questions, getting 124) is also pre-existing and reproduces on `main`.
+- Both failures are unrelated to this change; no regressions introduced.
+
+### Next
+
+- User needs to apply `supabase/migrations/041_add_job_source_detail.sql` in Supabase.
+- Optional: spot-check the badges in a live browser session (`/qa`).
+
+---
+
 ## 2026-05-22 — SD-P0: Question banks + concept primers + validator (Claude Code)
 
 **Commit:** 284a3fa

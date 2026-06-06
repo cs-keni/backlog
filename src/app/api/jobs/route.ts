@@ -72,6 +72,7 @@ export async function GET(request: NextRequest) {
       salary_max,
       url,
       source,
+      source_detail,
       posted_at,
       fetched_at,
       description,

@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Job } from '@/lib/jobs/types'
+import { getDiscoverySource } from '@/lib/jobs/discovery-source'
 import { MatchScoreBadge } from './MatchScoreBadge'
 import { CoverLetterSection } from './CoverLetterSection'
 
@@ -57,6 +58,7 @@ export function JobDetail({ job, onClose, onApplicationChange }: JobDetailProps)
   const [tailoredVersion, setTailoredVersion] = useState<ResumeVersion | null>(null)
   const [tailorError, setTailorError] = useState<string | null>(null)
   const [enrichedCompany, setEnrichedCompany] = useState<EnrichedCompany | null>(null)
+  const discoverySource = job ? getDiscoverySource(job.source_detail, job.source) : null
 
   // Load existing tailored version when job changes
   useEffect(() => {
@@ -237,11 +239,10 @@ export function JobDetail({ job, onClose, onApplicationChange }: JobDetailProps)
                   </Chip>
                 )}
                 <Chip icon="📅">{formatDate(job.posted_at)}</Chip>
-                {job.source === 'manual' && (
-                  <Chip icon="✋">Manually added</Chip>
-                )}
-                {job.source === 'portal' && (
-                  <Chip icon="🔎">Discovered</Chip>
+                {discoverySource && (
+                  <Chip icon={discoverySource.icon} title={`Found via ${discoverySource.group.toLowerCase()}: ${discoverySource.label}`}>
+                    {discoverySource.label}
+                  </Chip>
                 )}
               </div>
 
@@ -432,9 +433,9 @@ export function JobDetail({ job, onClose, onApplicationChange }: JobDetailProps)
   )
 }
 
-function Chip({ icon, children }: { icon: string; children: React.ReactNode }) {
+function Chip({ icon, title, children }: { icon: string; title?: string; children: React.ReactNode }) {
   return (
-    <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-zinc-800 border border-zinc-700 text-xs text-zinc-400">
+    <span title={title} className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-zinc-800 border border-zinc-700 text-xs text-zinc-400">
       <span>{icon}</span>
       {children}
     </span>

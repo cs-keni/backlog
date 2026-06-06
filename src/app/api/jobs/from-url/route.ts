@@ -76,6 +76,7 @@ export async function POST(request: Request) {
       salary_max: job.salary_max,
       url: job.url,
       source: 'manual',
+      source_detail: 'manual_url',
       description: job.description,
       tags: job.tags,
       is_remote: job.is_remote,

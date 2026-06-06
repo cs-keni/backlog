@@ -14,6 +14,10 @@ export interface NormalizedJob {
   url: string
   posted_at: string | null // ISO 8601
   description: string | null
+  // Tags the exact discovery channel (e.g. 'greenhouse', 'lever') for jobs whose
+  // fetcher knows it. Aggregators that only ever produce one channel (GitHub
+  // README, Brave Search) leave this unset and rely on writeJobs' default instead.
+  discoverySource?: string
 }
 
 const BATCH_SIZE = 20

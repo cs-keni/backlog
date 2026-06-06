@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { computeConversionStats } from '@/lib/analytics/conversion'
+import { getDiscoverySource } from '@/lib/jobs/discovery-source'
 import type { SourcePreferences } from '@/lib/user/source-preferences'
 
 export const dynamic = 'force-dynamic'
@@ -26,6 +27,7 @@ interface JobRow {
   id: string
   company: string
   source: string
+  source_detail: string | null
   fetched_at: string
 }
 
@@ -93,7 +95,7 @@ export async function GET(request: NextRequest) {
       .eq('user_id', user.id),
     supabase
       .from('jobs')
-      .select('id, company, source, fetched_at')
+      .select('id, company, source, source_detail, fetched_at')
       .gte('fetched_at', cutoffIso),
     supabase
       .from('users')
@@ -188,16 +190,19 @@ export async function GET(request: NextRequest) {
     .map(([company, count]) => ({ company, count }))
 
   // ── Source breakdown ─────────────────────────────────────────────────────────
+  // Granular per-channel counts (GitHub feed, Brave Search, Greenhouse, Lever,
+  // Workday, USAJobs, manual) — shows exactly where jobs are being discovered.
 
-  let githubCount = 0
-  let portalCount = 0
-  let manualCount = 0
+  const discoveryCounts = new Map<string, { label: string; icon: string; color: string; group: string; count: number }>()
   for (const job of recentJobs) {
-    const source = toSourceKey(job.source)
-    if (source === 'manual') manualCount++
-    else if (source === 'portal') portalCount++
-    else githubCount++
+    const meta = getDiscoverySource(job.source_detail, job.source)
+    const entry = discoveryCounts.get(meta.key)
+    if (entry) entry.count++
+    else discoveryCounts.set(meta.key, { label: meta.label, icon: meta.icon, color: meta.color, group: meta.group, count: 1 })
   }
+  const sourceBreakdown = [...discoveryCounts.entries()]
+    .map(([key, entry]) => ({ key, ...entry }))
+    .sort((a, b) => b.count - a.count)
 
   // ── Source yield ────────────────────────────────────────────────────────────
 
@@ -292,7 +297,7 @@ export async function GET(request: NextRequest) {
     funnel,
     jobActivity,
     topCompanies,
-    sourceBreakdown: { github: githubCount, portal: portalCount, manual: manualCount },
+    sourceBreakdown,
     sourceYield,
     sourcePreferences: (profileResult.data?.source_preferences ?? {}) as SourcePreferences,
     medianDaysToResponse,

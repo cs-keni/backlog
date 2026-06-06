@@ -129,7 +129,7 @@ async function runBraveSearchAggregation(): Promise<AggregationResult> {
   }
 
   console.log(`[aggregator] Brave Search: writing ${newJobs.length} new jobs`)
-  const { written, jobIds, writtenJobPairs } = await writeJobs(newJobs, 'full_time', 'portal')
+  const { written, jobIds, writtenJobPairs } = await writeJobs(newJobs, 'full_time', 'portal', 'brave_search')
   console.log(`[aggregator] Brave Search: wrote ${written}/${newJobs.length} jobs`)
 
   return { written, newJobs, writtenJobIds: jobIds, writtenJobPairs, skipped: false }
@@ -235,7 +235,7 @@ async function runSourceAggregation(
   const enrichedJobs = await enrichJobs(normalizedJobs)
 
   // 8. Write to Supabase (role_type comes from source config, not LLM)
-  const { written, jobIds, writtenJobPairs } = await writeJobs(enrichedJobs, config.roleType)
+  const { written, jobIds, writtenJobPairs } = await writeJobs(enrichedJobs, config.roleType, 'github', 'github_repo')
   console.log(`[aggregator] ${config.name}: Wrote ${written}/${enrichedJobs.length} jobs`)
 
   // 9. Update SHA

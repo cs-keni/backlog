@@ -1489,6 +1489,39 @@ Concept primers to add: `prometheus-scrape`, `slo-error-budget`, `opentelemetry`
 
 ---
 
+### Phase 21 — Job Discovery Source Badges & Analytics
+
+> Show *how* each job was found — GitHub feed, Brave Search, Greenhouse, Lever, Workday, USAJobs, or manually added — via a badge on the feed card and detail panel, and break down jobs by discovery channel on the analytics page.
+
+**Why:** `jobs.source` only buckets into `github | portal | manual` — ATS portal scans (Greenhouse/Lever/Workday/USAJobs) and Brave Search discoveries all collapse into `'portal'`, hiding which channel actually surfaces the most/best jobs.
+
+**Design:**
+- New nullable `jobs.source_detail` column captures the exact channel: `github_repo`, `brave_search`, `greenhouse`, `lever`, `workday`, `usajobs`, `manual_url`, `manual_entry`, `extension`
+- `src/lib/jobs/discovery-source.ts` — single source of truth mapping each `source_detail` to a label/icon/color/group, with a graceful fallback (based on the coarse `source`) for rows ingested before this migration
+- Each worker job-fetcher tags its `NormalizedJob`s with `discoverySource`; `writeJobs` resolves the final `source_detail` per job, falling back to a per-batch default for single-channel aggregators (GitHub README, Brave Search)
+
+**Tasks:**
+- [x] `supabase/migrations/041_add_job_source_detail.sql` — nullable `source_detail text` column + CHECK constraint
+- [x] `worker/src/llm/normalizer.ts` — add optional `discoverySource?: string` to `NormalizedJob`
+- [x] `worker/src/portals/greenhouse.ts`, `lever.ts`, `workday.ts`, `usajobs.ts` — tag jobs with their portal's `discoverySource`
+- [x] `worker/src/db/writer.ts` — accept `defaultSourceDetail`, write `source_detail: job.discoverySource ?? defaultSourceDetail`
+- [x] `worker/src/aggregator.ts` — pass `'github_repo'` / `'brave_search'` defaults to `writeJobs`
+- [x] `src/lib/jobs/discovery-source.ts` — `getDiscoverySource()` helper + label/icon/color/group map
+- [x] `src/lib/jobs/types.ts` — add `source_detail: string | null` to `Job`
+- [x] `src/app/api/jobs/route.ts` — select `source_detail`
+- [x] `src/app/api/jobs/manual/route.ts`, `from-url/route.ts`, `extension/add-job/route.ts`, `extension/apply/route.ts` — write `source_detail`
+- [x] `src/components/feed/JobCard.tsx` — icon+label badge in the meta row (tooltip shows full channel name)
+- [x] `src/components/feed/JobDetail.tsx` — replace the coarse `'manual'`/`'portal'` chip with the granular discovery badge
+- [x] `src/app/api/analytics/route.ts` — replace the 3-bucket `sourceBreakdown` with a granular per-channel breakdown
+- [x] `src/components/analytics/types.ts` — update `AnalyticsData['sourceBreakdown']` shape
+- [x] `src/components/analytics/SourceYield.tsx` (`FeedBreakdown`) — render granular per-channel bars + percentages
+- [x] `src/tests/integration/analytics.test.ts` — update fixtures/expectations for the new breakdown shape
+- [x] Verify: worker + frontend test suites pass, `tsc --noEmit` clean on both projects (only 2 pre-existing, unrelated failures remain: `normalizer.test.ts` GPT mock issue, `question-bank.test.ts` length assertion — both fail identically on `main` without these changes)
+
+> ⚠️ **Action needed:** apply `supabase/migrations/041_add_job_source_detail.sql` to the live database via the Supabase dashboard (migrations in this project are applied manually, not auto-run).
+
+---
+
 ## Future / Long-Term
 
 - [ ] Additional job sources: LinkedIn, Indeed, Glassdoor (when scraping strategy is solid)

@@ -120,15 +120,20 @@ export function FeedBreakdown({ data, range }: { data: AnalyticsData; range: Ana
 
       <div className="space-y-4">
         <SectionHeader title="Feed breakdown" sub={`Where your jobs came from - ${range}`} />
-        <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-5 space-y-5 h-full flex flex-col justify-center">
+        <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-5 space-y-4 h-full flex flex-col justify-center">
           {data.stats.jobsInRange === 0 ? (
             <p className="text-sm text-zinc-600 text-center">No jobs in this period</p>
           ) : (
-            <>
-              <SourceRow label="Aggregated feed" sub="SimplifyJobs GitHub sources" count={data.sourceBreakdown.github} total={data.stats.jobsInRange} color="bg-indigo-500" />
-              <SourceRow label="Company/search discovery" sub="Portal scan and Brave Search" count={data.sourceBreakdown.portal} total={data.stats.jobsInRange} color="bg-emerald-500" />
-              <SourceRow label="Manually added" sub="Pasted URLs or extension" count={data.sourceBreakdown.manual} total={data.stats.jobsInRange} color="bg-zinc-500" />
-            </>
+            data.sourceBreakdown.map((row) => (
+              <SourceRow
+                key={row.key}
+                label={`${row.icon} ${row.label}`}
+                sub={row.group}
+                count={row.count}
+                total={data.stats.jobsInRange}
+                color={row.color}
+              />
+            ))
           )}
         </div>
       </div>

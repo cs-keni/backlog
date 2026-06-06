@@ -84,6 +84,7 @@ export async function fetchLeverJobs(
       url: posting.hostedUrl,
       posted_at: posting.createdAt ? new Date(posting.createdAt).toISOString() : null,
       description,
+      discoverySource: 'lever',
     }
   })
 

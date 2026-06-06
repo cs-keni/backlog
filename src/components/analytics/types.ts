@@ -16,7 +16,14 @@ export interface AnalyticsData {
   funnel: Array<{ status: string; count: number }>
   jobActivity: Array<{ date: string; count: number }>
   topCompanies: Array<{ company: string; count: number }>
-  sourceBreakdown: { github: number; portal: number; manual: number }
+  sourceBreakdown: Array<{
+    key: string
+    label: string
+    icon: string
+    color: string
+    group: string
+    count: number
+  }>
   sourceYield: Array<{
     source: 'github' | 'portal' | 'manual'
     label: string

@@ -4,6 +4,42 @@
 
 ---
 
+## Session: 2026-06-05 — Job discovery source badges + analytics (Claude Code)
+
+### What changed
+
+- **New architecture piece:** `src/lib/jobs/discovery-source.ts` — single source of truth
+  mapping a job's exact discovery channel (`source_detail`) to a label/icon/Tailwind
+  color/group. Used by `JobCard`, `JobDetail`, and `/api/analytics`. Any new job-discovery
+  channel (new portal, new aggregator) should register here first.
+- **New DB column:** `jobs.source_detail` (nullable text, CHECK-constrained) —
+  see `supabase/migrations/041_add_job_source_detail.sql`. **Apply manually in Supabase
+  before relying on per-channel analytics** (legacy rows stay NULL and fall back gracefully).
+- **Worker:** `NormalizedJob.discoverySource` is the new optional field fetchers set;
+  `writeJobs(jobs, roleType, source, defaultSourceDetail)` resolves
+  `source_detail = job.discoverySource ?? defaultSourceDetail`.
+- **Analytics shape change:** `AnalyticsData['sourceBreakdown']` went from a fixed
+  `{ github, portal, manual }` object to `Array<{ key, label, icon, color, group, count }>`
+  sorted by count — any consumer expecting the old shape needs updating (only
+  `FeedBreakdown` in `SourceYield.tsx` consumed it; already migrated).
+- **Scope boundary:** `sourceYield` / `SourcePreferences` (pin/hide) / `ConversionStats`
+  intentionally remain on the coarse `github | portal | manual` system — only the
+  "Feed breakdown" panel was upgraded to granular detail (per explicit user choice).
+
+### Checks run
+
+- `tsc --noEmit` clean on both root and `worker/`.
+- Worker: 116/117 pass (1 pre-existing unrelated failure — `normalizer.test.ts` GPT mock).
+- Frontend integration: 166/167 pass (1 pre-existing unrelated failure —
+  `question-bank.test.ts` length assertion). Both reproduce identically on `main`.
+
+### Next
+
+- Apply migration 041 in Supabase.
+- Not yet committed — pending user go-ahead.
+
+---
+
 ## Session: 2026-05-22 — SD-P1 through SD-P5 complete (Codex)
 
 ### What changed

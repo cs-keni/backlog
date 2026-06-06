@@ -40,7 +40,7 @@ describe('GET /api/analytics', () => {
     expect(res.status).toBe(401)
   })
 
-  it('counts github, portal/search, and manual jobs separately', async () => {
+  it('breaks down jobs by granular discovery channel and counts source yield', async () => {
     const now = new Date().toISOString()
     const applications = [
       {
@@ -77,10 +77,10 @@ describe('GET /api/analytics', () => {
       },
     ]
     const jobs = [
-      { id: 'job-github', company: 'GitHub Co', source: 'github', fetched_at: now },
-      { id: 'job-portal', company: 'Portal Co', source: 'portal', fetched_at: now },
-      { id: 'job-manual', company: 'Manual Co', source: 'manual', fetched_at: now },
-      { id: 'job-legacy', company: 'Legacy Co', source: 'legacy', fetched_at: now },
+      { id: 'job-github', company: 'GitHub Co', source: 'github', source_detail: 'github_repo', fetched_at: now },
+      { id: 'job-portal', company: 'Portal Co', source: 'portal', source_detail: 'greenhouse', fetched_at: now },
+      { id: 'job-manual', company: 'Manual Co', source: 'manual', source_detail: 'manual_entry', fetched_at: now },
+      { id: 'job-legacy', company: 'Legacy Co', source: 'legacy', source_detail: null, fetched_at: now },
     ]
     let jobsCallCount = 0
 
@@ -134,7 +134,12 @@ describe('GET /api/analytics', () => {
     const res = await GET(makeRequest())
     expect(res.status).toBe(200)
     const json = await res.json()
-    expect(json.sourceBreakdown).toEqual({ github: 2, portal: 1, manual: 1 })
+    expect(json.sourceBreakdown).toEqual([
+      { key: 'github_repo', label: 'GitHub feed', icon: '🐙', color: 'bg-indigo-500', group: 'Curated feed', count: 1 },
+      { key: 'greenhouse', label: 'Greenhouse', icon: '🌱', color: 'bg-emerald-500', group: 'Company portal', count: 1 },
+      { key: 'manual_entry', label: 'Added manually', icon: '✋', color: 'bg-zinc-500', group: 'Manual', count: 1 },
+      { key: 'unknown', label: 'Discovered', icon: '🔎', color: 'bg-zinc-600', group: 'Other', count: 1 },
+    ])
     expect(json.stats.jobsInRange).toBe(4)
     expect(json.sourceYield).toEqual([
       {
