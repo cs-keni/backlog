@@ -4,6 +4,55 @@
 
 ---
 
+## Session: 2026-06-05 — Fix extension false-positive "applied" detection (Claude Code)
+
+### What changed
+
+The new source-badge analytics (previous session, same day) surfaced 27 phantom "Added
+manually" jobs — all silently created by the extension's `extension/apply` auto-detect flow
+on pages that were never job applications (GitHub settings pages, iCIMS login screens, a
+talent-community signup, and 4 duplicate stubs from one real multi-step application). Fixed
+the detection pipeline at every stage it was leaking:
+
+- **`extension/src/shared/postSubmit.ts`** — `isGenericPostSubmitPage` signature changed
+  from `(hasForm: boolean) => boolean` to `(url: string, hasForm: boolean, bodyText: string)
+  => boolean`. It used to be `!hasForm` (true after almost any navigation); now it requires
+  an explicit confirmation cue — a URL keyword (`thank-you`/`confirmation`/`success`/
+  `submitted`/`received`/etc.) or page-text phrase ("thank you for applying", "your
+  application has been received", etc.). **Any future caller must pass page body text, not
+  just a form check.**
+- **`extension/src/content/detect.ts`** — `detectAts` no longer whitelists the entire
+  `icims.com`/`bamboohr.com` domains as `'generic'` job pages; only `/jobs/<id>/...` paths
+  short-circuit, everything else falls through to `hasJobForm()`. That function's brand-name
+  check (`github`/`linkedin`/`portfolio`) now requires profile/URL/handle wording in the
+  *same* `<label>` — bare brand mentions (which saturate those platforms' own UI text) no
+  longer count.
+- **`extension/src/background/index.ts`** — `pageHasForm(tabId): Promise<boolean>` was
+  replaced by `inspectPostSubmitPage(tabId): Promise<{ hasForm, bodyText }>` (one
+  `executeScript` call gathers both). `markTabApplied` now has a per-tab `markingApplied`
+  lock (`Set<number>`) and clears `pendingSubmission` *before* calling `markApplied` —
+  closes a real race where `chrome.tabs.onUpdated` invokes `maybeDetectSubmitted` twice per
+  navigation (once with `changeInfo.url`, once with the resolved `tab.url`), both seeing
+  `pendingSubmission` as non-null and each posting a duplicate stub.
+
+### Checks run
+
+- Extension suite: 89/89 pass (`detect.test.ts` 30/30, incl. 2 new regression cases: a
+  GitHub-settings-page false-positive guard and a "GitHub Profile URL" true-positive).
+- `tsc --noEmit`: same error set as clean `main` (pre-existing `WeakRef`/lib-target gaps,
+  unused vars, missing `sidebar.css?inline` types) — confirmed via stash diff.
+
+### Next
+
+- **Not a code task, but worth raising with the user:** the ~27 already-created phantom
+  records are still live in the DB (`jobs.hide_from_feed = true` + linked `applications`
+  rows with `status = 'applied'`). This fix only stops new ones — a one-off cleanup query
+  may be wanted.
+- If you touch `maybeDetectSubmitted`/`markTabApplied` again, keep the lock-then-clear
+  ordering — removing either reopens the duplicate-stub race.
+
+---
+
 ## Session: 2026-06-05 — Job discovery source badges + analytics (Claude Code)
 
 ### What changed

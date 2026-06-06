@@ -25,8 +25,18 @@ export function detectAts(url: string): AtsType {
   if (/boards\.greenhouse\.io/.test(url) || /[?&]gh_jid=/.test(url)) return 'greenhouse'
   if (/jobs\.lever\.co/.test(url) || /[?&]lever_job_id=/.test(url)) return 'lever'
   if (/myworkdayjobs\.com|workday\.com/.test(url)) return 'workday'
-  if (/icims\.com/.test(url)) return 'generic'
-  if (/bamboohr\.com/.test(url)) return 'generic'
+
+  // iCIMS/BambooHR host job postings at /jobs/<id>/... but also serve login,
+  // password-reset, and account pages on the *same* domain — those aren't job
+  // pages even though the URL matches. Only short-circuit to 'generic' for
+  // confirmed job-posting paths; everything else falls through to the (much
+  // stricter) DOM-based form check below.
+  if (/icims\.com|bamboohr\.com/.test(url)) {
+    try {
+      if (/\/jobs\/\d+(?:[/?#]|$)/.test(new URL(url).pathname)) return 'generic'
+    } catch { /* malformed URL — fall through to DOM-based detection */ }
+  }
+
   // Detect Greenhouse by DOM markers (embedded via script, not iframe)
   if (typeof (window as Record<string, unknown>).Grnhse !== 'undefined') return 'greenhouse'
   // Check if the page has a job application form (best-effort generic detection)
@@ -55,11 +65,19 @@ function hasJobForm(): boolean {
     'input[name*="github" i], input[id*="github" i], input[placeholder*="github" i]'
   )) return true
 
-  // Job-application-specific label text
-  const labelText = Array.from(document.querySelectorAll('label'))
-    .map((l) => l.textContent?.toLowerCase() ?? '')
-    .join(' ')
-  if (/\bresume\b|cover\s+letter|work\s+auth|\bsponsorship\b|\blinkedin\b|\bgithub\b|\bportfolio\b/i.test(labelText)) return true
+  // Job-application-specific label text. Phrases like "resume" or "work
+  // authorization" are essentially unique to job applications.
+  const labels = Array.from(document.querySelectorAll('label')).map((l) => l.textContent?.toLowerCase() ?? '')
+  if (labels.some((t) => /\bresume\b|cover\s+letter|work\s+auth|\bsponsorship\b/i.test(t))) return true
+
+  // Brand-name mentions (LinkedIn/GitHub/portfolio) only count when the SAME
+  // label also references a profile/URL/handle. Bare brand mentions show up
+  // constantly on those platforms' own pages — e.g. GitHub's settings UI is
+  // full of the literal word "GitHub" — so requiring co-occurring
+  // "profile"/"url"/"link" wording keeps real "GitHub Profile URL" fields
+  // while rejecting the platforms' own UI text.
+  const BRAND_PROFILE = /\b(?:linkedin|github|portfolio)\b.{0,30}\b(?:url|link|profile|username|handle)\b|\b(?:url|link|profile|username|handle)\b.{0,30}\b(?:linkedin|github|portfolio)\b/i
+  if (labels.some((t) => BRAND_PROFILE.test(t))) return true
 
   return false
 }

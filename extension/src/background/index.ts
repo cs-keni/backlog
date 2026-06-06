@@ -176,28 +176,46 @@ export async function handleFetchFileMessage(
   }
 }
 
-async function pageHasForm(tabId: number): Promise<boolean> {
+async function inspectPostSubmitPage(tabId: number): Promise<{ hasForm: boolean; bodyText: string }> {
   const results = await chrome.scripting.executeScript({
     target: { tabId },
-    func: () => document.querySelector('form') !== null,
+    func: () => ({
+      hasForm: document.querySelector('form') !== null,
+      bodyText: (document.body?.innerText ?? '').slice(0, 5000),
+    }),
   })
-  return Boolean(results[0]?.result)
+  return results[0]?.result ?? { hasForm: true, bodyText: '' }
 }
 
+// Per-tab lock: chrome.tabs.onUpdated invokes maybeDetectSubmitted twice per
+// navigation event (once with changeInfo.url, once with the resolved
+// tab.url — see the listener below), so two concurrent calls can both read
+// `pendingSubmission` as non-null before either clears it, each posting a
+// duplicate "applied" record with a different scraped URL/title. This guard
+// makes only the first concurrent call actually run.
+const markingApplied = new Set<number>()
+
 async function markTabApplied(tabId: number, url: string): Promise<void> {
-  const state = await getTabState(tabId)
-  const pending = state?.pendingSubmission
-  if (!pending) return
+  if (markingApplied.has(tabId)) return
+  markingApplied.add(tabId)
+  try {
+    const state = await getTabState(tabId)
+    const pending = state?.pendingSubmission
+    if (!pending) return
 
-  await markApplied({
-    jobUrl: url,
-    jobTitle: state.jobContext?.jobTitle ?? pending.jobTitle,
-    company: state.jobContext?.jobCompany ?? pending.company,
-    jobId: state.jobContext?.jobId,
-    applicationId: state.jobContext?.applicationId,
-  })
+    // Clear before the network call so a racing call sees `pending === null`.
+    await updateTabState(tabId, { pendingSubmission: null })
 
-  await updateTabState(tabId, { pendingSubmission: null })
+    await markApplied({
+      jobUrl: url,
+      jobTitle: state.jobContext?.jobTitle ?? pending.jobTitle,
+      company: state.jobContext?.jobCompany ?? pending.company,
+      jobId: state.jobContext?.jobId,
+      applicationId: state.jobContext?.applicationId,
+    })
+  } finally {
+    markingApplied.delete(tabId)
+  }
 }
 
 async function maybeDetectSubmitted(tabId: number, url: string): Promise<void> {
@@ -217,9 +235,9 @@ async function maybeDetectSubmitted(tabId: number, url: string): Promise<void> {
 
   if (pending.ats === 'generic') {
     setTimeout(() => {
-      pageHasForm(tabId)
-        .then((hasForm) => {
-          if (isGenericPostSubmitPage(hasForm)) return markTabApplied(tabId, url)
+      inspectPostSubmitPage(tabId)
+        .then(({ hasForm, bodyText }) => {
+          if (isGenericPostSubmitPage(url, hasForm, bodyText)) return markTabApplied(tabId, url)
         })
         .catch(() => {})
     }, 500)

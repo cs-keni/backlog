@@ -4,9 +4,86 @@ Reverse-chronological. One entry per meaningful session.
 
 ---
 
+## 2026-06-05 — Fix extension false-positive "applied" detection (Claude Code)
+
+**Commit:** not yet committed
+
+### What happened
+
+The new source-badge analytics (previous entry, same day) surfaced 27 "Added manually" jobs
+the user never added — all `hide_from_feed: true` with linked `applied` application rows,
+created silently by the extension's `extension/apply` auto-detection flow. Live DB inspection
+(read-only Supabase queries) showed they were all false positives: GitHub settings pages
+(`github.com/settings/emails`, repo access pages), iCIMS login/password screens, a Wells
+Fargo talent-community signup — and one real application (job 72592, "Entry Level Software
+Engineer") that spawned **four** separate junk stub records across its multi-step flow
+("Enter Your Information" → "Enter Your Password" ×2 → final questions page), two of which
+landed within 1ms of each other with different scraped URLs.
+
+### Root causes (all in `extension/src/`)
+
+1. `shared/postSubmit.ts` `isGenericPostSubmitPage` was just `!hasForm` — true after almost
+   *any* navigation lands on a formless page, not evidence of a confirmation screen.
+2. `content/detect.ts` `detectAts` matched the *entire* `icims.com`/`bamboohr.com` domains as
+   `'generic'` job pages — including login/password/account paths that share the domain with
+   real job postings.
+3. `content/detect.ts` `hasJobForm()`'s label-text regex bare-matched
+   `\bgithub\b|\blinkedin\b|\bportfolio\b` across all page labels. Those brand names appear
+   constantly in the platforms' *own* UI copy (GitHub's settings pages say "GitHub"
+   everywhere — "Search GitHub Apps", "Notify me about activity on GitHub"), so `isJobPage`
+   flipped true on GitHub's own pages and armed the submission watcher.
+4. `background/index.ts`'s `chrome.tabs.onUpdated` listener calls `maybeDetectSubmitted`
+   *twice* per navigation (once with `changeInfo.url`, once with the resolved `tab.url` after
+   `status === 'complete'`). Both calls could read `pendingSubmission` as non-null before
+   either cleared it, each independently posting an "applied" record with a different scraped
+   URL — the source of the 1ms-apart duplicate stubs on job 72592.
+
+### What shipped
+
+- `shared/postSubmit.ts` — rewrote `isGenericPostSubmitPage(url, hasForm, bodyText)` to
+  require an explicit confirmation cue (URL keywords like `thank-you`/`confirmation`/
+  `success`/`submitted`/`received`, or page text matching "thank you for applying" /
+  "your application has been received" style phrases). A missing form alone no longer counts.
+- `content/detect.ts` `detectAts` — scoped `icims.com`/`bamboohr.com` matching to
+  `/jobs/<id>/...` paths only; everything else (login, password, account, forms) now falls
+  through to the stricter DOM-based `hasJobForm()` check instead of being domain-wide
+  whitelisted as a job page.
+- `content/detect.ts` `hasJobForm()` — brand-name mentions now require profile/URL/handle
+  wording in the *same* `<label>` (e.g. "GitHub Profile URL" passes, "Notify me about
+  activity on GitHub" doesn't); kept the unambiguous `resume`/`cover letter`/
+  `work authorization`/`sponsorship` phrase check unchanged.
+- `background/index.ts` — replaced `pageHasForm` (boolean only) with `inspectPostSubmitPage`
+  (gathers `hasForm` + up to 5KB of `document.body.innerText` in a single
+  `executeScript` call, feeding the new confirmation-text check); added a per-tab
+  `markingApplied` lock around `markTabApplied` and moved the `pendingSubmission` clear to
+  *before* the `markApplied` network call, closing the race that produced duplicate stubs.
+- `content/detect.test.ts` — rewrote the `isGenericPostSubmitPage` tests for the new
+  3-argument signature, added a GitHub-settings-page regression test (`isJobPage` must stay
+  `false` despite "GitHub" appearing in labels) and a brand+profile-context true-positive
+  test ("GitHub Profile URL" must still be detected).
+
+### Verification
+
+- Extension suite: 89/89 pass (`detect.test.ts` 30/30 including 2 new regression cases).
+- `tsc --noEmit`: identical error set on this branch and clean `main` (pre-existing
+  `WeakRef`/lib-target gaps in `fill.ts`/`fill.test.ts`/`shared/types.ts`, a `Window` cast
+  warning in `detect.ts`, two unused-variable warnings, and a missing `sidebar.css?inline`
+  module declaration) — confirmed via stash comparison, none touch the files changed here.
+
+### Next
+
+- The ~27 phantom records already in the live DB are untouched by this fix (it only stops
+  *new* false positives). Asked the user whether they'd like a one-off cleanup query to
+  remove the `hide_from_feed: true` stubs + linked `applied` applications with junk titles.
+- Spot-check in a live browser session would help confirm the fix end-to-end, but the
+  underlying bug only reproduces against real third-party ATS pages — covered here via
+  targeted unit/regression tests instead.
+
+---
+
 ## 2026-06-05 — Job discovery source badges + granular feed-breakdown analytics (Claude Code)
 
-**Commit:** not yet committed (pending user go-ahead)
+**Commit:** 1c91992
 
 ### What shipped
 

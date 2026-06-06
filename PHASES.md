@@ -1522,6 +1522,30 @@ Concept primers to add: `prometheus-scrape`, `slo-error-budget`, `opentelemetry`
 
 ---
 
+### Phase 22 — Extension Apply-Detection False Positives
+
+> Stop the extension from silently logging "applied" job-stub records on pages that were never job applications — login forms, account/settings pages, talent-community signups, and multi-step ATS flows that re-trigger the detector at every step.
+
+**Why:** the new source-badge analytics (Phase 21) surfaced 27 "Added manually" jobs the user never added — all `hide_from_feed: true` + linked `applied` application rows created automatically by `extension/apply`. Inspecting them live showed obvious false positives: GitHub settings pages (`github.com/settings/emails`, repo access pages), iCIMS login/password screens, and one real application (job 72592) that spawned **four** separate stub records across its multi-step flow.
+
+**Root causes found (all in `extension/src/`):**
+1. `shared/postSubmit.ts` `isGenericPostSubmitPage` was just `!hasForm` — true after almost *any* navigation, not evidence of a confirmation page.
+2. `content/detect.ts` `detectAts` matched the *entire* `icims.com`/`bamboohr.com` domains as `'generic'` job pages, including login/password/account paths that share a domain with real job postings.
+3. `content/detect.ts` `hasJobForm()`'s label-text check bare-matched `\bgithub\b|\blinkedin\b|\bportfolio\b` across all page labels — these brand names appear constantly in the platforms' *own* UI text (e.g. GitHub's settings pages say "GitHub" everywhere), so `isJobPage` flipped true on GitHub's own pages, arming the submission watcher.
+4. `background/index.ts` `chrome.tabs.onUpdated` calls `maybeDetectSubmitted` twice per navigation (once with `changeInfo.url`, once with the resolved `tab.url`); both calls could read `pendingSubmission` as non-null before either cleared it, each posting a duplicate "applied" record with a different scraped URL — explaining the 4x duplication on job 72592.
+
+**Fixes:**
+- [x] `shared/postSubmit.ts` — rewrite `isGenericPostSubmitPage(url, hasForm, bodyText)` to require an explicit confirmation cue (URL keyword like `thank-you`/`confirmation`/`success`/`submitted`/`received`, or page text matching "thank you for applying" / "your application has been received" style phrases) — a missing form alone no longer counts
+- [x] `content/detect.ts` `detectAts` — scope `icims.com`/`bamboohr.com` matching to `/jobs/<id>/...` paths only; login/password/account pages on those domains now fall through to the (stricter) DOM-based check instead of being blanket-classified as job pages
+- [x] `content/detect.ts` `hasJobForm()` — require brand-name mentions (`github`/`linkedin`/`portfolio`) to co-occur with profile/URL/handle wording *in the same label* (e.g. "GitHub Profile URL" passes, "Notify me about activity on GitHub" doesn't); kept the unambiguous `resume`/`cover letter`/`work authorization`/`sponsorship` phrase check as-is
+- [x] `background/index.ts` — replaced `pageHasForm` with `inspectPostSubmitPage` (gathers `hasForm` + page body text in one `executeScript` call); added a per-tab `markingApplied` lock around `markTabApplied` and moved the `pendingSubmission` clear *before* the network call, closing the race that produced duplicate stub records
+- [x] `content/detect.test.ts` — updated the `isGenericPostSubmitPage` signature tests, added a GitHub-settings-page regression test (rejects `isJobPage` despite "GitHub" in labels) and a brand+profile-context true-positive test ("GitHub Profile URL" still detected)
+- [x] Verify: extension test suite passes (89/89), `tsc --noEmit` shows only pre-existing/unrelated errors (identical on clean `main`: `WeakRef` lib-target gaps in `fill.ts`/`fill.test.ts`/`shared/types.ts`, `Window` cast in `detect.ts:41`, unused `parseAddress`/`tabId`, missing `sidebar.css?inline` types)
+
+> 💭 **Open question for the user:** the ~27 phantom "applied" application records already in the live DB are still there (this fix only stops *new* ones). Worth a one-off cleanup query to delete the `hide_from_feed: true` job stubs + their linked `applied` applications that have obviously-junk titles like "Enter Your Password" / "Enter Your Information" / page titles from non-ATS domains?
+
+---
+
 ## Future / Long-Term
 
 - [ ] Additional job sources: LinkedIn, Indeed, Glassdoor (when scraping strategy is solid)

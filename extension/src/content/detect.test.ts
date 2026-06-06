@@ -60,9 +60,29 @@ describe('post-submit detection helpers', () => {
     expect(isPostSubmitConfirmationUrl('https://example.com/thank-you', 'generic')).toBe(false)
   })
 
-  it('treats generic form-free destination as submitted', () => {
-    expect(isGenericPostSubmitPage(false)).toBe(true)
-    expect(isGenericPostSubmitPage(true)).toBe(false)
+  it('never confirms while a form is still present', () => {
+    expect(isGenericPostSubmitPage('https://example.com/apply/thank-you', true, 'Thank you for applying!')).toBe(false)
+  })
+
+  it('does not confirm a formless page without an explicit confirmation cue', () => {
+    // A bare "no form on the new page" used to be treated as "applied" — that
+    // fires on virtually any navigation (dashboards, settings pages, login
+    // redirects mid-flow), not just genuine confirmation pages.
+    expect(isGenericPostSubmitPage('https://example.com/dashboard', false, 'Welcome back')).toBe(false)
+    expect(isGenericPostSubmitPage('https://careers.example.com/jobs/login?redirect=App', false, 'Enter your password to continue')).toBe(false)
+  })
+
+  it('confirms via a confirmation-style URL', () => {
+    expect(isGenericPostSubmitPage('https://example.com/apply/thank-you', false, '')).toBe(true)
+    expect(isGenericPostSubmitPage('https://example.com/applications/12/confirmation', false, '')).toBe(true)
+  })
+
+  it('confirms via confirmation page text even on a generic URL', () => {
+    expect(isGenericPostSubmitPage(
+      'https://example.com/apply/done',
+      false,
+      'Thank you for applying! We have received your application and will be in touch.'
+    )).toBe(true)
   })
 })
 
@@ -125,6 +145,21 @@ describe('hasJobForm — must NOT false-positive on non-job pages', () => {
     `)
     expect(detectAts(window.location.href)).toBeNull()
   })
+
+  it('rejects GitHub\'s own settings pages despite "GitHub" appearing in label text', () => {
+    // Regression: github.com/settings/* pages were misdetected as job
+    // application forms because hasJobForm() bare-matched the word "github"
+    // anywhere in any <label>, and GitHub's own UI is full of that word.
+    setBody(`
+      <form>
+        <label>Search GitHub Apps</label><input type="text" name="q" />
+        <label>Email</label><input type="email" name="email" />
+        <label>Notify me about activity on GitHub</label><input type="text" name="notify" />
+        <button type="submit">Save</button>
+      </form>
+    `)
+    expect(detectAts(window.location.href)).toBeNull()
+  })
 })
 
 // ─── hasJobForm true-positive tests ──────────────────────────────────────────
@@ -168,6 +203,21 @@ describe('hasJobForm — MUST detect real job application forms', () => {
         <input type="text" name="phone" />
         <input type="text" id="github" placeholder="GitHub username" />
         <button type="submit">Apply Now</button>
+      </form>
+    `)
+    expect(detectAts(window.location.href)).toBe('generic')
+  })
+
+  it('detects a form with brand-name label text in profile context (GitHub Profile URL)', () => {
+    // Unlike a bare "github" mention, "GitHub Profile URL" co-occurs with
+    // profile/URL wording in the same label — a real application-form signal.
+    setBody(`
+      <form>
+        <label>Full Name</label><input type="text" name="name" />
+        <label>Email</label><input type="email" name="email" />
+        <label>Phone</label><input type="text" name="phone" />
+        <label>GitHub Profile URL</label><input type="text" name="github_profile" />
+        <button type="submit">Submit</button>
       </form>
     `)
     expect(detectAts(window.location.href)).toBe('generic')
