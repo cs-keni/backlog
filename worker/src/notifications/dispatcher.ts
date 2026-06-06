@@ -1,6 +1,6 @@
 import { supabase } from '../db/client'
 import type { NormalizedJob } from '../llm/normalizer'
-import { sendJobsNotification } from './discord'
+import { sendJobsNotification, buildSourceBreakdown, type SourceCount, type SourceRow } from './discord'
 import { sendEmailNotification } from './email'
 import {
   PushSubscriptionExpiredError,
@@ -125,7 +125,8 @@ export async function dispatchNotifications(
   if (usersError) {
     console.error('[dispatcher] Failed to fetch users:', usersError)
     if (currentJobs.length > 0) {
-      await sendDiscordDigest(currentJobs, newJobs.length, [], sendDiscord)
+      const sourceBreakdown = await fetchSourceBreakdown(db, currentJobIds)
+      await sendDiscordDigest(currentJobs, newJobs.length, [], sourceBreakdown, sendDiscord)
     }
     return result
   }
@@ -136,7 +137,8 @@ export async function dispatchNotifications(
     const allSkills = Array.from(
       new Set(userRows.flatMap((u) => u.skills ?? []))
     )
-    await sendDiscordDigest(currentJobs, newJobs.length, allSkills, sendDiscord)
+    const sourceBreakdown = await fetchSourceBreakdown(db, currentJobIds)
+    await sendDiscordDigest(currentJobs, newJobs.length, allSkills, sourceBreakdown, sendDiscord)
   }
 
   const notifyUsers = userRows.filter((u) => u.notification_email || u.notification_push)
@@ -222,6 +224,7 @@ async function sendDiscordDigest(
   jobsWithIds: JobWithId[],
   rawNewJobCount: number,
   allSkills: string[],
+  sourceBreakdown: SourceCount[],
   sendDiscord: typeof sendJobsNotification
 ): Promise<void> {
   const discordMinRelevance = parseFloat(process.env.DISCORD_MIN_RELEVANCE ?? '0')
@@ -229,7 +232,28 @@ async function sendDiscordDigest(
     ? jobsWithIds.filter(({ job }) => jaccardScore(job.tags ?? [], allSkills) >= discordMinRelevance)
     : jobsWithIds
 
-  await sendDiscord(discordJobs, rawNewJobCount, allSkills)
+  await sendDiscord(discordJobs, rawNewJobCount, allSkills, sourceBreakdown)
+}
+
+// Looks up the actual `source`/`source_detail` columns for this batch's jobs —
+// `NormalizedJob.discoverySource` is only populated for company-portal scrapers
+// (Greenhouse/Lever/Workday/USAJobs); aggregator jobs (GitHub README, Brave
+// Search) only get their channel tagged at write time, so the DB is the source
+// of truth for "where did this job come from."
+async function fetchSourceBreakdown(db: SupabaseLike, jobIds: string[]): Promise<SourceCount[]> {
+  if (jobIds.length === 0) return []
+
+  const { data, error } = await db
+    .from('jobs')
+    .select('source, source_detail')
+    .in('id', jobIds)
+
+  if (error) {
+    console.error('[dispatcher] Failed to fetch source breakdown:', error)
+    return []
+  }
+
+  return buildSourceBreakdown((data ?? []) as SourceRow[])
 }
 
 function pairJobsWithIds(

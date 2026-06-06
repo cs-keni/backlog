@@ -4,6 +4,56 @@
 
 ---
 
+## Session: 2026-06-06 — Discord source-mix ring chart (Claude Code)
+
+### What changed
+
+Added a donut/ring-chart "source mix" embed to the Discord job digest
+(`worker/src/notifications/discord.ts` / `dispatcher.ts`), per the user's request to
+visualize "what percentage of jobs were from github, discover, etc." as "circles that are
+hollowed out in the middle." Full design rationale is in PHASES.md Phase 23 — key points
+for anyone extending this:
+
+- **Chart rendering is outsourced to QuickChart.io** (a hosted Chart.js→image renderer).
+  `sourceChartImageUrl()` builds a JSON Chart.js config, URL-encodes it into a
+  `quickchart.io/chart?c=...` URL, and Discord embeds that URL as an `image`. **The worker
+  has zero canvas/image-rendering dependencies of its own** — don't add `canvas` or similar;
+  if QuickChart ever needs replacing, keep this URL-based pattern (lightweight, no native
+  deps, works in any Node environment including Render).
+- **`SOURCE_META` in `discord.ts` is a hand-maintained duplicate** of
+  `src/lib/jobs/discovery-source.ts`'s `DISCOVERY_SOURCES` (labels/icons, hex instead of
+  Tailwind classes) — the worker is a separate package (`worker/tsconfig.json` has
+  `rootDir: "src"`, no cross-package imports exist anywhere in the codebase) and can't
+  import from the Next.js app's `src/`. **If you add/rename a discovery source in one place,
+  mirror it in the other** or new-source jobs will render as a generic "🔎 Other" slice.
+- **Source data comes from a fresh DB query, not `NormalizedJob.discoverySource`** —
+  `dispatcher.ts`'s new `fetchSourceBreakdown()` queries `jobs.source, source_detail` by ID.
+  `discoverySource` is only populated on `NormalizedJob` for company-portal scrapers
+  (Greenhouse/Lever/Workday/USAJobs); aggregator jobs (GitHub README, Brave Search) only get
+  tagged at write time via `writeJobs()`'s `defaultSourceDetail` param — by notification
+  time, the DB is the only place that info reliably lives.
+- **The chart embed only appears for ≥2 distinct sources** — a single-color ring shows
+  nothing useful, so `sourceChartImageUrl()` returns `null` and the digest falls back to
+  just the job-listing embed (exactly like before this change).
+- Percentages are written into the embed's text *and* baked into the chart's legend labels
+  — so the breakdown stays legible even if the QuickChart image fails to load.
+
+### Checks run
+
+- Full worker suite: 124/124 pass (7 new cases in `discord.test.ts`, 1 in `dispatcher.test.ts`).
+- `tsc --noEmit`: clean.
+- **Not yet verified against a live Discord webhook** — the QuickChart URL was checked
+  structurally (correct Chart.js config shape) but never actually rendered in a real Discord
+  client. Worth a glance at the next live digest.
+
+### Next
+
+- Nothing blocking. If the chart looks off in a live digest (legend overflow, color
+  contrast, image sizing), tweak the Chart.js `options`/`width`/`height` in
+  `sourceChartImageUrl()` — it's a pure config object, no infra to touch.
+
+---
+
 ## Session: 2026-06-05 — Fix extension false-positive "applied" detection (Claude Code)
 
 ### What changed

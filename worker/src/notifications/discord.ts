@@ -52,10 +52,101 @@ function matchDot(score: number): string {
   return '⚪'
 }
 
+// ─── Source breakdown ring chart ──────────────────────────────────────────────
+// Mirrors the labels/icons the dashboard uses for discovery-source badges
+// (src/lib/jobs/discovery-source.ts) with hex colors instead of Tailwind
+// classes — duplicated rather than imported because the worker is a separate
+// package that can't reach into `src/`.
+
+const SOURCE_META: Record<string, { label: string; icon: string; hex: string }> = {
+  github_repo:  { label: 'GitHub feed',       icon: '🐙', hex: '#6366f1' },
+  brave_search: { label: 'Brave Search',      icon: '🦁', hex: '#f97316' },
+  greenhouse:   { label: 'Greenhouse',        icon: '🌱', hex: '#10b981' },
+  lever:        { label: 'Lever',             icon: '🎚️', hex: '#06b6d4' },
+  workday:      { label: 'Workday',           icon: '📅', hex: '#3b82f6' },
+  usajobs:      { label: 'USAJobs',           icon: '🇺🇸', hex: '#f43f5e' },
+  manual_url:   { label: 'Pasted URL',        icon: '🔗', hex: '#8b5cf6' },
+  manual_entry: { label: 'Added manually',    icon: '✋', hex: '#71717a' },
+  extension:    { label: 'Browser extension', icon: '🧩', hex: '#ec4899' },
+}
+const UNKNOWN_SOURCE_META = { label: 'Other', icon: '🔎', hex: '#52525b' }
+
+export interface SourceCount {
+  key: string
+  label: string
+  icon: string
+  hex: string
+  count: number
+  pct: number
+}
+
+export interface SourceRow {
+  source: string | null
+  source_detail: string | null
+}
+
+function resolveSourceKey({ source, source_detail }: SourceRow): string {
+  if (source_detail && source_detail in SOURCE_META) return source_detail
+  if (source === 'github') return 'github_repo'
+  if (source === 'manual') return 'manual_entry'
+  return 'unknown'
+}
+
+// Counts this batch's jobs by discovery channel, largest slice first. Powers
+// both the embed's ring chart and (if QuickChart is unreachable) its fallback text.
+export function buildSourceBreakdown(rows: SourceRow[]): SourceCount[] {
+  if (rows.length === 0) return []
+
+  const counts = new Map<string, number>()
+  for (const row of rows) {
+    const key = resolveSourceKey(row)
+    counts.set(key, (counts.get(key) ?? 0) + 1)
+  }
+
+  const total = rows.length
+  return Array.from(counts.entries())
+    .map(([key, count]) => {
+      const meta = SOURCE_META[key] ?? UNKNOWN_SOURCE_META
+      return { key, label: meta.label, icon: meta.icon, hex: meta.hex, count, pct: Math.round((count / total) * 100) }
+    })
+    .sort((a, b) => b.count - a.count)
+}
+
+// Renders the breakdown as a "hollowed out in the middle" ring chart via
+// QuickChart.io — a hosted Chart.js renderer, so the worker needs no canvas/
+// image deps of its own. Discord embeds the returned URL directly as an image.
+// Returns null for <2 slices: a single-color ring conveys nothing.
+function sourceChartImageUrl(breakdown: SourceCount[]): string | null {
+  if (breakdown.length < 2) return null
+
+  const config = {
+    type: 'doughnut',
+    data: {
+      labels: breakdown.map((s) => `${s.icon}  ${s.label} — ${s.pct}%`),
+      datasets: [{
+        data: breakdown.map((s) => s.count),
+        backgroundColor: breakdown.map((s) => s.hex),
+        borderColor: '#18181b',
+        borderWidth: 3,
+      }],
+    },
+    options: {
+      cutoutPercentage: 68,
+      legend: {
+        position: 'right',
+        labels: { fontColor: '#d4d4d8', fontSize: 12, boxWidth: 14, padding: 10 },
+      },
+    },
+  }
+
+  return `https://quickchart.io/chart?c=${encodeURIComponent(JSON.stringify(config))}&backgroundColor=%2318181b&width=460&height=260&devicePixelRatio=2`
+}
+
 export async function sendJobsNotification(
   jobsWithIds: JobWithId[],
   written: number,
-  userSkills: string[] = []
+  userSkills: string[] = [],
+  sourceBreakdown: SourceCount[] = []
 ): Promise<void> {
   const webhookUrl = process.env.DISCORD_WEBHOOK_URL
   if (!webhookUrl) {
@@ -98,9 +189,20 @@ export async function sendJobsNotification(
     timestamp: new Date().toISOString(),
   }
 
+  const embeds: Record<string, unknown>[] = [embed]
+  const chartUrl = sourceChartImageUrl(sourceBreakdown)
+  if (chartUrl) {
+    embeds.push({
+      color: 0x27272a, // zinc-800 — visually distinct "analytics" card beneath the listing
+      title: '📊 Source mix this batch',
+      description: sourceBreakdown.map((s) => `${s.icon} **${s.label}** — ${s.count} (${s.pct}%)`).join('\n'),
+      image: { url: chartUrl },
+    })
+  }
+
   const payload = {
     content: '',
-    embeds: [embed],
+    embeds,
   }
 
   try {

@@ -1546,6 +1546,28 @@ Concept primers to add: `prometheus-scrape`, `slo-error-budget`, `opentelemetry`
 
 ---
 
+### Phase 23 — Discord Source-Mix Ring Chart
+
+> Add the "where did these jobs come from" analytics that already exist on the dashboard (Phase 21's `FeedBreakdown`/`SourceYield`) to the Discord digest itself — as a donut/ring chart, per the user's request: *"include the analytics of what percentage of jobs were from github, discover, etc. as a chart... like those circles that are hollowed out in the middle."*
+
+**Why:** the existing Discord digest (Phase 15) is a pure job listing — no insight into *where* the batch came from. The dashboard already computes this breakdown for the web UI; bringing a lightweight version of it into Discord turns the digest into a small analytics surface too, with zero need to open the app.
+
+**Design decisions:**
+- **Chart renderer:** [QuickChart.io](https://quickchart.io) — a hosted Chart.js-to-image service. The worker just builds a JSON chart config, URL-encodes it, and Discord embeds the resulting image URL directly. No `canvas`/native image deps added to the worker (would be heavy and fragile in a Node/Render environment).
+- **Data scope:** breakdown of *this batch's* written jobs (not a rolling historical window) — keeps the chart directly tied to the jobs actually listed in the same message, requires only one extra `jobs` query by ID, and needs no new aggregation/caching infrastructure.
+- **Source resolution:** queries `jobs.source`/`source_detail` directly rather than trusting `NormalizedJob.discoverySource` — that field is only populated for company-portal scrapers (Greenhouse/Lever/Workday/USAJobs); aggregator jobs (GitHub README, Brave Search) only get their channel tagged at write time via `defaultSourceDetail`, so the DB is the only reliable source of truth at notification time.
+- **Visual language:** mirrors the dashboard's `DISCOVERY_SOURCES` labels/icons (`src/lib/jobs/discovery-source.ts`) with a hand-maintained hex-color version (`SOURCE_META` in `worker/src/notifications/discord.ts`) since the worker is a separate package and can't import from `src/`.
+- **Graceful degradation:** the chart embed is appended only when ≥2 distinct sources are represented — a single-color ring conveys nothing. Percentages are also written out as embed text (not just baked into the image) so the breakdown is still legible if QuickChart is ever unreachable and the image fails to load.
+
+**Implementation:**
+- [x] `worker/src/notifications/discord.ts` — added `SOURCE_META`/`UNKNOWN_SOURCE_META`, `SourceCount`/`SourceRow` types, `buildSourceBreakdown(rows)` (counts + sorts + percentages), and `sourceChartImageUrl(breakdown)` (builds the QuickChart doughnut URL — `cutoutPercentage: 68` for a thin modern ring, dark zinc background to match the app's palette, percentages baked into legend labels so no chart plugin dependency is needed)
+- [x] `sendJobsNotification` — new 4th param `sourceBreakdown: SourceCount[] = []`; appends a second "📊 Source mix this batch" embed (zinc-800, distinct from the main listing) with the ring-chart image + a text breakdown, only when 2+ sources are present
+- [x] `worker/src/notifications/dispatcher.ts` — added `fetchSourceBreakdown(db, jobIds)` (queries `jobs.source, source_detail` for the written batch's IDs); threaded `SourceCount[]` through `sendDiscordDigest` to both call sites (including the `usersError` early-exit path)
+- [x] Tests — `discord.test.ts`: `buildSourceBreakdown` counting/sorting/fallback-resolution (3 cases) + `sendJobsNotification` chart-embed presence/absence (omits when no breakdown, omits when single-source, appends with correct QuickChart URL + percentages when 2+ sources); `dispatcher.test.ts`: verifies the dispatcher queries `jobs` for source info and forwards a correctly-computed breakdown to `sendDiscord`
+- [x] Verify: full worker suite 124/124 pass, `tsc --noEmit` clean
+
+---
+
 ## Future / Long-Term
 
 - [ ] Additional job sources: LinkedIn, Indeed, Glassdoor (when scraping strategy is solid)

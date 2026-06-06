@@ -4,6 +4,62 @@ Reverse-chronological. One entry per meaningful session.
 
 ---
 
+## 2026-06-06 — Discord source-mix ring chart (Claude Code)
+
+**Commit:** (pending — committed alongside this log entry)
+
+### What happened
+
+The user asked to enhance the Discord integration with "analytics of what percentage of
+jobs were from github, discover, etc. as a chart... like those circles that are hollowed
+out in the middle" (i.e. a donut/ring chart), leaving the design open. Reviewed the
+existing Discord digest (`worker/src/notifications/discord.ts` — a pure ranked job listing,
+Phase 15) and the dashboard's existing source-breakdown analytics (Phase 21:
+`src/lib/jobs/discovery-source.ts` + `FeedBreakdown`/`SourceYield`) before designing the
+addition — concluded the digest genuinely lacked any "where did these come from" context
+and the chart was a worthwhile addition (see Phase 23 in PHASES.md for full design rationale).
+
+### What shipped
+
+- **`worker/src/notifications/discord.ts`**:
+  - `SOURCE_META`/`UNKNOWN_SOURCE_META` — hex-color mirror of the dashboard's
+    `DISCOVERY_SOURCES` labels/icons (worker can't import from `src/`, so it's a
+    hand-maintained duplicate; keep the two in sync if sources are added/renamed).
+  - `buildSourceBreakdown(rows: SourceRow[]): SourceCount[]` — counts jobs by resolved
+    source key, sorts largest-first, computes percentages.
+  - `sourceChartImageUrl(breakdown): string | null` — builds a QuickChart.io doughnut-chart
+    image URL (`cutoutPercentage: 68` for a thin "hollowed out" ring, dark zinc background,
+    percentages baked into legend labels). Returns `null` for <2 slices.
+  - `sendJobsNotification` — new optional 4th param `sourceBreakdown: SourceCount[]`;
+    appends a second "📊 Source mix this batch" embed (chart image + text breakdown,
+    distinct zinc-800 color) only when ≥2 sources are represented.
+- **`worker/src/notifications/dispatcher.ts`**:
+  - `fetchSourceBreakdown(db, jobIds)` — queries `jobs.source, source_detail` for the
+    written batch by ID (the DB, not `NormalizedJob.discoverySource`, is the source of
+    truth here — that field is only populated for portal scrapers, not aggregator jobs).
+  - Threaded `SourceCount[]` through `sendDiscordDigest` to both call sites.
+- **Tests**: `discord.test.ts` — 7 new cases covering `buildSourceBreakdown`
+  (counting/sorting/legacy-fallback) and the chart embed's presence/absence/content;
+  `dispatcher.test.ts` — 1 new case verifying the dispatcher queries `jobs` and forwards a
+  correctly-computed breakdown to `sendDiscord`.
+
+### Verification
+
+- Full worker suite: 124/124 pass (was 117 before this change — 7 new cases added, none
+  modified beyond the signature threading).
+- `tsc --noEmit`: clean (no errors).
+
+### Next
+
+- No rendering smoke test against a live Discord webhook — QuickChart image URLs were
+  validated structurally (correct `type: 'doughnut'`, labels, percentages) but not rendered.
+  Worth eyeballing the next live digest once `DISCORD_WEBHOOK_URL` fires for real.
+- `SOURCE_META` in `discord.ts` is a hand-maintained duplicate of
+  `src/lib/jobs/discovery-source.ts`'s `DISCOVERY_SOURCES` — if a new discovery channel is
+  added to one, mirror it in the other or the chart will fall back to the generic "Other" slice.
+
+---
+
 ## 2026-06-05 — Fix extension false-positive "applied" detection (Claude Code)
 
 **Commit:** 9f1153b

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { sortByRelevance, sendJobsNotification } from '../../src/notifications/discord'
+import { sortByRelevance, sendJobsNotification, buildSourceBreakdown } from '../../src/notifications/discord'
 import { makeNormalizedJob } from '../fixtures/jobs'
 
 const makeJobWithId = (overrides = {}, id?: string) => ({
@@ -79,5 +79,79 @@ describe('sendJobsNotification', () => {
 
     const body = JSON.parse((fetchSpy.mock.calls[0][1] as RequestInit).body as string)
     expect(body.embeds[0].description).toContain('?job=abc-123')
+  })
+
+  it('omits the source-mix embed when no breakdown is passed', async () => {
+    process.env.DISCORD_WEBHOOK_URL = 'https://discord.com/api/webhooks/test'
+    await sendJobsNotification([makeJobWithId()], 1)
+
+    const body = JSON.parse((fetchSpy.mock.calls[0][1] as RequestInit).body as string)
+    expect(body.embeds).toHaveLength(1)
+  })
+
+  it('omits the source-mix embed when only one source is represented', async () => {
+    process.env.DISCORD_WEBHOOK_URL = 'https://discord.com/api/webhooks/test'
+    const breakdown = buildSourceBreakdown([
+      { source: 'github', source_detail: 'github_repo' },
+      { source: 'github', source_detail: 'github_repo' },
+    ])
+    await sendJobsNotification([makeJobWithId()], 1, [], breakdown)
+
+    const body = JSON.parse((fetchSpy.mock.calls[0][1] as RequestInit).body as string)
+    expect(body.embeds).toHaveLength(1)
+  })
+
+  it('appends a ring-chart embed with a QuickChart image URL when 2+ sources are represented', async () => {
+    process.env.DISCORD_WEBHOOK_URL = 'https://discord.com/api/webhooks/test'
+    const breakdown = buildSourceBreakdown([
+      { source: 'github', source_detail: 'github_repo' },
+      { source: 'github', source_detail: 'github_repo' },
+      { source: 'portal', source_detail: 'greenhouse' },
+    ])
+    await sendJobsNotification([makeJobWithId()], 1, [], breakdown)
+
+    const body = JSON.parse((fetchSpy.mock.calls[0][1] as RequestInit).body as string)
+    expect(body.embeds).toHaveLength(2)
+
+    const chartEmbed = body.embeds[1]
+    expect(chartEmbed.title).toContain('Source mix')
+    expect(chartEmbed.image.url).toContain('https://quickchart.io/chart?c=')
+    expect(chartEmbed.image.url).toContain('doughnut')
+    expect(chartEmbed.description).toContain('GitHub feed')
+    expect(chartEmbed.description).toContain('67%')
+    expect(chartEmbed.description).toContain('Greenhouse')
+    expect(chartEmbed.description).toContain('33%')
+  })
+})
+
+describe('buildSourceBreakdown', () => {
+  it('returns an empty array for no rows', () => {
+    expect(buildSourceBreakdown([])).toEqual([])
+  })
+
+  it('counts and sorts by volume, largest slice first', () => {
+    const breakdown = buildSourceBreakdown([
+      { source: 'github', source_detail: 'github_repo' },
+      { source: 'github', source_detail: 'github_repo' },
+      { source: 'github', source_detail: 'github_repo' },
+      { source: 'portal', source_detail: 'lever' },
+    ])
+
+    expect(breakdown).toHaveLength(2)
+    expect(breakdown[0]).toMatchObject({ key: 'github_repo', label: 'GitHub feed', count: 3, pct: 75 })
+    expect(breakdown[1]).toMatchObject({ key: 'lever', label: 'Lever', count: 1, pct: 25 })
+  })
+
+  it('falls back from source_detail to coarse source for legacy rows', () => {
+    const breakdown = buildSourceBreakdown([
+      { source: 'github', source_detail: null },
+      { source: 'manual', source_detail: null },
+      { source: 'portal', source_detail: null },
+    ])
+
+    const byKey = Object.fromEntries(breakdown.map((b) => [b.key, b]))
+    expect(byKey.github_repo).toMatchObject({ count: 1 })
+    expect(byKey.manual_entry).toMatchObject({ count: 1 })
+    expect(byKey.unknown).toMatchObject({ label: 'Other', count: 1 })
   })
 })

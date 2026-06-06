@@ -410,4 +410,32 @@ describe('dispatchNotifications', () => {
       ])
     )
   })
+
+  it('looks up source/source_detail for the written batch and forwards a breakdown to Discord', async () => {
+    const jobA = makeNormalizedJob({ url: 'https://example.com/a', tags: ['typescript'] })
+    const jobB = makeNormalizedJob({ url: 'https://example.com/b', tags: ['typescript'] })
+    const { db } = makeDb({
+      users: [baseUser],
+      jobs: [
+        { id: 'job-a', ...jobA, source: 'github', source_detail: 'github_repo' },
+        { id: 'job-b', ...jobB, source: 'portal', source_detail: 'greenhouse' },
+      ] as never,
+    })
+    const sendDiscord = vi.fn()
+
+    await dispatchNotifications(
+      [jobA, jobB],
+      [{ id: 'job-a', url: jobA.url }, { id: 'job-b', url: jobB.url }],
+      { db, sendDiscord, sendEmail: vi.fn() }
+    )
+
+    expect(sendDiscord).toHaveBeenCalledTimes(1)
+    const [, , , sourceBreakdown] = sendDiscord.mock.calls[0]
+    expect(sourceBreakdown).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ key: 'github_repo', label: 'GitHub feed', count: 1, pct: 50 }),
+        expect.objectContaining({ key: 'greenhouse', label: 'Greenhouse', count: 1, pct: 50 }),
+      ])
+    )
+  })
 })
