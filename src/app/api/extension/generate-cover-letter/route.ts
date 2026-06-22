@@ -62,9 +62,11 @@ export async function POST(request: Request) {
 
   const systemPrompt = `You are a professional cover letter writer who knows ${applicantName}'s voice and style deeply.
 
+ABSOLUTE RULE — DO NOT USE EM DASHES: Never write the "—" character anywhere in the cover letter. This is non-negotiable. Employers use automated tools to flag em dashes as AI-generated text. Instead: use a comma, colon, period, or restructure the sentence entirely. Check your output before finalizing — if you see "—", rewrite that sentence.
+
 You do TWO things in ONE response, in this exact format:
 
-INSTRUCTIONS_JSON: <a JSON array of strings — empty [] if none>
+INSTRUCTIONS_JSON: <a JSON array of strings, empty [] if none>
 COVER_LETTER:
 <the letter body>
 
@@ -91,7 +93,6 @@ Tone and style:
 - Avoid generic filler phrases like "I am excited to apply" or "I believe I would be a great fit"
 - Match the energy of the job description: formal for enterprise, casual for startups
 - If the description asked to include a specific keyword or phrase in the letter, weave it naturally into the text
-- NEVER use em dashes (—). Replace them with commas, colons, or rephrase the sentence. Em dashes signal AI-generated text to employers.
 
 ${styleContext ? `\n## ${applicantName}'s writing style (extracted from past cover letters):\n${styleContext}\n` : ''}`
 
@@ -132,9 +133,17 @@ Remember: output INSTRUCTIONS_JSON first (one line), then COVER_LETTER: on the n
       try { specialInstructions = JSON.parse(instructionsMatch[1]) as string[] } catch { /* ignore */ }
     }
 
-    const coverLetterBody = coverLetterStart >= 0
+    let coverLetterBody = coverLetterStart >= 0
       ? raw.slice(coverLetterStart + 'COVER_LETTER:'.length).trim()
       : raw.trim()
+
+    // Guarantee no em dashes survive even if the model ignores the instruction.
+    // " — " → ", "   |   "— " → ", "   |   " —" → ","   |   bare "—" → ","
+    coverLetterBody = coverLetterBody
+      .replace(/ — /g, ', ')
+      .replace(/— /g, ', ')
+      .replace(/ —/g, ',')
+      .replace(/—/g, ',')
 
     return Response.json({ coverLetterBody, specialInstructions })
   } catch (err) {
