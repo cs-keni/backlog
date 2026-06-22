@@ -28,7 +28,7 @@ export function detectAts(url: string): AtsType {
 
   if (/joinhandshake\.com|myhandshake\.co/.test(url)) {
     try {
-      if (/\/jobs\/\d+/.test(new URL(url).pathname)) return 'handshake'
+      if (/\/(?:jobs|job-search)\/\d+/.test(new URL(url).pathname)) return 'handshake'
     } catch { /* malformed URL */ }
   }
 
