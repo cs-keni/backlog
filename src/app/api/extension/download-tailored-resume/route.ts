@@ -101,16 +101,16 @@ ${cleanResume}
 
 ## Task
 Replace the Projects section with the ${body.suggestions.length} projects above.
-For each project write EXACTLY 3 resume-style bullet points (no more) that:
+For each project write EXACTLY 4 resume-style bullet points that:
 - Lead with a strong action verb
 - Name the specific technologies from the project's stack
 - Mirror language from the job description where it fits naturally
 - Quantify impact where the project data provides numbers
-- Stay under 110 characters per bullet (shorter = better for fitting on one page)
+- Stay under 120 characters per bullet; write substantive, detail-rich bullets (not vague filler)
 
 IMPORTANT rules:
 - Keep every other section EXACTLY as-is (Experience, Skills, Education, header)
-- If the existing Experience section has more than 3 bullets per role, trim to 3
+- If the existing Experience section has more than 4 bullets per role, trim to 4
 - Use this format for each project heading: ### Name | Subtitle | Date Range
   - If no date range is known, omit the date part
   - The subtitle should be a short tech/category label (e.g. "Full-Stack Web App")

@@ -20,7 +20,7 @@ const s = StyleSheet.create({
   name: {
     fontFamily: FONT_BOLD,
     fontSize: 17,
-    marginBottom: 3,
+    marginBottom: 8,
   },
   contact: {
     fontSize: 9,
@@ -88,9 +88,6 @@ export function CoverLetterDoc({ name, contacts, date, jobTitle, company, body }
 
         {/* Date */}
         <Text style={s.date}>{date}</Text>
-
-        {/* Re: line */}
-        <Text style={s.reLabel}>Re: {company}</Text>
 
         {/* Salutation */}
         <Text style={s.salutation}>Dear Hiring Manager,</Text>

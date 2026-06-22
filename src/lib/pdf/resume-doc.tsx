@@ -23,7 +23,7 @@ const s = StyleSheet.create({
   name: {
     fontFamily: FONT_BOLD,
     fontSize: 17,
-    marginBottom: 2,
+    marginBottom: 7,
   },
   contacts: {
     fontSize: 8,
