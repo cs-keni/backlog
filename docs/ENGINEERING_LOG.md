@@ -6,7 +6,7 @@ Reverse-chronological. One entry per meaningful session.
 
 ## 2026-06-22 — v3.2.0: FAB + floating panel + light/dark theme (Claude Code)
 
-**Commit:** (see below)
+**Commit:** cfa1b64
 
 ### What shipped
 
