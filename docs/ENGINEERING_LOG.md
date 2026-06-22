@@ -6,7 +6,7 @@ Reverse-chronological. One entry per meaningful session.
 
 ## 2026-06-22 — Handshake Assistant Phase 24-P0 + P1 (Claude Code)
 
-**Commit:** TBD (next commit)
+**Commit:** cdfee47
 
 ### What happened
 
