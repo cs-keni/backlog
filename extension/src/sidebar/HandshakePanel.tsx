@@ -329,9 +329,19 @@ function JobCard({ jobData, summary, summaryLoading }: {
         <p style={{ fontSize: '10px', color: '#3f3f46', margin: 0 }}>No description detected</p>
       )}
 
-      {!summaryLoading && !summary && hasDesc && (
-        <p style={{ fontSize: '10px', color: '#52525b', margin: 0, lineHeight: 1.5 }}>
-          {jobData.description!.slice(0, 100).trim()}…
+      {/* Description snippet — always show a peek of the raw text below the chips */}
+      {hasDesc && (
+        <p style={{
+          fontSize: '10px',
+          color: '#3f3f46',
+          margin: (summary || summaryLoading) ? '6px 0 0' : '0',
+          lineHeight: 1.6,
+          display: '-webkit-box',
+          WebkitLineClamp: 2,
+          WebkitBoxOrient: 'vertical',
+          overflow: 'hidden',
+        }}>
+          {jobData.description!.trim()}
         </p>
       )}
     </div>

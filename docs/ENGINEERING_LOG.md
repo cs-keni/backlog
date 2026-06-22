@@ -4,6 +4,28 @@ Reverse-chronological. One entry per meaningful session.
 
 ---
 
+## 2026-06-22 — v3.1.1: bubbly outer shell + restore description preview (Claude Code)
+
+**Commit:** (see below)
+
+### What shipped
+
+**`extension/src/sidebar/Sidebar.tsx` — outer panel redesign:**
+- Background: `linear-gradient(180deg, #0d0d1a 0%, #09090b 35%, #09090e 100%)` — subtle cool-purple tint at top, fades to near-black. Replaces flat `#09090b`.
+- Left border: `rgba(99,102,241,0.18)` (indigo hint) instead of plain `#27272a`.
+- Border radius: `20px 0 0 20px` — rounds the left two corners so the panel feels like a floating card hugging the browser's right edge.
+- Box shadow: layered — deep dark `(-12px 0 48px rgba(0,0,0,0.7))` + soft indigo glow `(-2px 0 0 rgba(99,102,241,0.08))` + inner highlight at left edge.
+- Two ambient glow orbs (absolutely positioned, `pointer-events:none`): one indigo orb top-left, one violet orb bottom-right — very subtle radial gradients that add depth.
+- Header: gradient `rgba(79,70,229,0.08) → transparent` top-to-bottom, border fades to near-invisible `rgba(255,255,255,0.05)`.
+- Content and header wrapped in `position:relative; z-index:1` so they sit above the orbs.
+
+**`extension/src/sidebar/HandshakePanel.tsx` — restore description preview:**
+- Description preview is back in `JobCard`, shown as 2-line clamped text (`-webkit-line-clamp: 2`) below the summary chips. Was accidentally removed in v3.1.0.
+
+**`extension/public/manifest.json`:** bumped to v3.1.1.
+
+---
+
 ## 2026-06-22 — v3.1.0: bubbly panel redesign + AI job summary chips (Claude Code)
 
 **Commit:** (see below)

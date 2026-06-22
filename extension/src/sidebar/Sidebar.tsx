@@ -477,22 +477,44 @@ export function Sidebar({ initialPage }: { initialPage: PageInfo }) {
         right: 0,
         width: '360px',
         height: '100vh',
-        background: '#09090b',
-        borderLeft: '1px solid #27272a',
+        // Gradient background with subtle cool-purple tint at top
+        background: 'linear-gradient(180deg, #0d0d1a 0%, #09090b 35%, #09090e 100%)',
+        // Soft indigo border on the left instead of plain zinc
+        borderLeft: '1px solid rgba(99,102,241,0.18)',
+        // Rounded left corners — makes the panel feel like a floating card
+        borderRadius: '20px 0 0 20px',
         display: 'flex',
         flexDirection: 'column',
-        boxShadow: '-4px 0 24px rgba(0,0,0,0.5)',
+        // Layered shadow: deep dark + subtle indigo glow
+        boxShadow: '-12px 0 48px rgba(0,0,0,0.7), -2px 0 0 rgba(99,102,241,0.08), inset 1px 0 0 rgba(255,255,255,0.03)',
         zIndex: 2147483647,
         overflow: 'hidden',
       }}
     >
+      {/* Ambient glow orbs — purely decorative, pointer-events:none */}
+      <div style={{
+        position: 'absolute', top: '-80px', left: '-60px',
+        width: '320px', height: '320px',
+        background: 'radial-gradient(circle, rgba(99,102,241,0.09) 0%, transparent 68%)',
+        pointerEvents: 'none', zIndex: 0,
+      }} />
+      <div style={{
+        position: 'absolute', bottom: '60px', right: '-20px',
+        width: '220px', height: '220px',
+        background: 'radial-gradient(circle, rgba(139,92,246,0.05) 0%, transparent 70%)',
+        pointerEvents: 'none', zIndex: 0,
+      }} />
+
       {/* ── Header ── */}
       <div style={{
+        position: 'relative', zIndex: 1,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
-        padding: '12px 16px',
-        borderBottom: '1px solid #27272a',
+        padding: '14px 16px',
+        // Subtle indigo-glow gradient fading to transparent
+        background: 'linear-gradient(180deg, rgba(79,70,229,0.08) 0%, transparent 100%)',
+        borderBottom: '1px solid rgba(255,255,255,0.05)',
         flexShrink: 0,
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -502,13 +524,13 @@ export function Sidebar({ initialPage }: { initialPage: PageInfo }) {
             <rect x="1" y="9" width="6" height="6" rx="1.5" fill="#6366f1" />
             <rect x="9" y="9" width="6" height="6" rx="1.5" fill="#6366f1" opacity="0.35" />
           </svg>
-          <span style={{ fontSize: '13px', fontWeight: 600, color: '#f4f4f5' }}>Backlog</span>
+          <span style={{ fontSize: '13px', fontWeight: 600, color: '#e4e4e7', letterSpacing: '-0.01em' }}>Backlog</span>
         </div>
         <button
           onClick={() => setCollapsed(true)}
           style={{
             background: 'none', border: 'none', cursor: 'pointer', padding: '4px',
-            color: '#71717a', lineHeight: 1, borderRadius: '4px',
+            color: '#52525b', lineHeight: 1, borderRadius: '6px',
             transition: 'color 0.15s',
           }}
           title="Collapse"
@@ -520,7 +542,7 @@ export function Sidebar({ initialPage }: { initialPage: PageInfo }) {
       </div>
 
       {/* ── Scrollable body ── */}
-      <div className="sidebar-scroll" style={{ flex: 1, overflowY: 'auto', padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+      <div className="sidebar-scroll" style={{ position: 'relative', zIndex: 1, flex: 1, overflowY: 'auto', padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
 
         {/* DSA Companion mode — shown when on a NeetCode 150 LeetCode problem */}
         {page.dsaSlug && page.dsaDifficulty && (
