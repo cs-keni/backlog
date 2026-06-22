@@ -17,12 +17,10 @@ export function injectSidebar(pageInfo: PageInfo): void {
   const host = document.createElement('div')
   host.id = HOST_ID
   // The host sits outside the layout flow; the inner panel handles its own positioning
+  // Full-viewport transparent overlay — FAB and panel position themselves inside
   host.style.cssText = [
     'position: fixed',
-    'top: 0',
-    'right: 0',
-    'width: 360px',
-    'height: 100vh',
+    'inset: 0',
     'z-index: 2147483647',
     'pointer-events: none',
   ].join('; ')
@@ -35,7 +33,7 @@ export function injectSidebar(pageInfo: PageInfo): void {
 
   const mount = document.createElement('div')
   mount.id = 'backlog-sidebar-inner'
-  mount.style.cssText = 'width: 100%; height: 100%; pointer-events: auto;'
+  mount.style.cssText = 'width: 100%; height: 100%;'
   shadow.appendChild(mount)
 
   document.documentElement.appendChild(host)

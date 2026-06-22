@@ -130,7 +130,8 @@ function buildDebugExport(
 
 export function Sidebar({ initialPage }: { initialPage: PageInfo }) {
   const [state, setState] = useState<SidebarState>({ status: 'loading' })
-  const [collapsed, setCollapsed] = useState(false)
+  const [collapsed, setCollapsed] = useState(true)
+  const [theme, setTheme] = useState<'light' | 'dark'>('light')
   const [autoAdvance, setAutoAdvance] = useState(false)
   const [skillsField, setSkillsField] = useState<SkillsField | null>(null)
   const [improvingSkills, setImprovingSkills] = useState(false)
@@ -143,14 +144,19 @@ export function Sidebar({ initialPage }: { initialPage: PageInfo }) {
   const lastScannedRef = useRef<ScannedField[]>([])
   const lastDebugRef = useRef<DebugExport | null>(null)
 
-  // When collapsed, the mount div (360×100vh, pointer-events:auto) would still eat
-  // clicks on the underlying page even though visually only the 28px tab is visible.
-  // Set it to pointer-events:none when collapsed; the tab div overrides with its own auto.
+  // Restore saved theme
   useEffect(() => {
-    const host = document.getElementById('backlog-sidebar-host')
-    const inner = host?.shadowRoot?.getElementById('backlog-sidebar-inner')
-    if (inner) inner.style.pointerEvents = collapsed ? 'none' : 'auto'
-  }, [collapsed])
+    chrome.storage.local.get('backlog_theme', (r) => {
+      const saved = r.backlog_theme as 'light' | 'dark' | undefined
+      if (saved === 'light' || saved === 'dark') setTheme(saved)
+    })
+  }, [])
+
+  function toggleTheme() {
+    const next = theme === 'light' ? 'dark' : 'light'
+    setTheme(next)
+    chrome.storage.local.set({ backlog_theme: next })
+  }
 
   const init = useCallback(async () => {
     try {
@@ -434,115 +440,142 @@ export function Sidebar({ initialPage }: { initialPage: PageInfo }) {
 
   if (collapsed) {
     return (
-      <div
+      <button
+        className="fab-appear"
         onClick={() => setCollapsed(false)}
+        title="Open Backlog"
         style={{
           position: 'fixed',
-          top: '50%',
-          right: 0,
-          transform: 'translateY(-50%)',
-          width: '28px',
-          height: '72px',
-          background: '#18181b',
-          border: '1px solid #3f3f46',
-          borderRight: 'none',
-          borderRadius: '6px 0 0 6px',
+          bottom: '24px',
+          right: '24px',
+          width: '52px',
+          height: '52px',
+          borderRadius: '50%',
+          background: 'linear-gradient(135deg, #4f46e5 0%, #6d28d9 100%)',
+          border: 'none',
           cursor: 'pointer',
+          pointerEvents: 'auto',
+          zIndex: 2147483647,
+          boxShadow: '0 4px 20px rgba(79,70,229,0.45), 0 2px 6px rgba(0,0,0,0.25)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          zIndex: 2147483647,
-          boxShadow: '-2px 0 12px rgba(0,0,0,0.4)',
-          transition: 'background 0.15s',
-          pointerEvents: 'auto', // parent mount div is pointer-events:none when collapsed
         }}
-        title="Open Backlog"
       >
-        <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-          <rect x="2" y="2" width="5" height="5" rx="1" fill="#6366f1" />
-          <rect x="9" y="2" width="5" height="5" rx="1" fill="#6366f1" />
-          <rect x="2" y="9" width="5" height="5" rx="1" fill="#6366f1" />
-          <rect x="9" y="9" width="5" height="5" rx="1" fill="#6366f1" opacity="0.4" />
+        <svg width="22" height="22" viewBox="0 0 16 16" fill="none">
+          <rect x="1" y="1" width="6" height="6" rx="1.5" fill="white" />
+          <rect x="9" y="1" width="6" height="6" rx="1.5" fill="white" />
+          <rect x="1" y="9" width="6" height="6" rx="1.5" fill="white" />
+          <rect x="9" y="9" width="6" height="6" rx="1.5" fill="white" opacity="0.55" />
         </svg>
-      </div>
+      </button>
     )
   }
 
+  const isDark = theme === 'dark'
+
   return (
     <div
-      className="sidebar-enter"
+      className="panel-open"
       style={{
         position: 'fixed',
-        top: 0,
-        right: 0,
+        bottom: '20px',
+        right: '20px',
         width: '360px',
-        height: '100vh',
-        // Gradient background with subtle cool-purple tint at top
-        background: 'linear-gradient(180deg, #0d0d1a 0%, #09090b 35%, #09090e 100%)',
-        // Soft indigo border on the left instead of plain zinc
-        borderLeft: '1px solid rgba(99,102,241,0.18)',
-        // Rounded left corners — makes the panel feel like a floating card
-        borderRadius: '20px 0 0 20px',
+        maxHeight: 'calc(100vh - 40px)',
+        borderRadius: '20px',
+        background: isDark
+          ? 'linear-gradient(180deg, #0d0d1a 0%, #09090b 40%, #09090e 100%)'
+          : '#ffffff',
+        border: `1px solid ${isDark ? 'rgba(99,102,241,0.18)' : 'rgba(0,0,0,0.09)'}`,
+        boxShadow: isDark
+          ? '0 8px 40px rgba(0,0,0,0.7), 0 0 0 1px rgba(99,102,241,0.06)'
+          : '0 8px 32px rgba(0,0,0,0.13), 0 2px 8px rgba(0,0,0,0.06)',
         display: 'flex',
         flexDirection: 'column',
-        // Layered shadow: deep dark + subtle indigo glow
-        boxShadow: '-12px 0 48px rgba(0,0,0,0.7), -2px 0 0 rgba(99,102,241,0.08), inset 1px 0 0 rgba(255,255,255,0.03)',
-        zIndex: 2147483647,
         overflow: 'hidden',
+        pointerEvents: 'auto',
+        zIndex: 2147483647,
       }}
     >
-      {/* Ambient glow orbs — purely decorative, pointer-events:none */}
+      {/* Ambient glow orbs */}
       <div style={{
-        position: 'absolute', top: '-80px', left: '-60px',
-        width: '320px', height: '320px',
-        background: 'radial-gradient(circle, rgba(99,102,241,0.09) 0%, transparent 68%)',
+        position: 'absolute', top: '-60px', left: '-40px',
+        width: '260px', height: '260px',
+        background: `radial-gradient(circle, ${isDark ? 'rgba(99,102,241,0.09)' : 'rgba(99,102,241,0.05)'} 0%, transparent 68%)`,
         pointerEvents: 'none', zIndex: 0,
       }} />
       <div style={{
-        position: 'absolute', bottom: '60px', right: '-20px',
-        width: '220px', height: '220px',
-        background: 'radial-gradient(circle, rgba(139,92,246,0.05) 0%, transparent 70%)',
+        position: 'absolute', bottom: '40px', right: '-10px',
+        width: '180px', height: '180px',
+        background: `radial-gradient(circle, ${isDark ? 'rgba(139,92,246,0.05)' : 'rgba(139,92,246,0.03)'} 0%, transparent 70%)`,
         pointerEvents: 'none', zIndex: 0,
       }} />
 
       {/* ── Header ── */}
       <div style={{
-        position: 'relative', zIndex: 1,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        padding: '14px 16px',
-        // Subtle indigo-glow gradient fading to transparent
-        background: 'linear-gradient(180deg, rgba(79,70,229,0.08) 0%, transparent 100%)',
-        borderBottom: '1px solid rgba(255,255,255,0.05)',
-        flexShrink: 0,
+        position: 'relative', zIndex: 1, flexShrink: 0,
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        padding: '12px 14px',
+        background: isDark
+          ? 'linear-gradient(180deg, rgba(79,70,229,0.08) 0%, transparent 100%)'
+          : 'linear-gradient(180deg, rgba(79,70,229,0.04) 0%, transparent 100%)',
+        borderBottom: `1px solid ${isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.07)'}`,
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <svg width="18" height="18" viewBox="0 0 16 16" fill="none">
+        <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
+          <svg width="17" height="17" viewBox="0 0 16 16" fill="none">
             <rect x="1" y="1" width="6" height="6" rx="1.5" fill="#6366f1" />
             <rect x="9" y="1" width="6" height="6" rx="1.5" fill="#6366f1" />
             <rect x="1" y="9" width="6" height="6" rx="1.5" fill="#6366f1" />
             <rect x="9" y="9" width="6" height="6" rx="1.5" fill="#6366f1" opacity="0.35" />
           </svg>
-          <span style={{ fontSize: '13px', fontWeight: 600, color: '#e4e4e7', letterSpacing: '-0.01em' }}>Backlog</span>
+          <span style={{ fontSize: '13px', fontWeight: 600, color: isDark ? '#e4e4e7' : '#18181b', letterSpacing: '-0.01em' }}>
+            Backlog
+          </span>
         </div>
-        <button
-          onClick={() => setCollapsed(true)}
-          style={{
-            background: 'none', border: 'none', cursor: 'pointer', padding: '4px',
-            color: '#52525b', lineHeight: 1, borderRadius: '6px',
-            transition: 'color 0.15s',
-          }}
-          title="Collapse"
-        >
-          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-            <path d="M10 4L7 7L10 10M7 4L4 7L7 10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
+          {/* Theme toggle */}
+          <button
+            onClick={toggleTheme}
+            title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+            style={{
+              background: 'none', border: 'none', cursor: 'pointer',
+              padding: '5px', color: isDark ? '#71717a' : '#a1a1aa',
+              lineHeight: 1, borderRadius: '6px',
+              display: 'flex', alignItems: 'center',
+            }}
+          >
+            {isDark ? (
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                <circle cx="7" cy="7" r="2.8" stroke="currentColor" strokeWidth="1.4" />
+                <path d="M7 1.5v1.2M7 11.3v1.2M1.5 7h1.2M11.3 7h1.2M3.4 3.4l.85.85M9.75 9.75l.85.85M9.75 4.25l.85-.85M3.4 10.6l.85-.85" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+              </svg>
+            ) : (
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                <path d="M11.5 8.5A5 5 0 0 1 5.5 2.5 5 5 0 1 0 11.5 8.5Z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" />
+              </svg>
+            )}
+          </button>
+          {/* Minimize to FAB */}
+          <button
+            onClick={() => setCollapsed(true)}
+            title="Minimize"
+            style={{
+              background: 'none', border: 'none', cursor: 'pointer',
+              padding: '5px', color: isDark ? '#71717a' : '#a1a1aa',
+              lineHeight: 1, borderRadius: '6px',
+              display: 'flex', alignItems: 'center',
+            }}
+          >
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+              <path d="M3 7h8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+            </svg>
+          </button>
+        </div>
       </div>
 
       {/* ── Scrollable body ── */}
-      <div className="sidebar-scroll" style={{ position: 'relative', zIndex: 1, flex: 1, overflowY: 'auto', padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+      <div className="sidebar-scroll" style={{ position: 'relative', zIndex: 1, flex: 1, overflowY: 'auto', padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
 
         {/* DSA Companion mode — shown when on a NeetCode 150 LeetCode problem */}
         {page.dsaSlug && page.dsaDifficulty && (
@@ -556,7 +589,7 @@ export function Sidebar({ initialPage }: { initialPage: PageInfo }) {
 
         {/* Handshake assistant mode */}
         {!page.dsaSlug && page.ats === 'handshake' && (
-          <HandshakePanel tabId={tabId} />
+          <HandshakePanel tabId={tabId} theme={theme} />
         )}
 
         {/* Job application mode — shown when NOT on a DSA page or Handshake */}

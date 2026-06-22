@@ -4,6 +4,39 @@ Reverse-chronological. One entry per meaningful session.
 
 ---
 
+## 2026-06-22 — v3.2.0: FAB + floating panel + light/dark theme (Claude Code)
+
+**Commit:** (see below)
+
+### What shipped
+
+**`extension/src/sidebar/inject.ts`** — host element changed from `top:0; right:0; width:360px; height:100vh` to `inset:0` (full-viewport transparent overlay). Mount loses `pointer-events:auto`. FAB and panel now self-position inside.
+
+**`extension/src/sidebar/sidebar.css`** — two new animations:
+- `fab-appear`: spring scale-in (`cubic-bezier(0.34,1.56,0.64,1)`) for the FAB circle
+- `panel-open`: `translateY(10px) → 0 + scale(0.97→1)` from bottom-right origin
+
+**`extension/src/sidebar/Sidebar.tsx`** — full redesign:
+- `collapsed` now defaults to `true` → sidebar starts as a 52px indigo circle FAB at `bottom:24px; right:24px`
+- FAB expands to full panel on click; panel collapses back to FAB via the `—` minimize button
+- Panel is no longer full-height: `bottom:20px; right:20px; width:360px; maxHeight:calc(100vh-40px); borderRadius:20px`
+- `theme` state (`'light' | 'dark'`, default `'light'`), persisted to `chrome.storage.local` key `backlog_theme`
+- `toggleTheme()` switches between modes and persists
+- Header now has two icon buttons: sun/moon theme toggle + `—` minimize
+- All panel colors are now theme-conditional (`isDark` checks)
+- `HandshakePanel` receives `theme` prop
+
+**`extension/src/sidebar/HandshakePanel.tsx`** — full theme token pass-through:
+- Accepts `theme: 'light' | 'dark'` prop, derives `isDark`
+- All sub-components (`JobCard`, `EmptyJobCard`, `ActionButton`, `CoverLetterResult`, `ProjectSuggestionsResult`, `PillButton`, `Spinner`, `SkeletonChip`) accept `isDark` and apply conditional colors
+- Light mode: card bg `#f5f5fb→#f0f0f8`, text `#18181b`, secondary text `#71717a`, borders `rgba(0,0,0,0.07)`
+- Dark mode: unchanged from v3.1.1 — `#141420→#0e0e18` cards, `#f4f4f5` primary text
+- Chip colors unchanged — they work on both themes (colored on semi-transparent bg)
+
+**`extension/public/manifest.json`:** bumped to v3.2.0.
+
+---
+
 ## 2026-06-22 — v3.1.1: bubbly outer shell + restore description preview (Claude Code)
 
 **Commit:** (see below)

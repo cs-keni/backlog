@@ -59,6 +59,13 @@ Phase 24 is the Handshake job assistant extension. Design doc at:
 - Two-phase async scrape: waits for title/company, then clicks "More" expand buttons and reads full description (up to 6000 chars)
 - Easter egg detection: single Claude call returns `{ coverLetterBody, specialInstructions }` — hidden instructions surfaced in an amber banner in the sidebar
 
+### What's done (Phase 24-P6) — v3.2.0
+
+- FAB+floating panel: sidebar starts as 52px circle FAB (bottom-right), expands to compact floating panel on click (no longer full-height)
+- Light/dark theme toggle (light default) — sun/moon button in header, persisted to `chrome.storage.local`
+- `HandshakePanel` fully theme-aware with light/dark token pass-through
+- Version bumped to v3.2.0
+
 ### What's done (Phase 24-P5) — v3.1.0
 
 - Full HandshakePanel visual redesign: pill/bubble shapes, gradient cards, gradient buttons, glow shadows

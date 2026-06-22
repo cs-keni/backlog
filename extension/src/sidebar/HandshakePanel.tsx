@@ -26,7 +26,7 @@ type PanelStep =
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export function HandshakePanel({ tabId }: { tabId: number }) {
+export function HandshakePanel({ tabId, theme }: { tabId: number; theme: 'light' | 'dark' }) {
   const [jobData, setJobData]               = useState<HandshakeJobData | null>(null)
   const [summary, setSummary]               = useState<JobSummary | null>(null)
   const [summaryLoading, setSummaryLoading] = useState(false)
@@ -39,6 +39,8 @@ export function HandshakePanel({ tabId }: { tabId: number }) {
   const [copied, setCopied]                 = useState(false)
   const [downloadingCl, setDownloadingCl]   = useState(false)
   const [downloadingResume, setDownloadingResume] = useState(false)
+
+  const isDark = theme === 'dark'
 
   // Poll GET_HANDSHAKE_JOB_DATA every 2s until data arrives
   useEffect(() => {
@@ -178,9 +180,9 @@ export function HandshakePanel({ tabId }: { tabId: number }) {
 
       {/* Job card */}
       {jobData ? (
-        <JobCard jobData={jobData} summary={summary} summaryLoading={summaryLoading} />
+        <JobCard jobData={jobData} summary={summary} summaryLoading={summaryLoading} isDark={isDark} />
       ) : (
-        <EmptyJobCard timedOut={scrapeTimedOut} />
+        <EmptyJobCard timedOut={scrapeTimedOut} isDark={isDark} />
       )}
 
       {/* Easter egg banner */}
@@ -201,6 +203,7 @@ export function HandshakePanel({ tabId }: { tabId: number }) {
           icon={<PenIcon />}
           label="Generate cover letter"
           variant="primary"
+          isDark={isDark}
         />
       )}
 
@@ -214,6 +217,7 @@ export function HandshakePanel({ tabId }: { tabId: number }) {
           onDownloadCl={handleDownloadCoverLetter}
           downloadingCl={downloadingCl}
           isLoading={isLoading}
+          isDark={isDark}
         />
       )}
 
@@ -226,6 +230,7 @@ export function HandshakePanel({ tabId }: { tabId: number }) {
           icon={<GridIcon />}
           label="Suggest resume projects"
           variant="secondary"
+          isDark={isDark}
         />
       )}
 
@@ -237,6 +242,7 @@ export function HandshakePanel({ tabId }: { tabId: number }) {
           onDownloadResume={handleDownloadResume}
           downloadingResume={downloadingResume}
           isLoading={isLoading}
+          isDark={isDark}
         />
       )}
 
@@ -247,14 +253,14 @@ export function HandshakePanel({ tabId }: { tabId: number }) {
         rel="noreferrer"
         style={{
           fontSize: '10px',
-          color: '#3f3f46',
+          color: isDark ? '#3f3f46' : '#c4c4c8',
           textDecoration: 'none',
           textAlign: 'center',
           paddingTop: '2px',
           transition: 'color 0.15s',
         }}
-        onMouseEnter={(e) => { (e.target as HTMLElement).style.color = '#71717a' }}
-        onMouseLeave={(e) => { (e.target as HTMLElement).style.color = '#3f3f46' }}
+        onMouseEnter={(e) => { (e.target as HTMLElement).style.color = isDark ? '#71717a' : '#71717a' }}
+        onMouseLeave={(e) => { (e.target as HTMLElement).style.color = isDark ? '#3f3f46' : '#c4c4c8' }}
       >
         Manage cover letter style & projects →
       </a>
@@ -289,34 +295,37 @@ function HandshakeBadge() {
 
 // ─── Job card ─────────────────────────────────────────────────────────────────
 
-function JobCard({ jobData, summary, summaryLoading }: {
+function JobCard({ jobData, summary, summaryLoading, isDark }: {
   jobData: HandshakeJobData
   summary: JobSummary | null
   summaryLoading: boolean
+  isDark: boolean
 }) {
   const hasDesc = jobData.description && jobData.description.length > 10
 
   return (
     <div style={{
-      background: 'linear-gradient(160deg, #141420 0%, #0e0e18 100%)',
-      border: '1px solid rgba(255,255,255,0.07)',
+      background: isDark
+        ? 'linear-gradient(160deg, #141420 0%, #0e0e18 100%)'
+        : 'linear-gradient(160deg, #f5f5fb 0%, #f0f0f8 100%)',
+      border: isDark ? '1px solid rgba(255,255,255,0.07)' : '1px solid rgba(0,0,0,0.07)',
       borderRadius: '18px',
       padding: '14px 14px 12px',
-      boxShadow: '0 2px 16px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.04)',
+      boxShadow: isDark
+        ? '0 2px 16px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.04)'
+        : '0 2px 12px rgba(0,0,0,0.06)',
     }}>
-      {/* Role + company */}
-      <p style={{ fontSize: '13px', fontWeight: 600, color: '#f4f4f5', margin: '0 0 3px', lineHeight: 1.3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+      <p style={{ fontSize: '13px', fontWeight: 600, color: isDark ? '#f4f4f5' : '#18181b', margin: '0 0 3px', lineHeight: 1.3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
         {jobData.jobTitle ?? '—'}
       </p>
       <p style={{ fontSize: '11px', color: '#71717a', margin: '0 0 10px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
         {jobData.company ?? '—'}
       </p>
 
-      {/* Summary chips */}
       {summaryLoading && (
         <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap' }}>
           {[48, 60, 56, 44].map((w, i) => (
-            <SkeletonChip key={i} width={w} />
+            <SkeletonChip key={i} width={w} isDark={isDark} />
           ))}
         </div>
       )}
@@ -326,14 +335,13 @@ function JobCard({ jobData, summary, summaryLoading }: {
       )}
 
       {!summaryLoading && !summary && !hasDesc && (
-        <p style={{ fontSize: '10px', color: '#3f3f46', margin: 0 }}>No description detected</p>
+        <p style={{ fontSize: '10px', color: isDark ? '#3f3f46' : '#c4c4c8', margin: 0 }}>No description detected</p>
       )}
 
-      {/* Description snippet — always show a peek of the raw text below the chips */}
       {hasDesc && (
         <p style={{
           fontSize: '10px',
-          color: '#3f3f46',
+          color: isDark ? '#3f3f46' : '#a1a1aa',
           margin: (summary || summaryLoading) ? '6px 0 0' : '0',
           lineHeight: 1.6,
           display: '-webkit-box',
@@ -351,7 +359,6 @@ function JobCard({ jobData, summary, summaryLoading }: {
 function SummaryChips({ summary }: { summary: JobSummary }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-      {/* Row 1: pay + location */}
       {(summary.pay || summary.location) && (
         <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap' }}>
           {summary.pay && <Chip label={summary.pay} color="green" />}
@@ -359,13 +366,11 @@ function SummaryChips({ summary }: { summary: JobSummary }) {
           {summary.highlights.map((h, i) => <Chip key={i} label={h} color="amber" />)}
         </div>
       )}
-      {/* Row 2: tech stack */}
       {summary.techStack.length > 0 && (
         <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap' }}>
           {summary.techStack.map((t, i) => <Chip key={i} label={t} color="teal" />)}
         </div>
       )}
-      {/* Row 3: requirements */}
       {summary.requirements.length > 0 && (
         <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap' }}>
           {summary.requirements.map((r, i) => <Chip key={i} label={r} color="purple" />)}
@@ -408,36 +413,38 @@ function Chip({ label, color }: { label: string; color: ChipColor }) {
   )
 }
 
-function SkeletonChip({ width }: { width: number }) {
+function SkeletonChip({ width, isDark }: { width: number; isDark: boolean }) {
   return (
     <span style={{
       display: 'inline-block',
       width: `${width}px`,
       height: '20px',
       borderRadius: '99px',
-      background: 'rgba(255,255,255,0.05)',
+      background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.07)',
       animation: 'bl-pulse 1.4s ease-in-out infinite',
     }} />
   )
 }
 
-function EmptyJobCard({ timedOut }: { timedOut: boolean }) {
+function EmptyJobCard({ timedOut, isDark }: { timedOut: boolean; isDark: boolean }) {
   return (
     <div style={{
-      background: 'linear-gradient(160deg, #141420 0%, #0e0e18 100%)',
-      border: '1px solid rgba(255,255,255,0.05)',
+      background: isDark
+        ? 'linear-gradient(160deg, #141420 0%, #0e0e18 100%)'
+        : 'linear-gradient(160deg, #f5f5fb 0%, #f0f0f8 100%)',
+      border: isDark ? '1px solid rgba(255,255,255,0.05)' : '1px solid rgba(0,0,0,0.06)',
       borderRadius: '18px',
       padding: '14px',
-      boxShadow: '0 2px 16px rgba(0,0,0,0.25)',
+      boxShadow: isDark ? '0 2px 16px rgba(0,0,0,0.25)' : '0 2px 8px rgba(0,0,0,0.05)',
     }}>
-      <p style={{ fontSize: '11px', color: '#52525b', margin: 0, lineHeight: 1.6 }}>
+      <p style={{ fontSize: '11px', color: isDark ? '#52525b' : '#a1a1aa', margin: 0, lineHeight: 1.6 }}>
         {timedOut
           ? 'Reload the tab to detect this job (extension was reloaded).'
           : 'Detecting job…'}
       </p>
       {!timedOut && (
         <div style={{ display: 'flex', gap: '5px', marginTop: '8px', flexWrap: 'wrap' }}>
-          {[80, 60, 72, 52].map((w, i) => <SkeletonChip key={i} width={w} />)}
+          {[80, 60, 72, 52].map((w, i) => <SkeletonChip key={i} width={w} isDark={isDark} />)}
         </div>
       )}
     </div>
@@ -446,7 +453,7 @@ function EmptyJobCard({ timedOut }: { timedOut: boolean }) {
 
 // ─── Action buttons ───────────────────────────────────────────────────────────
 
-function ActionButton({ onClick, disabled, loading, loadingLabel, icon, label, variant }: {
+function ActionButton({ onClick, disabled, loading, loadingLabel, icon, label, variant, isDark }: {
   onClick: () => void
   disabled: boolean
   loading: boolean
@@ -454,6 +461,7 @@ function ActionButton({ onClick, disabled, loading, loadingLabel, icon, label, v
   icon: React.ReactNode
   label: string
   variant: 'primary' | 'secondary'
+  isDark: boolean
 }) {
   const isPrimary = variant === 'primary'
   return (
@@ -475,8 +483,8 @@ function ActionButton({ onClick, disabled, loading, loadingLabel, icon, label, v
         transition: 'all 0.18s ease',
         ...(disabled
           ? {
-            background: '#1a1a1f',
-            color: '#3f3f46',
+            background: isDark ? '#1a1a1f' : '#f0f0f4',
+            color: isDark ? '#3f3f46' : '#c4c4c8',
             boxShadow: 'none',
           }
           : isPrimary
@@ -486,16 +494,18 @@ function ActionButton({ onClick, disabled, loading, loadingLabel, icon, label, v
             boxShadow: '0 4px 14px rgba(79,70,229,0.4), inset 0 1px 0 rgba(255,255,255,0.12)',
           }
           : {
-            background: 'linear-gradient(135deg, #1e1e2e 0%, #161622 100%)',
-            color: '#a1a1aa',
-            border: '1px solid rgba(255,255,255,0.08)',
-            boxShadow: '0 2px 8px rgba(0,0,0,0.25)',
+            background: isDark
+              ? 'linear-gradient(135deg, #1e1e2e 0%, #161622 100%)'
+              : 'linear-gradient(135deg, #f4f4f8 0%, #ededf4 100%)',
+            color: isDark ? '#a1a1aa' : '#71717a',
+            border: isDark ? '1px solid rgba(255,255,255,0.08)' : '1px solid rgba(0,0,0,0.09)',
+            boxShadow: isDark ? '0 2px 8px rgba(0,0,0,0.25)' : '0 2px 6px rgba(0,0,0,0.06)',
           }),
       }}
     >
       {loading ? (
         <>
-          <Spinner />
+          <Spinner isDark={isDark} />
           <span>{loadingLabel}</span>
         </>
       ) : (
@@ -511,7 +521,7 @@ function ActionButton({ onClick, disabled, loading, loadingLabel, icon, label, v
 // ─── Cover letter result ──────────────────────────────────────────────────────
 
 function CoverLetterResult({
-  text, copied, onCopy, onRegenerate, onShowProjects, onDownloadCl, downloadingCl, isLoading,
+  text, copied, onCopy, onRegenerate, onShowProjects, onDownloadCl, downloadingCl, isLoading, isDark,
 }: {
   text: string
   copied: boolean
@@ -521,33 +531,36 @@ function CoverLetterResult({
   onDownloadCl: () => void
   downloadingCl: boolean
   isLoading: boolean
+  isDark: boolean
 }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
       <div style={{
-        background: 'linear-gradient(160deg, #141420 0%, #0e0e18 100%)',
-        border: '1px solid rgba(255,255,255,0.07)',
+        background: isDark
+          ? 'linear-gradient(160deg, #141420 0%, #0e0e18 100%)'
+          : 'linear-gradient(160deg, #f5f5fb 0%, #f0f0f8 100%)',
+        border: isDark ? '1px solid rgba(255,255,255,0.07)' : '1px solid rgba(0,0,0,0.07)',
         borderRadius: '18px',
         overflow: 'hidden',
-        boxShadow: '0 2px 16px rgba(0,0,0,0.3)',
+        boxShadow: isDark ? '0 2px 16px rgba(0,0,0,0.3)' : '0 2px 10px rgba(0,0,0,0.06)',
       }}>
         <div style={{
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
           padding: '8px 12px',
-          borderBottom: '1px solid rgba(255,255,255,0.05)',
+          borderBottom: isDark ? '1px solid rgba(255,255,255,0.05)' : '1px solid rgba(0,0,0,0.06)',
         }}>
-          <span style={{ fontSize: '10px', color: '#52525b', fontWeight: 500, letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+          <span style={{ fontSize: '10px', color: isDark ? '#52525b' : '#a1a1aa', fontWeight: 500, letterSpacing: '0.04em', textTransform: 'uppercase' }}>
             Cover letter
           </span>
           <button
             onClick={onCopy}
             style={{
-              background: copied ? 'rgba(52,211,153,0.1)' : 'rgba(255,255,255,0.04)',
-              border: `1px solid ${copied ? 'rgba(52,211,153,0.3)' : 'rgba(255,255,255,0.08)'}`,
+              background: copied ? 'rgba(52,211,153,0.1)' : (isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.04)'),
+              border: `1px solid ${copied ? 'rgba(52,211,153,0.3)' : (isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.09)')}`,
               borderRadius: '99px',
               padding: '3px 10px',
               fontSize: '10px',
-              color: copied ? '#34d399' : '#71717a',
+              color: copied ? '#34d399' : (isDark ? '#71717a' : '#a1a1aa'),
               cursor: 'pointer',
               transition: 'all 0.15s',
               fontWeight: 500,
@@ -566,7 +579,7 @@ function CoverLetterResult({
             border: 'none',
             padding: '12px',
             fontSize: '11px',
-            color: '#d4d4d8',
+            color: isDark ? '#d4d4d8' : '#3f3f46',
             lineHeight: '1.65',
             resize: 'vertical',
             outline: 'none',
@@ -584,12 +597,13 @@ function CoverLetterResult({
         icon={<DownloadIcon />}
         label="Download cover letter PDF"
         variant="primary"
+        isDark={isDark}
       />
 
       <div style={{ display: 'flex', gap: '7px' }}>
-        <PillButton onClick={onRegenerate} disabled={isLoading}>Regenerate</PillButton>
-        <PillButton onClick={onShowProjects} disabled={isLoading}>
-          {isLoading ? <><Spinner />Thinking…</> : 'Suggest projects'}
+        <PillButton onClick={onRegenerate} disabled={isLoading} isDark={isDark}>Regenerate</PillButton>
+        <PillButton onClick={onShowProjects} disabled={isLoading} isDark={isDark}>
+          {isLoading ? <><Spinner isDark={isDark} />Thinking…</> : 'Suggest projects'}
         </PillButton>
       </div>
     </div>
@@ -599,7 +613,7 @@ function CoverLetterResult({
 // ─── Project suggestions result ───────────────────────────────────────────────
 
 function ProjectSuggestionsResult({
-  projects, onRegenerate, onShowCL, onDownloadResume, downloadingResume, isLoading,
+  projects, onRegenerate, onShowCL, onDownloadResume, downloadingResume, isLoading, isDark,
 }: {
   projects: ProjectSuggestion[]
   onRegenerate: () => void
@@ -607,18 +621,21 @@ function ProjectSuggestionsResult({
   onDownloadResume: () => void
   downloadingResume: boolean
   isLoading: boolean
+  isDark: boolean
 }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
       <div style={{
-        background: 'linear-gradient(160deg, #141420 0%, #0e0e18 100%)',
-        border: '1px solid rgba(255,255,255,0.07)',
+        background: isDark
+          ? 'linear-gradient(160deg, #141420 0%, #0e0e18 100%)'
+          : 'linear-gradient(160deg, #f5f5fb 0%, #f0f0f8 100%)',
+        border: isDark ? '1px solid rgba(255,255,255,0.07)' : '1px solid rgba(0,0,0,0.07)',
         borderRadius: '18px',
         overflow: 'hidden',
-        boxShadow: '0 2px 16px rgba(0,0,0,0.3)',
+        boxShadow: isDark ? '0 2px 16px rgba(0,0,0,0.3)' : '0 2px 10px rgba(0,0,0,0.06)',
       }}>
-        <div style={{ padding: '8px 12px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-          <span style={{ fontSize: '10px', color: '#52525b', fontWeight: 500, letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+        <div style={{ padding: '8px 12px', borderBottom: isDark ? '1px solid rgba(255,255,255,0.05)' : '1px solid rgba(0,0,0,0.06)' }}>
+          <span style={{ fontSize: '10px', color: isDark ? '#52525b' : '#a1a1aa', fontWeight: 500, letterSpacing: '0.04em', textTransform: 'uppercase' }}>
             Recommended projects
           </span>
         </div>
@@ -626,8 +643,8 @@ function ProjectSuggestionsResult({
           {projects.map((p) => (
             <div key={p.projectId} style={{
               padding: '10px 12px',
-              background: 'rgba(0,0,0,0.3)',
-              border: '1px solid rgba(255,255,255,0.05)',
+              background: isDark ? 'rgba(0,0,0,0.3)' : 'rgba(255,255,255,0.7)',
+              border: isDark ? '1px solid rgba(255,255,255,0.05)' : '1px solid rgba(0,0,0,0.06)',
               borderRadius: '12px',
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '7px', marginBottom: '5px' }}>
@@ -640,9 +657,9 @@ function ProjectSuggestionsResult({
                 }}>
                   #{p.rank}
                 </span>
-                <span style={{ fontSize: '12px', fontWeight: 600, color: '#f4f4f5' }}>{p.name}</span>
+                <span style={{ fontSize: '12px', fontWeight: 600, color: isDark ? '#f4f4f5' : '#18181b' }}>{p.name}</span>
               </div>
-              <p style={{ fontSize: '10.5px', color: '#a1a1aa', margin: '0 0 4px', lineHeight: 1.55 }}>{p.relevance}</p>
+              <p style={{ fontSize: '10.5px', color: isDark ? '#a1a1aa' : '#52525b', margin: '0 0 4px', lineHeight: 1.55 }}>{p.relevance}</p>
               <p style={{ fontSize: '10.5px', color: '#818cf8', margin: 0, lineHeight: 1.55 }}>↳ {p.swapReason}</p>
             </div>
           ))}
@@ -657,11 +674,12 @@ function ProjectSuggestionsResult({
         icon={<DownloadIcon />}
         label="Download tailored resume PDF"
         variant="primary"
+        isDark={isDark}
       />
 
       <div style={{ display: 'flex', gap: '7px' }}>
-        <PillButton onClick={onRegenerate} disabled={isLoading}>Regenerate</PillButton>
-        <PillButton onClick={onShowCL} disabled={isLoading}>Generate CL</PillButton>
+        <PillButton onClick={onRegenerate} disabled={isLoading} isDark={isDark}>Regenerate</PillButton>
+        <PillButton onClick={onShowCL} disabled={isLoading} isDark={isDark}>Generate CL</PillButton>
       </div>
     </div>
   )
@@ -718,9 +736,10 @@ function ErrorBubble({ message }: { message: string }) {
 
 // ─── Shared small components ──────────────────────────────────────────────────
 
-function PillButton({ onClick, disabled, children }: {
+function PillButton({ onClick, disabled, isDark, children }: {
   onClick: () => void
   disabled: boolean
+  isDark: boolean
   children: React.ReactNode
 }) {
   return (
@@ -729,10 +748,10 @@ function PillButton({ onClick, disabled, children }: {
       disabled={disabled}
       style={{
         flex: 1, padding: '8px',
-        background: 'rgba(255,255,255,0.03)',
-        border: '1px solid rgba(255,255,255,0.07)',
+        background: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.03)',
+        border: isDark ? '1px solid rgba(255,255,255,0.07)' : '1px solid rgba(0,0,0,0.09)',
         borderRadius: '40px',
-        color: disabled ? '#3f3f46' : '#71717a',
+        color: disabled ? (isDark ? '#3f3f46' : '#c4c4c8') : (isDark ? '#71717a' : '#a1a1aa'),
         fontSize: '11.5px', fontWeight: 500,
         cursor: disabled ? 'not-allowed' : 'pointer',
         transition: 'all 0.15s',
@@ -744,11 +763,11 @@ function PillButton({ onClick, disabled, children }: {
   )
 }
 
-function Spinner() {
+function Spinner({ isDark }: { isDark: boolean }) {
   return (
     <span className="bl-spin" style={{
       display: 'inline-block', width: '11px', height: '11px',
-      border: '1.5px solid rgba(255,255,255,0.1)',
+      border: isDark ? '1.5px solid rgba(255,255,255,0.1)' : '1.5px solid rgba(0,0,0,0.1)',
       borderTopColor: '#6366f1',
       borderRadius: '50%',
       flexShrink: 0,
