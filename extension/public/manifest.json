@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Backlog",
-  "version": "2.0.0",
-  "description": "Auto-fill job applications and track them in Backlog",
+  "version": "3.0.0",
+  "description": "Auto-fill job applications, practice LeetCode with an AI coach, and get AI-generated cover letters and resume project suggestions for Handshake jobs.",
   "permissions": [
     "storage",
     "activeTab",
