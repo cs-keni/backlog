@@ -50,6 +50,8 @@ export async function POST(request: Request) {
   })
 
   const buffer = await renderToBuffer(
+    // CoverLetterDoc renders a <Document> internally; cast satisfies renderToBuffer's
+    // ReactElement<DocumentProps> constraint without losing runtime correctness.
     createElement(CoverLetterDoc, {
       name,
       contacts,
@@ -57,7 +59,7 @@ export async function POST(request: Request) {
       jobTitle: body.jobTitle,
       company:  body.company,
       body:     body.coverLetterBody,
-    })
+    }) as unknown as Parameters<typeof renderToBuffer>[0]
   )
 
   const filename = `Cover_Letter_${body.company.replace(/\s+/g, '_')}.pdf`

@@ -128,7 +128,9 @@ IMPORTANT rules:
     .trim()
 
   const parsed = parseResume(tailoredMarkdown)
-  const buffer = await renderToBuffer(createElement(ResumeDoc, { resume: parsed }))
+  const buffer = await renderToBuffer(
+    createElement(ResumeDoc, { resume: parsed }) as unknown as Parameters<typeof renderToBuffer>[0]
+  )
 
   const name     = user.full_name ?? 'Resume'
   const safeName = name.replace(/\s+/g, '_')
