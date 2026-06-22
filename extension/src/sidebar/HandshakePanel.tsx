@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { generateCoverLetter, suggestProjects } from '../shared/api'
+import { generateCoverLetter, suggestProjects, downloadCoverLetterPdf, downloadTailoredResumePdf } from '../shared/api'
 import type { HandshakeJobData } from '../shared/types'
 import { BACKLOG_URL } from '../shared/config'
 
@@ -29,6 +29,8 @@ export function HandshakePanel({ tabId }: { tabId: number }) {
   const [projects, setProjects] = useState<ProjectSuggestion[]>([])
   const [error, setError] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
+  const [downloadingCl, setDownloadingCl] = useState(false)
+  const [downloadingResume, setDownloadingResume] = useState(false)
 
   // Load handshake context from tab session storage
   useEffect(() => {
@@ -93,6 +95,53 @@ export function HandshakePanel({ tabId }: { tabId: number }) {
     } else {
       setProjects(res.suggestions)
       setStep('projects-ready')
+    }
+  }
+
+  function triggerPdfDownload(buffer: ArrayBuffer, filename: string) {
+    const blob = new Blob([buffer], { type: 'application/pdf' })
+    const url  = URL.createObjectURL(blob)
+    const a    = document.createElement('a')
+    a.href     = url
+    a.download = filename
+    a.click()
+    setTimeout(() => URL.revokeObjectURL(url), 5000)
+  }
+
+  async function handleDownloadCoverLetter() {
+    if (!jobData || !coverLetter) return
+    setDownloadingCl(true)
+    setError(null)
+    try {
+      const buffer = await downloadCoverLetterPdf({
+        jobTitle:        jobData.jobTitle ?? 'Unknown role',
+        company:         jobData.company ?? 'Unknown company',
+        coverLetterBody: coverLetter,
+      })
+      triggerPdfDownload(buffer, `Cover_Letter_${(jobData.company ?? 'Company').replace(/\s+/g, '_')}.pdf`)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Download failed')
+    } finally {
+      setDownloadingCl(false)
+    }
+  }
+
+  async function handleDownloadResume() {
+    if (!jobData || !projects.length) return
+    setDownloadingResume(true)
+    setError(null)
+    try {
+      const buffer = await downloadTailoredResumePdf({
+        jobTitle:       jobData.jobTitle ?? 'Unknown role',
+        company:        jobData.company ?? 'Unknown company',
+        jobDescription: jobData.description ?? '',
+        suggestions:    projects,
+      })
+      triggerPdfDownload(buffer, `Resume_${(jobData.company ?? 'Company').replace(/\s+/g, '_')}.pdf`)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Download failed')
+    } finally {
+      setDownloadingResume(false)
     }
   }
 
@@ -185,6 +234,8 @@ export function HandshakePanel({ tabId }: { tabId: number }) {
           onCopy={copyToClipboard}
           onRegenerate={handleGenerateCoverLetter}
           onShowProjects={handleSuggestProjects}
+          onDownloadCl={handleDownloadCoverLetter}
+          downloadingCl={downloadingCl}
           isLoading={isLoading}
         />
       )}
@@ -217,6 +268,8 @@ export function HandshakePanel({ tabId }: { tabId: number }) {
           projects={projects}
           onRegenerate={handleSuggestProjects}
           onShowCL={handleGenerateCoverLetter}
+          onDownloadResume={handleDownloadResume}
+          downloadingResume={downloadingResume}
           isLoading={isLoading}
         />
       )}
@@ -275,13 +328,15 @@ function JobInfoCard({ jobData }: { jobData: HandshakeJobData }) {
 }
 
 function CoverLetterResult({
-  text, copied, onCopy, onRegenerate, onShowProjects, isLoading,
+  text, copied, onCopy, onRegenerate, onShowProjects, onDownloadCl, downloadingCl, isLoading,
 }: {
   text: string
   copied: boolean
   onCopy: () => void
   onRegenerate: () => void
   onShowProjects: () => void
+  onDownloadCl: () => void
+  downloadingCl: boolean
   isLoading: boolean
 }) {
   return (
@@ -329,6 +384,24 @@ function CoverLetterResult({
           }}
         />
       </div>
+      {/* Download PDF — full width, prominent */}
+      <button
+        onClick={onDownloadCl}
+        disabled={downloadingCl || isLoading}
+        style={primaryButtonStyle(downloadingCl || isLoading)}
+      >
+        {downloadingCl ? (
+          <><Spinner />Building PDF…</>
+        ) : (
+          <>
+            <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+              <path d="M6.5 2v7M3.5 6.5l3 3 3-3" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+              <path d="M1.5 11h10" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+            </svg>
+            Download cover letter PDF
+          </>
+        )}
+      </button>
       <div style={{ display: 'flex', gap: '6px' }}>
         <button onClick={onRegenerate} disabled={isLoading} style={{ ...secondaryButtonStyle(isLoading), flex: 1, padding: '7px' }}>
           Regenerate
@@ -343,11 +416,13 @@ function CoverLetterResult({
 }
 
 function ProjectSuggestionsResult({
-  projects, onRegenerate, onShowCL, isLoading,
+  projects, onRegenerate, onShowCL, onDownloadResume, downloadingResume, isLoading,
 }: {
   projects: ProjectSuggestion[]
   onRegenerate: () => void
   onShowCL: () => void
+  onDownloadResume: () => void
+  downloadingResume: boolean
   isLoading: boolean
 }) {
   return (
@@ -394,6 +469,24 @@ function ProjectSuggestionsResult({
           ))}
         </div>
       </div>
+      {/* Download tailored resume — full width, prominent */}
+      <button
+        onClick={onDownloadResume}
+        disabled={downloadingResume || isLoading}
+        style={primaryButtonStyle(downloadingResume || isLoading)}
+      >
+        {downloadingResume ? (
+          <><Spinner />Building resume…</>
+        ) : (
+          <>
+            <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+              <path d="M6.5 2v7M3.5 6.5l3 3 3-3" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+              <path d="M1.5 11h10" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+            </svg>
+            Download tailored resume PDF
+          </>
+        )}
+      </button>
       <div style={{ display: 'flex', gap: '6px' }}>
         <button onClick={onRegenerate} disabled={isLoading} style={{ ...secondaryButtonStyle(isLoading), flex: 1, padding: '7px' }}>
           Regenerate

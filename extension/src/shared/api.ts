@@ -175,6 +175,41 @@ export async function suggestProjects(payload: {
   return res.json() as Promise<{ suggestions: Array<{ projectId: string; name: string; rank: number; relevance: string; swapReason: string }> } | { error: string }>
 }
 
+/** Returns an ArrayBuffer of the PDF binary (application/pdf). */
+export async function downloadCoverLetterPdf(payload: {
+  jobTitle:        string
+  company:         string
+  coverLetterBody: string
+}): Promise<ArrayBuffer> {
+  const res = await apiFetch('/api/extension/download-cover-letter', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+  if (!res.ok) {
+    const json = await res.json().catch(() => ({})) as { error?: string }
+    throw new Error(json.error ?? `PDF generation failed (${res.status})`)
+  }
+  return res.arrayBuffer()
+}
+
+/** Returns an ArrayBuffer of the PDF binary (application/pdf). */
+export async function downloadTailoredResumePdf(payload: {
+  jobTitle:       string
+  company:        string
+  jobDescription: string
+  suggestions:    Array<{ projectId: string; name: string; rank: number; relevance: string; swapReason: string }>
+}): Promise<ArrayBuffer> {
+  const res = await apiFetch('/api/extension/download-tailored-resume', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+  if (!res.ok) {
+    const json = await res.json().catch(() => ({})) as { error?: string }
+    throw new Error(json.error ?? `Resume generation failed (${res.status})`)
+  }
+  return res.arrayBuffer()
+}
+
 // ─── DSA Companion ────────────────────────────────────────────────────────────
 
 export async function fetchDsaHints(slug: string): Promise<ProblemHints | null> {

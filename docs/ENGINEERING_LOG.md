@@ -53,17 +53,35 @@ Also fixed two parser bugs in `scripts/seed-project-catalog.mjs` discovered duri
 - `src/app/api/user/extract-cover-letter-style/route.ts`: multipart PDF upload, processes up to 20 PDFs, stores style context
 
 **Extension API wrappers (`extension/src/shared/api.ts`):**
-- `generateCoverLetter()` and `suggestProjects()` added
+- `generateCoverLetter()`, `suggestProjects()`, `downloadCoverLetterPdf()`, `downloadTailoredResumePdf()` added
+
+**PDF infrastructure (Next.js server):**
+- `src/lib/pdf/resume-utils.ts` — `preprocessResumeLol()`, `parseResume()`, `ParsedResume` types
+- `src/lib/pdf/cover-letter-doc.tsx` — `CoverLetterDoc` React component (@react-pdf/renderer)
+- `src/lib/pdf/resume-doc.tsx` — `ResumeDoc` React component
+- `src/app/api/extension/download-cover-letter/route.ts` — fetches user profile, renders PDF via renderToBuffer
+- `src/app/api/extension/download-tailored-resume/route.ts` — fetches resume_markdown, asks Claude to swap projects, renders PDF
+
+**Additional API routes:**
+- `src/app/api/user/upload-resume/route.ts` — `POST { markdown }` → `users.resume_markdown`
+- `supabase/migrations/043_resume_markdown.sql` — adds `resume_markdown text` to users
+
+**Scripts:**
+- `scripts/upload-resume.mjs` — uploads local `resume-data/resume.md` to DB via service role key
 
 **Sidebar (`extension/src/sidebar/HandshakePanel.tsx` — NEW):**
 - Job info card (title, company, description preview), live-updates via storage onChanged listener
-- "Generate cover letter" → streaming-style loading → copyable textarea with "Copy" / "Regenerate" actions
-- "Suggest resume projects" → ranked cards with relevance + swap talking point
-- Settings link to web app
+- "Generate cover letter" → copyable textarea → "Download cover letter PDF" (ArrayBuffer → Blob → anchor click)
+- "Suggest resume projects" → ranked cards with relevance + swap talking point → "Download tailored resume PDF"
+- `triggerPdfDownload()` helper, `handleDownloadCoverLetter()`, `handleDownloadResume()` all wired
 
 **Sidebar wiring (`extension/src/sidebar/Sidebar.tsx`):**
 - `HandshakePanel` routed for `page.ats === 'handshake'`
 - Added `handshake: 'Handshake'` to `ATS_LABELS`
+
+**Extension manifest (`extension/public/manifest.json`):**
+- Version bumped to `3.0.0`
+- Description updated to mention Handshake cover letters and resume tailoring
 
 ---
 

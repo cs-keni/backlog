@@ -1,7 +1,7 @@
 # Current Task
 
 **Last updated:** 2026-06-22
-**Status:** Phase 24 (Handshake Assistant) — P0 + P1 core wiring complete. Migration and seed script need to be run.
+**Status:** Phase 24 (Handshake Assistant) — P0 + P1 complete including PDF download. Pending: run migrations, seed script, upload resume, upload cover-letter PDFs, live-test selectors.
 
 ---
 
@@ -32,22 +32,32 @@ Phase 24 is the Handshake job assistant extension. Design doc at:
 - `src/app/api/user/extract-cover-letter-style/route.ts` — multipart PDF upload → style extraction
 
 **Sidebar**
-- `extension/src/sidebar/HandshakePanel.tsx` — NEW: full panel with job info, CL generation, project suggestions
+- `extension/src/sidebar/HandshakePanel.tsx` — full panel: job info, CL generation + copy + PDF download, project suggestions + tailored resume PDF download
 - `extension/src/sidebar/Sidebar.tsx` — `HandshakePanel` routed for `page.ats === 'handshake'`
 
+**PDF infrastructure**
+- `src/lib/pdf/resume-utils.ts`, `src/lib/pdf/cover-letter-doc.tsx`, `src/lib/pdf/resume-doc.tsx`
+- `src/app/api/extension/download-cover-letter/route.ts`
+- `src/app/api/extension/download-tailored-resume/route.ts`
+- `src/app/api/user/upload-resume/route.ts`
+- `supabase/migrations/043_resume_markdown.sql` (NOT YET applied)
+
 **Scripts + migrations**
-- `scripts/seed-project-catalog.mjs` — parser bugs fixed (`: **` detection, paren-before-split)
-- `supabase/migrations/042_application_materials.sql` — ready to apply
+- `scripts/seed-project-catalog.mjs` — parser bugs fixed
+- `scripts/upload-resume.mjs` — NEW: uploads `resume-data/resume.md` to DB
+- `supabase/migrations/042_application_materials.sql` — applied ✅
+- `supabase/migrations/043_resume_markdown.sql` — NOT applied yet
 
 ### What's blocked / next steps
 
-1. **Apply migration 042** in Supabase console (SQL in `supabase/migrations/042_application_materials.sql`)
+1. **Apply migration 043** in Supabase console (`supabase/migrations/043_resume_markdown.sql`)
 2. **Run seed script**: `node --env-file=.env.local scripts/seed-project-catalog.mjs`
-3. **Upload cover letter PDFs** via settings page to populate `users.cover_letter_style_context`
-   - `POST /api/user/extract-cover-letter-style` with files under `pdfs` form field
-4. **Live-test Handshake selectors** on `app.joinhandshake.com` — may need DOM selector tuning
-5. **Build + load extension**: `cd extension && npm run build` then load in Chrome
-6. Project catalog settings UI (web) — Phase 24-P2
+3. **Upload resume**: `node --env-file=.env.local scripts/upload-resume.mjs`
+4. **Upload cover letter PDFs** to populate style context:
+   - `POST /api/user/extract-cover-letter-style` with files under `pdfs` form field (curl or settings UI)
+5. **Reload extension** in Chrome (extension already built — click Reload in chrome://extensions)
+6. **Live-test Handshake selectors** on `app.joinhandshake.com/jobs/<id>` — may need DOM tuning
+7. Project catalog settings UI (web) — Phase 24-P2
 
 ---
 
