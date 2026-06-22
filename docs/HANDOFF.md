@@ -4,6 +4,53 @@
 
 ---
 
+## Session: 2026-06-22 — Handshake Assistant Phase 24-P0 + P1 (Claude Code)
+
+### What changed
+
+Built the Handshake job assistant features into the existing extension — no new extension, same `extension/` package. The extension now detects Handshake job pages, scrapes job data, shows a new `HandshakePanel` sidebar, generates cover letter body text via Claude Sonnet, and suggests which resume projects to swap in via Haiku.
+
+### Architecture decisions to know
+
+**`HandshakeJobData` vs `JobContext`:** These are kept as separate fields in `TabSessionState` (`handshakeContext` vs `jobContext`). `JobContext` requires a `jobId` (Backlog-tracked job), `HandshakeJobData` doesn't. Don't merge them.
+
+**Cross-platform context capture:** When user clicks "Apply Externally" on Handshake, the content script sends `STORE_CROSS_PLATFORM_JOB_CONTEXT` to background. Background stores it in `pendingCrossPlatformContext: Map<tabId, HandshakeJobData>`. When `chrome.tabs.onUpdated` fires for that tab at `status='loading'`, the pending context is written to session storage as `handshakeContext`. This happens at `'loading'` (not `'complete'`) so the context is ready before the ATS page's content scripts run. Known limitation: single slot per tab — if two Handshake tabs navigate simultaneously the second may clobber the first's pending context.
+
+**Sidebar routing:** `page.ats === 'handshake'` renders `HandshakePanel` instead of the regular auto-fill panel. The `HandshakePanel` reads `handshakeContext` from `chrome.storage.session` and listens for real-time changes via `chrome.storage.session.onChanged`.
+
+**Rate limits are in-memory:** Cover letter: 5/day. Project suggestions: 20/day. Style extraction: no limit. These reset on process restart (Vercel cold start). No DB columns for this.
+
+**`is_active` on projects table:** The seed script sets `is_active = true` on all seeded rows. The `suggest-projects` route filters to `is_active = true`. When a settings UI is built, toggle this column to hide specific projects from suggestions.
+
+### What still needs to happen before P1 is usable
+
+1. Apply `supabase/migrations/042_application_materials.sql` in Supabase console
+2. Run: `node --env-file=.env.local scripts/seed-project-catalog.mjs`
+3. Build the extension: `cd extension && npm run build`
+4. Live test on `app.joinhandshake.com/jobs/<id>` — the DOM selectors in `handshake.ts` are best-guess; they may need tuning
+5. Upload 57 cover letter PDFs via `POST /api/user/extract-cover-letter-style` (needs settings UI or curl)
+
+### Key files changed this session
+
+| File | Change |
+|------|--------|
+| `extension/src/shared/types.ts` | AtsType +handshake, HandshakeJobData, handshakeContext, 3 message types |
+| `extension/src/content/detect.ts` | Handshake URL detection |
+| `extension/src/content/handshake.ts` | NEW: DOM scraper + external-apply interceptor |
+| `extension/src/content/index.ts` | maybeInitHandshake(), interceptor install |
+| `extension/src/background/index.ts` | 3 new message handlers, cross-platform context write |
+| `extension/src/shared/api.ts` | generateCoverLetter(), suggestProjects() |
+| `extension/src/sidebar/HandshakePanel.tsx` | NEW: full Handshake panel |
+| `extension/src/sidebar/Sidebar.tsx` | Route handshake to HandshakePanel |
+| `src/app/api/extension/generate-cover-letter/route.ts` | NEW: CL generation API |
+| `src/app/api/extension/suggest-projects/route.ts` | NEW: project ranking API |
+| `src/app/api/user/extract-cover-letter-style/route.ts` | NEW: PDF style extraction API |
+| `supabase/migrations/042_application_materials.sql` | NEW: migration |
+| `scripts/seed-project-catalog.mjs` | Parser bug fixes |
+| `PHASES.md` | Phase 24 added |
+
+---
+
 ## Session: 2026-06-06 — Discord source-mix ring chart (Claude Code)
 
 ### What changed

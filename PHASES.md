@@ -1618,3 +1618,40 @@ Concept primers to add: `prometheus-scrape`, `slo-error-budget`, `opentelemetry`
 - [ ] **Phase 10B.2 — Async combobox fill** — Workday country/state/city use async comboboxes (`[data-automation-id="countryDropdown"]` etc.); need to type into the input, wait for dropdown items to appear, then click the match; currently shows "manual input required" note in preview
 - [ ] **Phase 10B.3 — Real Workday smoke test** — test on a live Workday application (`*.myworkdayjobs.com`); capture a DOM fixture from a real Workday form for deterministic regression testing
 - [ ] E2E test (Playwright): scan preview shows correct fields → apply → inputs are filled
+
+---
+
+### Phase 24 — Handshake Assistant (AI cover letters + resume project suggestions)
+
+> Extend the Backlog extension to support the Handshake job application workflow. One extension, no manual copy-paste. Auto-scrape job details from the Handshake DOM, generate cover letter body text, and recommend which resume projects to swap in.
+
+**Design doc:** `~/.gstack/projects/cs-keni-backlog/keni-main-design-handshake-assistant-20260621-214851.md`
+
+#### Phase 24-P0 — Style extraction
+- [x] `supabase/migrations/042_application_materials.sql` — add `cover_letter_style_context` to users, enrich `projects` table
+- [x] `scripts/seed-project-catalog.mjs` — parse `projects-data/*.md`, upsert 10 projects into `public.projects`
+- [x] Fix seed script parser bugs: `:**` vs `**:` for bold-label extraction; paren-before-split fix
+- [x] `src/app/api/user/extract-cover-letter-style/route.ts` — multipart PDF upload → Claude Sonnet style extraction → store in `users.cover_letter_style_context`
+- [ ] Apply migration 042 in Supabase console
+- [ ] Run seed script: `node --env-file=.env.local scripts/seed-project-catalog.mjs`
+- [ ] Upload 57 cover letter PDFs from `cover-letter-data/` via settings UI (need settings UI)
+
+#### Phase 24-P1 — Handshake detection + cover letter
+- [x] `extension/src/shared/types.ts` — add `AtsType 'handshake'`, `HandshakeJobData`, `handshakeContext` on `TabSessionState`, three new `ExtensionMessage` types
+- [x] `extension/src/content/detect.ts` — add Handshake URL detection (`joinhandshake.com|myhandshake.co`)
+- [x] `extension/src/content/handshake.ts` — `scrapeHandshakeJob()` (MutationObserver, 5s timeout) + `installExternalApplyInterceptor()`
+- [x] `extension/src/content/index.ts` — `maybeInitHandshake()`, hook into `backlog:navigation`, install external-apply interceptor
+- [x] `extension/src/background/index.ts` — `SET_HANDSHAKE_JOB_DATA`, `GET_HANDSHAKE_JOB_DATA`, `STORE_CROSS_PLATFORM_JOB_CONTEXT` handlers; `pendingCrossPlatformContext` Map; write cross-platform context at `onUpdated status='loading'`
+- [x] `src/app/api/extension/generate-cover-letter/route.ts` — Claude Sonnet cover letter body generation
+- [x] `extension/src/shared/api.ts` — `generateCoverLetter()` + `suggestProjects()` wrappers
+- [x] `extension/src/sidebar/HandshakePanel.tsx` — full panel: job info, CL generation, project suggestions, copy button
+- [x] `extension/src/sidebar/Sidebar.tsx` — route Handshake pages to `HandshakePanel`
+
+#### Phase 24-P2 — Project catalog + swap spec
+- [x] `src/app/api/extension/suggest-projects/route.ts` — Haiku project ranking by JD match
+- [ ] Project catalog settings UI (web app) — view/toggle active projects
+- [ ] Handshake Selector validation on live joinhandshake.com (tune DOM selectors if needed)
+
+#### Phase 24-P3 — Design refresh (after P1-P2 stable)
+- [ ] `/plan-design-review` before starting
+- [ ] Modern sidebar chrome redesign

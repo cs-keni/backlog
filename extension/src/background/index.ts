@@ -1,7 +1,12 @@
 import { BACKLOG_URL } from '../shared/config'
 import { markApplied, addJob, analyzePage, answerQuestion, getApiKey, fetchJobContext } from '../shared/api'
-import type { ExtensionMessage, TabSessionState, PageFill, FillResult, FieldAnalysisResult, JobContext } from '../shared/types'
+import type { ExtensionMessage, TabSessionState, PageFill, FillResult, FieldAnalysisResult, JobContext, HandshakeJobData } from '../shared/types'
 import { isGenericPostSubmitPage, isPostSubmitConfirmationUrl } from '../shared/postSubmit'
+
+// Pending cross-platform context: keyed by tabId, set when the user clicks
+// "Apply Externally" on a Handshake job page. Written to session state once
+// the tab navigates to the company ATS (at onUpdated status='loading').
+const pendingCrossPlatformContext = new Map<number, HandshakeJobData>()
 
 // ─── Session state helpers ────────────────────────────────────────────────────
 // chrome.storage.session persists for the entire browser session (not per-tab).
@@ -32,6 +37,7 @@ async function updateTabState(tabId: number, patch: Partial<TabSessionState>): P
     pages: current?.pages ?? [],
     currentPageIndex: current?.currentPageIndex ?? -1,
     jobContext: current?.jobContext ?? null,
+    handshakeContext: current?.handshakeContext ?? null,
     pendingSubmission: current?.pendingSubmission ?? null,
     ...patch,
   }
@@ -338,6 +344,49 @@ chrome.runtime.onMessage.addListener((message: ExtensionMessage, sender, sendRes
     return false
   }
 
+  // ── Handshake job data ────────────────────────────────────────────────────
+  if (message.type === 'SET_HANDSHAKE_JOB_DATA') {
+    const tabId = sender.tab?.id
+    if (!tabId) return false
+    updateTabState(tabId, { handshakeContext: message.payload }).catch(() => {})
+    // Auto-inject sidebar so the user sees the Handshake panel immediately
+    chrome.scripting.executeScript({
+      target: { tabId },
+      func: () => {
+        const host = document.getElementById('backlog-sidebar-host')
+        if (!host?.shadowRoot) return false
+        const inner = host.shadowRoot.getElementById('backlog-sidebar-inner')
+        if (inner?.style.display === 'none') inner.style.display = ''
+        return !!host
+      },
+    }).then((results) => {
+      if (!results[0]?.result) {
+        return chrome.scripting.executeScript({ target: { tabId }, files: ['sidebar.js'] })
+      }
+    }).catch(() => {})
+    return false
+  }
+
+  if (message.type === 'GET_HANDSHAKE_JOB_DATA') {
+    const tabId = sender.tab?.id
+    if (!tabId) {
+      sendResponse({ handshakeContext: null })
+      return true
+    }
+    getTabState(tabId)
+      .then((state) => sendResponse({ handshakeContext: state?.handshakeContext ?? null }))
+      .catch(() => sendResponse({ handshakeContext: null }))
+    return true
+  }
+
+  if (message.type === 'STORE_CROSS_PLATFORM_JOB_CONTEXT') {
+    const tabId = sender.tab?.id
+    if (!tabId) return false
+    const { jobTitle, company, description } = message.payload
+    pendingCrossPlatformContext.set(tabId, { jobTitle, company, description })
+    return false
+  }
+
   if (message.type === 'AUTO_INJECT_SIDEBAR') {
     const tabId = sender.tab?.id
     if (!tabId) return false
@@ -401,6 +450,14 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
 
   if (changeInfo.url) {
     void maybeDetectSubmitted(tabId, changeInfo.url)
+  }
+
+  // Write cross-platform Handshake context at navigation START (not 'complete')
+  // so it's available in session storage before the content script runs.
+  if (changeInfo.status === 'loading' && pendingCrossPlatformContext.has(tabId)) {
+    const pending = pendingCrossPlatformContext.get(tabId)!
+    pendingCrossPlatformContext.delete(tabId)
+    updateTabState(tabId, { handshakeContext: pending }).catch(() => {})
   }
 
   if (changeInfo.status !== 'complete') return

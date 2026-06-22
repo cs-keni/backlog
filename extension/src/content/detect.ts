@@ -26,6 +26,12 @@ export function detectAts(url: string): AtsType {
   if (/jobs\.lever\.co/.test(url) || /[?&]lever_job_id=/.test(url)) return 'lever'
   if (/myworkdayjobs\.com|workday\.com/.test(url)) return 'workday'
 
+  if (/joinhandshake\.com|myhandshake\.co/.test(url)) {
+    try {
+      if (/\/jobs\/\d+/.test(new URL(url).pathname)) return 'handshake'
+    } catch { /* malformed URL */ }
+  }
+
   // iCIMS/BambooHR host job postings at /jobs/<id>/... but also serve login,
   // password-reset, and account pages on the *same* domain — those aren't job
   // pages even though the URL matches. Only short-circuit to 'generic' for

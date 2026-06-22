@@ -140,6 +140,41 @@ export async function addJob(payload: {
   return res.json() as Promise<{ job: { id: string }; duplicate: boolean }>
 }
 
+// ─── Handshake assistant ─────────────────────────────────────────────────────
+
+export async function generateCoverLetter(payload: {
+  jobTitle:       string
+  company:        string
+  jobDescription: string
+}): Promise<{ coverLetterBody: string } | { error: string }> {
+  const res = await apiFetch('/api/extension/generate-cover-letter', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+  return res.json() as Promise<{ coverLetterBody: string } | { error: string }>
+}
+
+export async function suggestProjects(payload: {
+  jobTitle:       string
+  company:        string
+  jobDescription: string
+  maxProjects?:   number
+}): Promise<{
+  suggestions: Array<{
+    projectId:  string
+    name:       string
+    rank:       number
+    relevance:  string
+    swapReason: string
+  }>
+} | { error: string }> {
+  const res = await apiFetch('/api/extension/suggest-projects', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+  return res.json() as Promise<{ suggestions: Array<{ projectId: string; name: string; rank: number; relevance: string; swapReason: string }> } | { error: string }>
+}
+
 // ─── DSA Companion ────────────────────────────────────────────────────────────
 
 export async function fetchDsaHints(slug: string): Promise<ProblemHints | null> {

@@ -4,6 +4,69 @@ Reverse-chronological. One entry per meaningful session.
 
 ---
 
+## 2026-06-22 — Handshake Assistant Phase 24-P0 + P1 (Claude Code)
+
+**Commit:** TBD (next commit)
+
+### What happened
+
+Built the Handshake job assistant extension — auto-scrape job details from Handshake, generate AI cover letter body, suggest resume projects to swap in. Full design doc was written in a prior session via `/office-hours`; this session was all implementation.
+
+Also fixed two parser bugs in `scripts/seed-project-catalog.mjs` discovered during smoke testing last session.
+
+### What shipped
+
+**Bug fixes (seed script):**
+- `parseTechStack`: was searching for `**:` (opening bold + colon) but Handshake markdown format puts the colon INSIDE the bold: `**Category:**`. Fixed to search for `:**` (colon + closing bold markers). All 10 projects now parse correctly (0 → 19 techs per project).
+- `parseTechStack`: moved parenthetical strip (`\([^)]*\)`) to before the comma-split so commas inside parens (e.g. `(complex reasoning, long-form responses)`) don't create phantom tech entries.
+
+**New migration:**
+- `supabase/migrations/042_application_materials.sql` — adds `cover_letter_style_context` to users; adds `detailed_description`, `impact`, `is_active` to projects; adds unique index on `(user_id, name)` needed for upsert.
+
+**Extension type changes (`extension/src/shared/types.ts`):**
+- `AtsType` extended with `'handshake'`
+- New `HandshakeJobData` interface
+- `TabSessionState.handshakeContext` field
+- Three new `ExtensionMessage` union members
+
+**Extension detection (`extension/src/content/detect.ts`):**
+- Added `joinhandshake.com|myhandshake.co` URL pattern, only triggers on `/jobs/\d+` paths
+
+**Extension scraping (`extension/src/content/handshake.ts` — NEW):**
+- `scrapeHandshakeJob()`: MutationObserver-based DOM scrape with 5s timeout for React SPA readiness
+- `installExternalApplyInterceptor()`: captures job data on "Apply Externally" clicks before tab navigates to ATS
+
+**Extension content wiring (`extension/src/content/index.ts`):**
+- `maybeInitHandshake()` triggers on page load and SPA `backlog:navigation` events
+- External-apply interceptor installed at top frame
+
+**Extension background (`extension/src/background/index.ts`):**
+- `pendingCrossPlatformContext: Map<number, HandshakeJobData>` module-level state
+- `SET_HANDSHAKE_JOB_DATA`: stores in tab session + auto-injects sidebar
+- `GET_HANDSHAKE_JOB_DATA`: reads from tab session for sidebar
+- `STORE_CROSS_PLATFORM_JOB_CONTEXT`: stores pending context by tabId
+- `onUpdated` at `status='loading'`: writes pending cross-platform context to new tab session before content scripts run
+
+**API routes (Next.js):**
+- `src/app/api/extension/generate-cover-letter/route.ts`: Claude Sonnet, style-aware, 5 CL/day limit
+- `src/app/api/extension/suggest-projects/route.ts`: Haiku project ranking, 20 suggestions/day
+- `src/app/api/user/extract-cover-letter-style/route.ts`: multipart PDF upload, processes up to 20 PDFs, stores style context
+
+**Extension API wrappers (`extension/src/shared/api.ts`):**
+- `generateCoverLetter()` and `suggestProjects()` added
+
+**Sidebar (`extension/src/sidebar/HandshakePanel.tsx` — NEW):**
+- Job info card (title, company, description preview), live-updates via storage onChanged listener
+- "Generate cover letter" → streaming-style loading → copyable textarea with "Copy" / "Regenerate" actions
+- "Suggest resume projects" → ranked cards with relevance + swap talking point
+- Settings link to web app
+
+**Sidebar wiring (`extension/src/sidebar/Sidebar.tsx`):**
+- `HandshakePanel` routed for `page.ats === 'handshake'`
+- Added `handshake: 'Handshake'` to `ATS_LABELS`
+
+---
+
 ## 2026-06-06 — Discord source-mix ring chart (Claude Code)
 
 **Commit:** a2e275d

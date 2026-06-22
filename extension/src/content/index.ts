@@ -1,6 +1,7 @@
-import { extractPageInfo, detectLeetCodeProblem } from './detect'
+import { extractPageInfo, detectLeetCodeProblem, detectAts } from './detect'
 import { fillForm, applyFieldValues, fillWorkdayComboboxes, fillFileInputs } from './fill'
 import { detectNextButton, detectPageType } from './detect'
+import { scrapeHandshakeJob, installExternalApplyInterceptor } from './handshake'
 import type { ExtensionMessage, FillResult, PageInfo, PageTypeInfo, JobContext } from '../shared/types'
 
 // Guard: don't run sidebar injection or message handlers in iframes.
@@ -14,6 +15,37 @@ const IS_TOP_FRAME = window === window.top
 // this cache the moment inputs appear.
 let cachedPageInfo: PageInfo = { ats: null, jobTitle: null, company: null, jobDescription: null, isJobPage: false }
 let submissionWatched = false
+
+// ─── Handshake job scraping ───────────────────────────────────────────────────
+
+function maybeInitHandshake(url: string) {
+  if (!IS_TOP_FRAME) return
+  if (detectAts(url) !== 'handshake') return
+
+  // Scrape job data and push to background for sidebar consumption
+  scrapeHandshakeJob().then((data) => {
+    if (!data) return
+    try {
+      chrome.runtime.sendMessage({ type: 'SET_HANDSHAKE_JOB_DATA', payload: data } as ExtensionMessage)
+    } catch { /* context invalidated */ }
+  })
+}
+
+// Install the external-apply interceptor once on Handshake pages so we can
+// capture the job data before the tab navigates to the company ATS.
+if (IS_TOP_FRAME && detectAts(location.href) === 'handshake') {
+  installExternalApplyInterceptor((data, sourceUrl) => {
+    try {
+      chrome.runtime.sendMessage({
+        type: 'STORE_CROSS_PLATFORM_JOB_CONTEXT',
+        payload: { ...data, sourceUrl },
+      } as ExtensionMessage)
+    } catch { /* context invalidated */ }
+  })
+}
+
+// Initial scrape on page load
+maybeInitHandshake(location.href)
 
 function refreshCache(): PageInfo {
   try {
@@ -88,6 +120,7 @@ window.addEventListener('backlog:navigation', (e) => {
   setTimeout(() => {
     refreshCache()
     tryUpdateDsaPanel(url)
+    maybeInitHandshake(url)
     try { chrome.runtime.sendMessage({ type: 'PAGE_NAVIGATED', payload: { url } } as ExtensionMessage) } catch { /* context invalidated */ }
   }, 300)
 })

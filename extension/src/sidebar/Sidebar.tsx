@@ -3,6 +3,7 @@ import {
   getApiKey, setApiKey, fetchProfile, analyzePage, answerQuestion, improveSkills, addJob,
 } from '../shared/api'
 import { DsaCompanion } from './DsaCompanion'
+import { HandshakePanel } from './HandshakePanel'
 import { computeFills, applyFills, applyFieldValues, getLabelForInput, fillWorkdayComboboxes, fillFileInputs } from '../content/fill'
 import { detectNextButton, detectPageType } from '../content/detect'
 import type {
@@ -32,6 +33,7 @@ const ATS_LABELS: Record<string, string> = {
   greenhouse: 'Greenhouse',
   lever: 'Lever',
   workday: 'Workday',
+  handshake: 'Handshake',
   generic: 'Job page',
 }
 
@@ -530,8 +532,13 @@ export function Sidebar({ initialPage }: { initialPage: PageInfo }) {
           />
         )}
 
-        {/* Job application mode — shown when NOT on a DSA page */}
-        {!page.dsaSlug && (
+        {/* Handshake assistant mode */}
+        {!page.dsaSlug && page.ats === 'handshake' && (
+          <HandshakePanel tabId={tabId} />
+        )}
+
+        {/* Job application mode — shown when NOT on a DSA page or Handshake */}
+        {!page.dsaSlug && page.ats !== 'handshake' && (
           <>
             {jobContext && <JobContextBadge context={jobContext} />}
 

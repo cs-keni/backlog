@@ -101,7 +101,13 @@ export interface FullProfile {
 
 // ─── Extension messages ───────────────────────────────────────────────────────
 
-export type AtsType = 'greenhouse' | 'lever' | 'workday' | 'generic' | null
+export type AtsType = 'greenhouse' | 'lever' | 'workday' | 'handshake' | 'generic' | null
+
+export interface HandshakeJobData {
+  jobTitle:    string | null
+  company:     string | null
+  description: string | null
+}
 
 export interface PageInfo {
   ats: AtsType
@@ -177,6 +183,7 @@ export interface TabSessionState {
   pages: PageFill[]
   currentPageIndex: number
   jobContext?: JobContext | null
+  handshakeContext?: HandshakeJobData | null
   pendingSubmission?: {
     url: string
     jobTitle: string | null
@@ -215,3 +222,6 @@ export type ExtensionMessage =
   | { type: 'SCAN_FORM'; payload: FullProfile }
   | { type: 'APPLY_SCANNED'; payload: { fields: Array<{ selector: string; value: string }> } }
   | { type: 'AUTO_INJECT_SIDEBAR' }
+  | { type: 'SET_HANDSHAKE_JOB_DATA'; payload: HandshakeJobData }
+  | { type: 'GET_HANDSHAKE_JOB_DATA' }
+  | { type: 'STORE_CROSS_PLATFORM_JOB_CONTEXT'; payload: { jobTitle: string | null; company: string | null; description: string | null; sourceUrl: string } }
