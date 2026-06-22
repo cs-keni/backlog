@@ -59,18 +59,20 @@ Phase 24 is the Handshake job assistant extension. Design doc at:
 - Two-phase async scrape: waits for title/company, then clicks "More" expand buttons and reads full description (up to 6000 chars)
 - Easter egg detection: single Claude call returns `{ coverLetterBody, specialInstructions }` — hidden instructions surfaced in an amber banner in the sidebar
 
-### What's done (Phase 24-P4)
+### What's done (Phase 24-P4) — v3.0.1
 
-- Fixed description scraper race: `waitForDescriptionSection()` now waits for the H3 to appear before reading (was racing)
-- Fixed `readDescription()` to read ALL siblings (removed premature `break`)
-- `expandDescriptionSections()` now uses regex match instead of exact string match
-- `generate-cover-letter` route: `jobDescription` now optional; generates without description gracefully
+- Case-insensitive H3 matching via regex (covers Handshake casing variants)
+- `readDescription()` now has 3 fallback strategies: direct H3 siblings → parent siblings → parent full text
+- Debug `console.log('[Backlog] ...)` output added so DOM structure is visible in DevTools
+- `jobDescription` reverted to required in API (never optional)
+- Version bumped to 3.0.1; versioning convention documented
 
 ### What's next
 
-1. **Reload extension** in Chrome (`chrome://extensions`) and refresh a Handshake job page
-2. **Verify full description** is now scraped — description should no longer be null
-3. **Test Easter egg detection** on a job that has hidden instructions — check that the amber banner appears
+1. **Reload extension** in Chrome (`chrome://extensions`)
+2. Open a Handshake job page and open **DevTools > Console** (filter by `[Backlog]`)
+3. Check what H3s are printed — if none match, we'll know the actual heading text and can add it
+4. Once description reads correctly, test Easter egg detection
 
 ---
 

@@ -3,7 +3,10 @@ import type { HandshakeJobData } from '../shared/types'
 // ─── DOM scraper ──────────────────────────────────────────────────────────────
 
 const SCRAPE_TIMEOUT_MS = 12000
-const DESC_SECTIONS = ['Job description', "What they're looking for", 'What this job offers']
+
+// Case-insensitive — Handshake has used at least two casings in the wild
+const DESC_SECTION_RE =
+  /^(job description|what they.?re looking for|what this job offers|about the role|about this role|responsibilities|role description|what you.?ll do|the role)$/i
 
 interface BasicJobData {
   jobTitle: string
@@ -31,12 +34,12 @@ function attemptBasicScrape(): BasicJobData | null {
   return { jobTitle, company }
 }
 
-// Wait for any of the known description H3s to appear in the DOM.
+// Wait for any of the known description headings to appear in the DOM.
 function waitForDescriptionSection(): Promise<boolean> {
   return new Promise((resolve) => {
     const found = () =>
       Array.from(document.querySelectorAll<HTMLElement>('h3')).some((el) =>
-        DESC_SECTIONS.includes(el.textContent?.trim() ?? '')
+        DESC_SECTION_RE.test(el.textContent?.trim() ?? '')
       )
 
     if (found()) { resolve(true); return }
@@ -59,7 +62,7 @@ function waitForDescriptionSection(): Promise<boolean> {
   })
 }
 
-// Click any collapsed "More" / "Show more" expand buttons near description sections.
+// Click any collapsed expand buttons near description sections.
 async function expandDescriptionSections(): Promise<void> {
   const buttons = Array.from(document.querySelectorAll<HTMLElement>('button, span, a')).filter(
     (el) => {
@@ -68,6 +71,7 @@ async function expandDescriptionSections(): Promise<void> {
       return /^(more|show more|see more|read more)$/i.test(text)
     }
   )
+  console.log('[Backlog] expandDescriptionSections: found', buttons.length, 'expand buttons')
   for (const btn of buttons) {
     try { btn.click() } catch { /* ignore */ }
   }
@@ -76,39 +80,70 @@ async function expandDescriptionSections(): Promise<void> {
   }
 }
 
+function collectText(el: Element): string | null {
+  const text = el.textContent?.trim() ?? ''
+  if (text.length > 30 && !/^(more|less|show more|see more|show less|read more)$/i.test(text)) {
+    return text
+  }
+  return null
+}
+
 function readDescription(): string | null {
+  const allH3s = Array.from(document.querySelectorAll<HTMLElement>('h3'))
+  console.log('[Backlog] readDescription: H3s on page:', allH3s.map((el) => el.textContent?.trim()))
+
   const descParts: string[] = []
 
-  for (const h3 of Array.from(document.querySelectorAll<HTMLElement>('h3'))) {
-    if (!DESC_SECTIONS.includes(h3.textContent?.trim() ?? '')) continue
+  for (const h3 of allH3s) {
+    if (!DESC_SECTION_RE.test(h3.textContent?.trim() ?? '')) continue
 
-    // Collect ALL siblings after this H3 until the next heading.
+    console.log('[Backlog] readDescription: matched H3:', h3.textContent?.trim())
+
+    // Strategy 1: siblings of H3 itself
     const sectionTexts: string[] = []
     let sibling = h3.nextElementSibling
     while (sibling) {
       if (/^H[1-6]$/.test(sibling.tagName)) break
-      const text = sibling.textContent?.trim() ?? ''
-      // Skip "More"/"Less" expand/collapse labels and very short fragments
-      if (text.length > 30 && !/^(more|less|show more|see more|show less|read more)$/i.test(text)) {
-        sectionTexts.push(text)
-      }
+      const t = collectText(sibling)
+      if (t) sectionTexts.push(t)
       sibling = sibling.nextElementSibling
     }
+    console.log('[Backlog] readDescription: S1 siblings found:', sectionTexts.length)
 
     if (sectionTexts.length > 0) {
       descParts.push(sectionTexts.join('\n'))
-    } else {
-      // Fallback: read parent container's text (minus the H3 label itself)
-      const parent = h3.parentElement
-      if (parent) {
-        const all = parent.textContent?.trim() ?? ''
-        const label = h3.textContent?.trim() ?? ''
-        const body = all.replace(label, '').trim()
-        if (body.length > 30) descParts.push(body)
+      continue
+    }
+
+    // Strategy 2: parent's siblings (H3 may be the only child of a header wrapper)
+    const parent = h3.parentElement
+    if (parent) {
+      let psib = parent.nextElementSibling
+      while (psib) {
+        if (/^H[1-6]$/.test(psib.tagName)) break
+        const t = collectText(psib)
+        if (t) sectionTexts.push(t)
+        psib = psib.nextElementSibling
+      }
+      console.log('[Backlog] readDescription: S2 parent-siblings found:', sectionTexts.length)
+
+      if (sectionTexts.length > 0) {
+        descParts.push(sectionTexts.join('\n'))
+        continue
+      }
+
+      // Strategy 3: parent's full text minus the H3 label
+      const all = parent.textContent?.trim() ?? ''
+      const label = h3.textContent?.trim() ?? ''
+      const body = all.replace(label, '').trim()
+      console.log('[Backlog] readDescription: S3 parent body length:', body.length)
+      if (body.length > 30) {
+        descParts.push(body)
       }
     }
   }
 
+  console.log('[Backlog] readDescription: final parts:', descParts.length, '| total chars:', descParts.join('').length)
   return descParts.length > 0 ? descParts.join('\n\n').slice(0, 6000) : null
 }
 
@@ -142,11 +177,12 @@ export async function scrapeHandshakeJob(): Promise<HandshakeJobData | null> {
   const basics = await waitForBasicData()
   if (!basics) return null
 
-  // Phase 2: wait for the description section to render (it often appears slightly
-  // after the title), then expand any collapsed "More" sections, then read
-  await waitForDescriptionSection()
+  // Phase 2: wait for the description section to render, expand "More", then read
+  const descFound = await waitForDescriptionSection()
+  console.log('[Backlog] scrapeHandshakeJob: description section found?', descFound)
   await expandDescriptionSections()
   const description = readDescription()
+  console.log('[Backlog] scrapeHandshakeJob: description length:', description?.length ?? 0)
 
   return { ...basics, description }
 }

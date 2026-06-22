@@ -4,21 +4,24 @@ Reverse-chronological. One entry per meaningful session.
 
 ---
 
-## 2026-06-22 — Fix description scraper: timing race + sibling traversal + relaxed API validation (Claude Code)
+## 2026-06-22 — v3.0.1: debug description scraper, case-insensitive H3 matching, parent-sibling fallback (Claude Code)
 
 **Commit:** (see below)
 
 ### What shipped
 
-**`extension/src/content/handshake.ts` — three scraper bugs fixed:**
-- Added `waitForDescriptionSection()`: after getting title/company, now explicitly waits (MutationObserver, 5s cap) for an H3 matching "Job description" etc. to appear. Previously `scrapeHandshakeJob()` called `readDescription()` immediately after title resolved, racing against the description section rendering — timing-dependent null.
-- Fixed `readDescription()` to iterate ALL siblings after the H3 (not just the first one). Old code had an early `break` after the first sibling with > 20 chars, so sections with multiple paragraph siblings only returned one.
-- Fixed `expandDescriptionSections()` to use `/^(more|show more|see more|read more)$/i` regex instead of exact string equality, so "More" with different casing or minor whitespace variants are matched.
-- Raised minimum text-length threshold to 30 chars and added "less"/"show less" to the button-skip filter.
+**`extension/src/content/handshake.ts`:**
+- `DESC_SECTION_RE` — switched from exact-match string array to case-insensitive regex. Covers "Job description", "Job Description", "About the role", "Responsibilities", "What you'll do", etc. Previous code was case-sensitive and would silently return null if Handshake capitalised differently.
+- `readDescription()` — added Strategy 2 (parent's siblings) and Strategy 3 (parent's full text minus heading label) as fallbacks when H3 has no direct siblings. Needed when Handshake wraps `<h3>` alone in a header `<div>` and puts the body in a separate sibling.
+- Added `console.log('[Backlog] ...)` debug output throughout `readDescription()`, `expandDescriptionSections()`, and `scrapeHandshakeJob()` so the actual DOM structure is visible in Chrome DevTools > Console.
+- Reverted accidental optional-description API change (jobDescription required again).
 
-**`src/app/api/extension/generate-cover-letter/route.ts` — allow no description:**
-- `jobDescription` is now optional. Validation only requires `jobTitle` + `company`.
-- Prompt gracefully handles absent description: tells Claude to write a strong general cover letter for the role.
+**`extension/public/manifest.json`:** bumped to v3.0.1.
+
+**Versioning convention established:**
+- Major (x.0.0): new platform integrations (3=Handshake, next would be LeetCode overhaul, auto-apply, etc.)
+- Minor (x.y.0): significant feature additions within a platform
+- Patch (x.y.z): bug fixes, UX tweaks
 
 ---
 
