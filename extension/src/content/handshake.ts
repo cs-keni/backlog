@@ -7,32 +7,38 @@ import type { HandshakeJobData } from '../shared/types'
 const SCRAPE_TIMEOUT_MS = 5000
 
 function attemptScrape(): HandshakeJobData | null {
-  // Title — try several selectors in priority order
-  const titleEl =
-    document.querySelector<HTMLElement>('[data-hook="posting-name"]') ??
-    document.querySelector<HTMLElement>('[data-label="job-name"]') ??
-    document.querySelector<HTMLElement>('h1.job-name') ??
-    document.querySelector<HTMLElement>('h1')
+  // Job title: first H1 that isn't the search page header ("Jobs") or a modal
+  const titleEl = Array.from(document.querySelectorAll<HTMLElement>('h1')).find((el) => {
+    const text = el.textContent?.trim() ?? ''
+    if (!text || text === 'Jobs') return false
+    if (/share this job|reporting|withdrawal/i.test(text)) return false
+    return true
+  })
 
-  // Company — employer name appears in the job header
-  const companyEl =
-    document.querySelector<HTMLElement>('[data-hook="employer-name"]') ??
-    document.querySelector<HTMLElement>('[data-label="employer-name"]') ??
-    document.querySelector<HTMLElement>('.employer-name') ??
-    document.querySelector<HTMLElement>('[class*="employer" i]')
+  // Company: Handshake renders "Apply to <Company>" as an H2 in the detail panel
+  const applyH2 = Array.from(document.querySelectorAll<HTMLElement>('h2')).find(
+    (el) => /^apply to /i.test(el.textContent?.trim() ?? '')
+  )
+  const company = applyH2
+    ? applyH2.textContent!.trim().replace(/^apply to\s+/i, '')
+    : null
 
-  // Description — Handshake renders it inside a rich-text block
-  const descEl =
-    document.querySelector<HTMLElement>('[data-hook="description"]') ??
-    document.querySelector<HTMLElement>('.posting-description') ??
-    document.querySelector<HTMLElement>('[data-label="job-description"]') ??
-    document.querySelector<HTMLElement>('[class*="description" i]')
+  // Description: aggregate content from the relevant H3 section blocks
+  const DESC_SECTIONS = ['Job description', "What they're looking for", 'What this job offers']
+  const descParts: string[] = []
+  for (const h3 of Array.from(document.querySelectorAll<HTMLElement>('h3'))) {
+    if (!DESC_SECTIONS.includes(h3.textContent?.trim() ?? '')) continue
+    let sibling = h3.nextElementSibling
+    while (sibling) {
+      if (/^H[1-6]$/.test(sibling.tagName)) break
+      const text = sibling.textContent?.trim() ?? ''
+      if (text.length > 20) { descParts.push(text); break }
+      sibling = sibling.nextElementSibling
+    }
+  }
+  const description = descParts.length > 0 ? descParts.join('\n\n').slice(0, 4000) : null
 
-  const jobTitle    = titleEl?.textContent?.trim() ?? null
-  const company     = companyEl?.textContent?.trim() ?? null
-  const description = descEl?.textContent?.trim().slice(0, 4000) ?? null
-
-  // If we got at least a title we consider the scrape successful
+  const jobTitle = titleEl?.textContent?.trim() ?? null
   if (!jobTitle) return null
 
   return { jobTitle, company, description }
