@@ -1,10 +1,9 @@
 import type { HandshakeJobData } from '../shared/types'
 
 // ─── DOM scraper ──────────────────────────────────────────────────────────────
-// Handshake is a React SPA. After a `backlog:navigation` event the DOM may not
-// be ready yet, so we retry with a MutationObserver up to 12 s.
 
 const SCRAPE_TIMEOUT_MS = 12000
+const DESC_SECTIONS = ['Job description', "What they're looking for", 'What this job offers']
 
 interface BasicJobData {
   jobTitle: string
@@ -12,7 +11,6 @@ interface BasicJobData {
 }
 
 function attemptBasicScrape(): BasicJobData | null {
-  // Job title: first H1 that isn't the search page header ("Jobs") or a modal
   const titleEl = Array.from(document.querySelectorAll<HTMLElement>('h1')).find((el) => {
     const text = el.textContent?.trim() ?? ''
     if (!text || text === 'Jobs') return false
@@ -23,7 +21,6 @@ function attemptBasicScrape(): BasicJobData | null {
   const jobTitle = titleEl?.textContent?.trim() ?? null
   if (!jobTitle) return null
 
-  // Company: Handshake renders "Apply to <Company>" as an H2 in the detail panel
   const applyH2 = Array.from(document.querySelectorAll<HTMLElement>('h2')).find(
     (el) => /^apply to /i.test(el.textContent?.trim() ?? '')
   )
@@ -34,40 +31,88 @@ function attemptBasicScrape(): BasicJobData | null {
   return { jobTitle, company }
 }
 
-// Click any "More" / "Show more" expand buttons in the job detail panel,
-// then wait briefly for the DOM to re-render with the full text.
+// Wait for any of the known description H3s to appear in the DOM.
+function waitForDescriptionSection(): Promise<boolean> {
+  return new Promise((resolve) => {
+    const found = () =>
+      Array.from(document.querySelectorAll<HTMLElement>('h3')).some((el) =>
+        DESC_SECTIONS.includes(el.textContent?.trim() ?? '')
+      )
+
+    if (found()) { resolve(true); return }
+
+    let settled = false
+    const deadline = setTimeout(() => {
+      observer.disconnect()
+      if (!settled) { settled = true; resolve(false) }
+    }, 5000)
+
+    const observer = new MutationObserver(() => {
+      if (found() && !settled) {
+        settled = true
+        clearTimeout(deadline)
+        observer.disconnect()
+        resolve(true)
+      }
+    })
+    observer.observe(document.body, { childList: true, subtree: true })
+  })
+}
+
+// Click any collapsed "More" / "Show more" expand buttons near description sections.
 async function expandDescriptionSections(): Promise<void> {
   const buttons = Array.from(document.querySelectorAll<HTMLElement>('button, span, a')).filter(
     (el) => {
       const text = el.textContent?.trim()
-      return text === 'More' || text === 'Show more' || text === 'See more'
+      if (!text) return false
+      return /^(more|show more|see more|read more)$/i.test(text)
     }
   )
   for (const btn of buttons) {
     try { btn.click() } catch { /* ignore */ }
   }
   if (buttons.length > 0) {
-    await new Promise<void>((r) => setTimeout(r, 700))
+    await new Promise<void>((r) => setTimeout(r, 1000))
   }
 }
 
 function readDescription(): string | null {
-  const DESC_SECTIONS = ['Job description', "What they're looking for", 'What this job offers']
   const descParts: string[] = []
+
   for (const h3 of Array.from(document.querySelectorAll<HTMLElement>('h3'))) {
     if (!DESC_SECTIONS.includes(h3.textContent?.trim() ?? '')) continue
+
+    // Collect ALL siblings after this H3 until the next heading.
+    const sectionTexts: string[] = []
     let sibling = h3.nextElementSibling
     while (sibling) {
       if (/^H[1-6]$/.test(sibling.tagName)) break
       const text = sibling.textContent?.trim() ?? ''
-      if (text.length > 20) { descParts.push(text); break }
+      // Skip "More"/"Less" expand/collapse labels and very short fragments
+      if (text.length > 30 && !/^(more|less|show more|see more|show less|read more)$/i.test(text)) {
+        sectionTexts.push(text)
+      }
       sibling = sibling.nextElementSibling
     }
+
+    if (sectionTexts.length > 0) {
+      descParts.push(sectionTexts.join('\n'))
+    } else {
+      // Fallback: read parent container's text (minus the H3 label itself)
+      const parent = h3.parentElement
+      if (parent) {
+        const all = parent.textContent?.trim() ?? ''
+        const label = h3.textContent?.trim() ?? ''
+        const body = all.replace(label, '').trim()
+        if (body.length > 30) descParts.push(body)
+      }
+    }
   }
+
   return descParts.length > 0 ? descParts.join('\n\n').slice(0, 6000) : null
 }
 
-// Phase 1: wait for the job title/company to appear (MutationObserver)
+// Phase 1: wait for the job title/company to appear
 function waitForBasicData(): Promise<BasicJobData | null> {
   return new Promise((resolve) => {
     const immediate = attemptBasicScrape()
@@ -97,7 +142,9 @@ export async function scrapeHandshakeJob(): Promise<HandshakeJobData | null> {
   const basics = await waitForBasicData()
   if (!basics) return null
 
-  // Phase 2: expand truncated "More" sections, then read full description
+  // Phase 2: wait for the description section to render (it often appears slightly
+  // after the title), then expand any collapsed "More" sections, then read
+  await waitForDescriptionSection()
   await expandDescriptionSections()
   const description = readDescription()
 
@@ -105,9 +152,6 @@ export async function scrapeHandshakeJob(): Promise<HandshakeJobData | null> {
 }
 
 // ─── "Apply Externally" click interceptor ────────────────────────────────────
-// When the user clicks an external-apply link on a Handshake job page, we
-// capture the current job data so the background can write it to session
-// storage before the tab navigates to the company ATS.
 
 export function installExternalApplyInterceptor(
   onCapture: (data: HandshakeJobData, sourceUrl: string) => void

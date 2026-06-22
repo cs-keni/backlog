@@ -23,9 +23,9 @@ function checkRateLimit(userId: string): boolean {
 }
 
 interface GenerateCoverLetterBody {
-  jobTitle:       string
-  company:        string
-  jobDescription: string
+  jobTitle:        string
+  company:         string
+  jobDescription?: string
 }
 
 export async function POST(request: Request) {
@@ -39,11 +39,11 @@ export async function POST(request: Request) {
   let body: GenerateCoverLetterBody
   try {
     body = await request.json() as GenerateCoverLetterBody
-    if (!body.jobTitle || !body.company || !body.jobDescription) {
+    if (!body.jobTitle || !body.company) {
       throw new Error('missing required fields')
     }
   } catch {
-    return Response.json({ error: 'Invalid body — jobTitle, company, jobDescription required' }, { status: 400 })
+    return Response.json({ error: 'Invalid body — jobTitle and company required' }, { status: 400 })
   }
 
   // Fetch user's cover letter style context and profile
@@ -94,12 +94,15 @@ Tone and style:
 
 ${styleContext ? `\n## ${applicantName}'s writing style (extracted from past cover letters):\n${styleContext}\n` : ''}`
 
+  const descSection = body.jobDescription?.trim()
+    ? `**Job Description:**\n${body.jobDescription.slice(0, 4000)}`
+    : `**Job Description:** Not available — write a strong general cover letter for this role.`
+
   const userPrompt = `Job:
 **Role:** ${body.jobTitle}
 **Company:** ${body.company}
 
-**Job Description:**
-${body.jobDescription.slice(0, 4000)}
+${descSection}
 
 Cover letter requirements:
 - 3–4 paragraphs

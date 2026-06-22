@@ -59,11 +59,18 @@ Phase 24 is the Handshake job assistant extension. Design doc at:
 - Two-phase async scrape: waits for title/company, then clicks "More" expand buttons and reads full description (up to 6000 chars)
 - Easter egg detection: single Claude call returns `{ coverLetterBody, specialInstructions }` — hidden instructions surfaced in an amber banner in the sidebar
 
+### What's done (Phase 24-P4)
+
+- Fixed description scraper race: `waitForDescriptionSection()` now waits for the H3 to appear before reading (was racing)
+- Fixed `readDescription()` to read ALL siblings (removed premature `break`)
+- `expandDescriptionSections()` now uses regex match instead of exact string match
+- `generate-cover-letter` route: `jobDescription` now optional; generates without description gracefully
+
 ### What's next
 
 1. **Reload extension** in Chrome (`chrome://extensions`) and refresh a Handshake job page
-2. **Verify full description** is now scraped (previously cut off by collapsed "More" section)
-3. **Test Easter egg detection** on a job that has hidden instructions — check that the amber banner appears in the sidebar after generating a cover letter
+2. **Verify full description** is now scraped — description should no longer be null
+3. **Test Easter egg detection** on a job that has hidden instructions — check that the amber banner appears
 
 ---
 
