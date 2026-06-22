@@ -2,7 +2,8 @@ export const maxDuration = 120
 export const dynamic = 'force-dynamic'
 
 import Anthropic from '@anthropic-ai/sdk'
-import { createClient } from '@supabase/supabase-js'
+import { createClient as createServiceClient } from '@supabase/supabase-js'
+import { createClient } from '@/lib/supabase/server'
 import { verifyApiKeyFromRequest } from '@/lib/auth/api-key'
 import { extractTextFromPdf } from '@/lib/pdf/parser'
 
@@ -14,11 +15,16 @@ const MAX_PDFS = 20
 const CHARS_PER_PDF = 2000
 
 export async function POST(request: Request) {
-  const auth = await verifyApiKeyFromRequest(request)
-  if (!auth) {
-    // Also accept session-based auth for the web settings UI
-    // (API key auth is for extension, session for the web app)
-    return Response.json({ error: 'Unauthorized' }, { status: 401 })
+  // API key auth (extension) or session auth (web UI)
+  let userId: string
+  const apiAuth = await verifyApiKeyFromRequest(request)
+  if (apiAuth) {
+    userId = apiAuth.userId
+  } else {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 })
+    userId = user.id
   }
 
   let formData: FormData
@@ -89,15 +95,15 @@ ${combinedText}`
       .trim()
 
     // Persist to users table
-    const supabase = createClient(
+    const serviceSupabase = createServiceClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY!
     )
 
-    await supabase
+    await serviceSupabase
       .from('users')
       .update({ cover_letter_style_context: styleContext })
-      .eq('id', auth.userId)
+      .eq('id', userId)
 
     return Response.json({
       styleContext,

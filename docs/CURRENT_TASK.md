@@ -1,7 +1,7 @@
 # Current Task
 
 **Last updated:** 2026-06-22
-**Status:** Phase 24 (Handshake Assistant) — P0 + P1 complete including PDF download. Pending: run migrations, seed script, upload resume, upload cover-letter PDFs, live-test selectors.
+**Status:** Phase 24 (Handshake Assistant) — P2 Settings UI built. Pending: upload 57 cover-letter PDFs via new UI, live-test Handshake selectors.
 
 ---
 
@@ -48,16 +48,17 @@ Phase 24 is the Handshake job assistant extension. Design doc at:
 - `supabase/migrations/042_application_materials.sql` — applied ✅
 - `supabase/migrations/043_resume_markdown.sql` — NOT applied yet
 
+### What's done (Phase 24-P2)
+
+- `HandshakeSettings` component (`src/components/settings/HandshakeSettings.tsx`): PDF drag-and-drop upload for cover letter style, resume Markdown textarea + save
+- Session auth added to `extract-cover-letter-style` and `upload-resume` routes (was extension-only Bearer token)
+- Settings page fetches `resume_markdown` + `cover_letter_style_context` and renders `HandshakeSettings`
+
 ### What's blocked / next steps
 
-1. **Apply migration 043** in Supabase console (`supabase/migrations/043_resume_markdown.sql`)
-2. **Run seed script**: `node --env-file=.env.local scripts/seed-project-catalog.mjs`
-3. **Upload resume**: `node --env-file=.env.local scripts/upload-resume.mjs`
-4. **Upload cover letter PDFs** to populate style context:
-   - `POST /api/user/extract-cover-letter-style` with files under `pdfs` form field (curl or settings UI)
-5. **Reload extension** in Chrome (extension already built — click Reload in chrome://extensions)
-6. **Live-test Handshake selectors** on `app.joinhandshake.com/jobs/<id>` — may need DOM tuning
-7. Project catalog settings UI (web) — Phase 24-P2
+1. **Upload 57 cover letter PDFs** — visit `/settings`, drag PDFs from `cover-letter-data/` into the Handshake section. This populates `cover_letter_style_context` so generation becomes style-aware.
+2. **Live-test Handshake selectors** on `app.joinhandshake.com/jobs/<id>` — verify job title/company/description scrape. Selectors in `extension/src/content/handshake.ts`.
+3. **Reload extension** in Chrome if needed (click Reload in `chrome://extensions`)
 
 ---
 

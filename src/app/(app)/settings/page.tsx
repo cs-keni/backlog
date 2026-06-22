@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { NotificationSettings } from '@/components/settings/NotificationSettings'
 import { ApiKeySettings } from '@/components/settings/ApiKeySettings'
 import { SecuritySettings } from '@/components/settings/SecuritySettings'
+import { HandshakeSettings } from '@/components/settings/HandshakeSettings'
 
 export const dynamic = 'force-dynamic'
 
@@ -12,7 +13,7 @@ export default async function SettingsPage() {
 
   const { data: prefs } = await supabase
     .from('users')
-    .select('notification_email, notification_push, notification_quiet_hours_start, notification_quiet_hours_end, notification_timezone, alert_match_threshold, email')
+    .select('notification_email, notification_push, notification_quiet_hours_start, notification_quiet_hours_end, notification_timezone, alert_match_threshold, email, resume_markdown, cover_letter_style_context')
     .eq('id', user.id)
     .single()
 
@@ -51,6 +52,13 @@ export default async function SettingsPage() {
         }}
         recentLogs={(recentLogs ?? []) as unknown as NotificationLogEntry[]}
         vapidPublicKey={process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? ''}
+      />
+
+      <div className="border-t border-zinc-800" />
+
+      <HandshakeSettings
+        initialResume={prefs?.resume_markdown ?? null}
+        initialStyleContext={prefs?.cover_letter_style_context ?? null}
       />
     </div>
   )

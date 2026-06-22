@@ -4,6 +4,29 @@ Reverse-chronological. One entry per meaningful session.
 
 ---
 
+## 2026-06-22 — Handshake Settings UI (Phase 24-P2) (Claude Code)
+
+**Commit:** (see below)
+
+### What shipped
+
+**`HandshakeSettings` component** (`src/components/settings/HandshakeSettings.tsx`):
+- Drag-and-drop PDF upload zone for cover letters; sends up to 20 PDFs to `POST /api/user/extract-cover-letter-style`; shows spinner with progress text; displays truncated style context preview once set with re-upload option
+- Resume Markdown textarea populated from `users.resume_markdown`; Save button posts to `POST /api/user/upload-resume`; inline char count, save feedback, and error state
+
+**Session auth on API routes** (previously extension-only Bearer token):
+- `src/app/api/user/extract-cover-letter-style/route.ts` — tries API key first; falls back to Supabase session cookies for web UI callers
+- `src/app/api/user/upload-resume/route.ts` — same dual-auth pattern; renamed internal `createClient` alias to `createServiceClient` to avoid name collision with `@/lib/supabase/server`
+
+**Settings page** (`src/app/(app)/settings/page.tsx`):
+- Added `resume_markdown` and `cover_letter_style_context` to the single `users` SELECT
+- Renders `<HandshakeSettings>` below the NotificationSettings divider
+
+### Notes
+- Pre-existing type error in `src/app/api/extension/download-cover-letter/route.ts` (`@react-pdf/renderer` createElement overload) was present before this session; left untouched
+
+---
+
 ## 2026-06-22 — Handshake Assistant Phase 24-P0 + P1 (Claude Code)
 
 **Commit:** cdfee47
