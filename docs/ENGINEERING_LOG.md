@@ -4,6 +4,36 @@ Reverse-chronological. One entry per meaningful session.
 
 ---
 
+## 2026-06-22 — v3.1.0: bubbly panel redesign + AI job summary chips (Claude Code)
+
+**Commit:** (see below)
+
+### What shipped
+
+**`extension/src/sidebar/HandshakePanel.tsx` — full visual redesign:**
+- Replaced all flat rectangles with rounded/pill shapes. Cards: `borderRadius: 18px` with subtle gradient backgrounds. Buttons: full pill (`borderRadius: 40px`) with gradient fills + box shadows.
+- `HandshakeBadge`: pill-shaped amber glow badge with star icon instead of a flat rectangle bar.
+- `JobCard`: gradient dark background, `18px` radius, inset highlight, `16px` shadow.
+- `ActionButton`: shared component for pill buttons. Primary = indigo→violet gradient with glow shadow. Secondary = dark slate with subtle border.
+- `PillButton`: small pill for Regenerate/Suggest pairs.
+- `SummaryChips` + `Chip`: colored chip pills (green=pay, blue=location, teal=tech stack, purple=requirements, amber=highlights). Auto-loaded once job description arrives.
+- `SkeletonChip`: animated pulse skeleton for summary loading state.
+- `EasterEggBanner`: gradient orange card with `14px` radius and glow shadow.
+- `ErrorBubble`: `12px` radius subtle red card.
+- Removed all inline `primaryButtonStyle`/`secondaryButtonStyle` helper functions — replaced by component-based approach.
+
+**`src/app/api/extension/summarize-job/route.ts` — NEW:**
+- Claude Haiku: parses job description into `{ pay, location, requirements, techStack, highlights }`.
+- Returns compact chip-sized strings (≤30 chars). 30/day rate limit per user.
+
+**`extension/src/shared/api.ts`:** Added `summarizeJob()` + `JobSummary` type.
+
+**`extension/src/sidebar/sidebar.css`:** Added `@keyframes bl-pulse` + `.bl-pulse` for skeleton chip animation.
+
+**`extension/public/manifest.json`:** bumped to v3.1.0.
+
+---
+
 ## 2026-06-22 — v3.0.1: debug description scraper, case-insensitive H3 matching, parent-sibling fallback (Claude Code)
 
 **Commit:** (see below)

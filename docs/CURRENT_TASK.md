@@ -59,6 +59,14 @@ Phase 24 is the Handshake job assistant extension. Design doc at:
 - Two-phase async scrape: waits for title/company, then clicks "More" expand buttons and reads full description (up to 6000 chars)
 - Easter egg detection: single Claude call returns `{ coverLetterBody, specialInstructions }` — hidden instructions surfaced in an amber banner in the sidebar
 
+### What's done (Phase 24-P5) — v3.1.0
+
+- Full HandshakePanel visual redesign: pill/bubble shapes, gradient cards, gradient buttons, glow shadows
+- Auto AI job summary: chips for pay, location, tech stack, requirements, highlights (Haiku, ≤30 chars each)
+- Skeleton loading chips animate while summary loads
+- `summarize-job` API route (Haiku, 30/day rate limit)
+- Version bumped to v3.1.0
+
 ### What's done (Phase 24-P4) — v3.0.1
 
 - Case-insensitive H3 matching via regex (covers Handshake casing variants)

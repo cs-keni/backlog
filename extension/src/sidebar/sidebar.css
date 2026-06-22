@@ -61,3 +61,11 @@
 .bl-spin {
   animation: spin 0.7s linear infinite;
 }
+
+@keyframes bl-pulse {
+  0%, 100% { opacity: 0.4; }
+  50%       { opacity: 0.8; }
+}
+.bl-pulse {
+  animation: bl-pulse 1.4s ease-in-out infinite;
+}

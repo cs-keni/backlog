@@ -142,6 +142,31 @@ export async function addJob(payload: {
 
 // ─── Handshake assistant ─────────────────────────────────────────────────────
 
+export interface JobSummary {
+  pay:          string | null
+  location:     string | null
+  requirements: string[]
+  techStack:    string[]
+  highlights:   string[]
+}
+
+export async function summarizeJob(payload: {
+  jobTitle:       string
+  company:        string
+  jobDescription: string
+}): Promise<JobSummary | null> {
+  try {
+    const res = await apiFetch('/api/extension/summarize-job', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    })
+    if (!res.ok) return null
+    return res.json() as Promise<JobSummary>
+  } catch {
+    return null
+  }
+}
+
 export async function generateCoverLetter(payload: {
   jobTitle:       string
   company:        string
