@@ -1,7 +1,7 @@
 import { Document, Page, Text, View, StyleSheet } from '@react-pdf/renderer'
 
-const FONT = 'Helvetica'
-const FONT_BOLD = 'Helvetica-Bold'
+const FONT = 'Times-Roman'
+const FONT_BOLD = 'Times-Bold'
 const BLACK = '#111827'
 const MUTED = '#6b7280'
 const RULE  = '#d1d5db'
@@ -48,7 +48,7 @@ const s = StyleSheet.create({
   },
   closing: {
     marginTop: 14,
-    marginBottom: 36,
+    marginBottom: 12,
   },
   signatureName: {
     fontFamily: FONT_BOLD,
@@ -90,7 +90,7 @@ export function CoverLetterDoc({ name, contacts, date, jobTitle, company, body }
         <Text style={s.date}>{date}</Text>
 
         {/* Re: line */}
-        <Text style={s.reLabel}>Re: {jobTitle} — {company}</Text>
+        <Text style={s.reLabel}>Re: {company}</Text>
 
         {/* Salutation */}
         <Text style={s.salutation}>Dear Hiring Manager,</Text>

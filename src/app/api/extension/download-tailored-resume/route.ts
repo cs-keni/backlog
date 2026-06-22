@@ -86,7 +86,7 @@ export async function POST(request: Request) {
 
   const cleanResume = preprocessResumeLol(user.resume_markdown)
 
-  const prompt = `You are tailoring a resume for a specific job application.
+  const prompt = `You are tailoring a resume for a specific job application. The output MUST fit on ONE page when rendered as a PDF with 9pt Times New Roman font and 36pt top/bottom margins.
 
 ## Job
 **Title:** ${body.jobTitle}
@@ -101,18 +101,19 @@ ${cleanResume}
 
 ## Task
 Replace the Projects section with the ${body.suggestions.length} projects above.
-For each project write 3–5 resume-style bullet points that:
+For each project write EXACTLY 3 resume-style bullet points (no more) that:
 - Lead with a strong action verb
 - Name the specific technologies from the project's stack
 - Mirror language from the job description where it fits naturally
 - Quantify impact where the project data provides numbers
-- Stay under 120 characters per bullet
+- Stay under 110 characters per bullet (shorter = better for fitting on one page)
 
 IMPORTANT rules:
 - Keep every other section EXACTLY as-is (Experience, Skills, Education, header)
+- If the existing Experience section has more than 3 bullets per role, trim to 3
 - Use this format for each project heading: ### Name | Subtitle | Date Range
   - If no date range is known, omit the date part
-  - The subtitle should be a short tech/category label (e.g. "Full-Stack Web App + Chrome Extension")
+  - The subtitle should be a short tech/category label (e.g. "Full-Stack Web App")
 - Output ONLY the complete modified resume markdown — no commentary, no code fences`
 
   const message = await anthropic.messages.create({

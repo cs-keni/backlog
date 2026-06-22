@@ -1,8 +1,8 @@
 import { Document, Page, Text, View, StyleSheet } from '@react-pdf/renderer'
 import type { ParsedResume } from './resume-utils'
 
-const FONT      = 'Helvetica'
-const FONT_BOLD = 'Helvetica-Bold'
+const FONT      = 'Times-Roman'
+const FONT_BOLD = 'Times-Bold'
 const BLACK     = '#111827'
 const MUTED     = '#6b7280'
 const RULE      = '#374151'
@@ -10,59 +10,59 @@ const RULE      = '#374151'
 const s = StyleSheet.create({
   page: {
     fontFamily: FONT,
-    fontSize: 9.5,
+    fontSize: 9,
     color: BLACK,
-    paddingTop: 44,
-    paddingBottom: 40,
-    paddingLeft: 48,
-    paddingRight: 48,
-    lineHeight: 1.4,
+    paddingTop: 36,
+    paddingBottom: 32,
+    paddingLeft: 44,
+    paddingRight: 44,
+    lineHeight: 1.3,
   },
 
   // ── Header ──
   name: {
     fontFamily: FONT_BOLD,
-    fontSize: 19,
-    marginBottom: 3,
+    fontSize: 17,
+    marginBottom: 2,
   },
   contacts: {
-    fontSize: 8.5,
+    fontSize: 8,
     color: MUTED,
-    marginBottom: 12,
+    marginBottom: 8,
   },
 
   // ── Section ──
   section: {
-    marginBottom: 8,
+    marginBottom: 6,
   },
   sectionTitle: {
     fontFamily: FONT_BOLD,
-    fontSize: 9,
-    letterSpacing: 0.8,
+    fontSize: 8.5,
+    letterSpacing: 0.7,
     textTransform: 'uppercase',
     paddingBottom: 2,
-    borderBottomWidth: 1,
+    borderBottomWidth: 0.75,
     borderBottomColor: RULE,
-    marginBottom: 5,
+    marginBottom: 4,
   },
 
   // ── Entry ──
   entry: {
-    marginBottom: 5,
+    marginBottom: 4,
   },
   entryHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 2,
+    marginBottom: 1,
   },
   entryTitle: {
     fontFamily: FONT_BOLD,
-    fontSize: 9.5,
+    fontSize: 9,
     flex: 1,
     marginRight: 4,
   },
   entryDate: {
-    fontSize: 8.5,
+    fontSize: 8,
     color: MUTED,
     flexShrink: 0,
   },
@@ -70,11 +70,11 @@ const s = StyleSheet.create({
   // ── Bullets ──
   bullet: {
     flexDirection: 'row',
-    marginBottom: 1.5,
-    paddingLeft: 8,
+    marginBottom: 1,
+    paddingLeft: 7,
   },
   bulletDot: {
-    width: 8,
+    width: 7,
     flexShrink: 0,
   },
   bulletText: {
@@ -83,7 +83,7 @@ const s = StyleSheet.create({
 
   // ── Skills ──
   skillLine: {
-    marginBottom: 2,
+    marginBottom: 1.5,
   },
   skillLabel: {
     fontFamily: FONT_BOLD,

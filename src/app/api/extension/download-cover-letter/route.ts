@@ -36,13 +36,21 @@ export async function POST(request: Request) {
     .eq('id', auth.userId)
     .single()
 
-  const name     = user?.full_name ?? 'Applicant'
+  const name = user?.full_name ?? 'Applicant'
+
+  function formatPhone(raw: string): string {
+    const digits = raw.replace(/\D/g, '')
+    const local = digits.startsWith('1') && digits.length === 11 ? digits.slice(1) : digits
+    if (local.length === 10) return `(${local.slice(0, 3)}) ${local.slice(3, 6)}-${local.slice(6)}`
+    return raw
+  }
+
   const contacts = [
     user?.email,
-    user?.phone,
+    user?.phone ? formatPhone(user.phone) : null,
     user?.portfolio_url,
     user?.github_url,
-    user?.linkedin_url,
+    // LinkedIn intentionally omitted from cover letter header
   ].filter(Boolean) as string[]
 
   const date = new Date().toLocaleDateString('en-US', {
