@@ -24,6 +24,7 @@ type PanelStep =
 
 export function HandshakePanel({ tabId }: { tabId: number }) {
   const [jobData, setJobData] = useState<HandshakeJobData | null>(null)
+  const [scrapeTimedOut, setScrapeTimedOut] = useState(false)
   const [step, setStep] = useState<PanelStep>('idle')
   const [coverLetter, setCoverLetter] = useState<string | null>(null)
   const [projects, setProjects] = useState<ProjectSuggestion[]>([])
@@ -42,7 +43,7 @@ export function HandshakePanel({ tabId }: { tabId: number }) {
     }).catch(() => {})
   }, [tabId])
 
-  // Also listen for real-time updates when the scraper finds data
+  // Listen for real-time updates when the scraper finds data
   useEffect(() => {
     if (!tabId) return
     const key = `tab_${tabId}`
@@ -54,6 +55,14 @@ export function HandshakePanel({ tabId }: { tabId: number }) {
     chrome.storage.session.onChanged.addListener(listener)
     return () => chrome.storage.session.onChanged.removeListener(listener)
   }, [tabId])
+
+  // If no job data arrives within 8s, the content script is likely orphaned
+  // (extension was reloaded without refreshing the tab). Show a hint.
+  useEffect(() => {
+    if (jobData) return
+    const t = setTimeout(() => setScrapeTimedOut(true), 8000)
+    return () => clearTimeout(t)
+  }, [jobData])
 
   async function handleGenerateCoverLetter() {
     if (!jobData) return
@@ -188,7 +197,9 @@ export function HandshakePanel({ tabId }: { tabId: number }) {
           fontSize: '12px',
           color: '#71717a',
         }}>
-          Scraping job details…
+          {scrapeTimedOut
+            ? 'Refresh this tab to detect the job (the extension was reloaded).'
+            : 'Scraping job details…'}
         </div>
       )}
 
