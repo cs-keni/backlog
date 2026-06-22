@@ -77,6 +77,8 @@ Return only the JSON object, no markdown, no explanation.`
       .map((b) => b.text)
       .join('')
       .trim()
+      .replace(/^```(?:json)?\s*/i, '')
+      .replace(/\s*```$/, '')
 
     const summary = JSON.parse(raw) as JobSummary
     return Response.json(summary)

@@ -134,6 +134,8 @@ Respond ONLY with a JSON array (no markdown):
       .map((b) => b.text)
       .join('')
       .trim()
+      .replace(/^```(?:json)?\s*/i, '')
+      .replace(/\s*```$/, '')
 
     let suggestions: ProjectSuggestion[]
     try {

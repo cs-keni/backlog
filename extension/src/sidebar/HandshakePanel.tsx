@@ -30,6 +30,7 @@ export function HandshakePanel({ tabId, theme }: { tabId: number; theme: 'light'
   const [jobData, setJobData]               = useState<HandshakeJobData | null>(null)
   const [summary, setSummary]               = useState<JobSummary | null>(null)
   const [summaryLoading, setSummaryLoading] = useState(false)
+  const [summaryAttempted, setSummaryAttempted] = useState(false)
   const [scrapeTimedOut, setScrapeTimedOut] = useState(false)
   const [step, setStep]                     = useState<PanelStep>('idle')
   const [coverLetter, setCoverLetter]       = useState<string | null>(null)
@@ -59,9 +60,10 @@ export function HandshakePanel({ tabId, theme }: { tabId: number; theme: 'light'
     return () => { cancelled = true }
   }, [tabId, jobData])
 
-  // Auto-summarize once job data + description arrive
+  // Auto-summarize once — guard with summaryAttempted to avoid retry loops on 500
   useEffect(() => {
-    if (!jobData?.description || summary || summaryLoading) return
+    if (!jobData?.description || summaryAttempted) return
+    setSummaryAttempted(true)
     setSummaryLoading(true)
     summarizeJob({
       jobTitle:       jobData.jobTitle ?? 'Unknown',
@@ -71,7 +73,7 @@ export function HandshakePanel({ tabId, theme }: { tabId: number; theme: 'light'
       setSummary(s)
       setSummaryLoading(false)
     })
-  }, [jobData, summary, summaryLoading])
+  }, [jobData, summaryAttempted])
 
   // 20s timeout if no job data arrives
   useEffect(() => {

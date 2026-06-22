@@ -91,6 +91,7 @@ Tone and style:
 - Avoid generic filler phrases like "I am excited to apply" or "I believe I would be a great fit"
 - Match the energy of the job description: formal for enterprise, casual for startups
 - If the description asked to include a specific keyword or phrase in the letter, weave it naturally into the text
+- NEVER use em dashes (—). Replace them with commas, colons, or rephrase the sentence. Em dashes signal AI-generated text to employers.
 
 ${styleContext ? `\n## ${applicantName}'s writing style (extracted from past cover letters):\n${styleContext}\n` : ''}`
 
