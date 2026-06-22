@@ -62,12 +62,27 @@ export async function POST(request: Request) {
 
   const systemPrompt = `You are a professional cover letter writer who knows ${applicantName}'s voice and style deeply.
 
-Your task: write the BODY of a cover letter (3–4 paragraphs). Do NOT include:
+You do TWO things in ONE response, in this exact format:
+
+INSTRUCTIONS_JSON: <a JSON array of strings — empty [] if none>
+COVER_LETTER:
+<the letter body>
+
+─── PART 1: Scan for hidden applicant instructions ───
+Carefully read the job description for any special instructions companies embed to test attentiveness. Common patterns:
+- "Email your resume/portfolio to [address]"
+- "Apply on our external site at [URL]"
+- "Include [keyword/phrase] in your cover letter or email subject line"
+- "Mention you saw this on Handshake" or similar sourcing signals
+- Any instruction that seems oddly specific or is buried in the description
+
+Put ONLY actionable instructions in the JSON array. Use short, imperative strings ("Email resume to careers@company.com", "Include phrase 'user-centric' in cover letter"). Output [] if there are none.
+
+─── PART 2: Write the cover letter body ───
+Write the BODY of a cover letter (3–4 paragraphs). Do NOT include:
 - "Dear [Hiring Manager]" salutation
 - "Sincerely, [Name]" closing
 - Any header, date, address blocks
-
-The user will paste your output into their own template. Write only the body paragraphs.
 
 Tone and style:
 - Confident but not arrogant
@@ -75,39 +90,52 @@ Tone and style:
 - Show genuine excitement for this company/role
 - Avoid generic filler phrases like "I am excited to apply" or "I believe I would be a great fit"
 - Match the energy of the job description: formal for enterprise, casual for startups
+- If the description asked to include a specific keyword or phrase in the letter, weave it naturally into the text
 
-${styleContext ? `\n## Kenny's writing style (extracted from his past cover letters):\n${styleContext}\n` : ''}`
+${styleContext ? `\n## ${applicantName}'s writing style (extracted from past cover letters):\n${styleContext}\n` : ''}`
 
-  const userPrompt = `Write a cover letter body for this job:
-
+  const userPrompt = `Job:
 **Role:** ${body.jobTitle}
 **Company:** ${body.company}
 
 **Job Description:**
-${body.jobDescription.slice(0, 3000)}
+${body.jobDescription.slice(0, 4000)}
 
-Requirements:
+Cover letter requirements:
 - 3–4 paragraphs
 - Opening: hook that shows you know the company, then pivot to your fit
 - Middle: 1–2 specific project/experience stories that match the JD requirements
 - Closing: clear expression of interest + brief mention of what you'd bring
-- Body text only — no salutation, no sign-off`
+
+Remember: output INSTRUCTIONS_JSON first (one line), then COVER_LETTER: on the next line, then the body text only.`
 
   try {
     const message = await anthropic.messages.create({
       model: 'claude-sonnet-4-6',
-      max_tokens: 1024,
+      max_tokens: 1200,
       messages: [{ role: 'user', content: userPrompt }],
       system: systemPrompt,
     })
 
-    const text = message.content
+    const raw = message.content
       .filter((b) => b.type === 'text')
       .map((b) => b.text)
       .join('')
-      .trim()
 
-    return Response.json({ coverLetterBody: text })
+    // Parse structured response
+    const instructionsMatch = raw.match(/^INSTRUCTIONS_JSON:\s*(\[.*?\])/m)
+    const coverLetterStart = raw.indexOf('COVER_LETTER:')
+
+    let specialInstructions: string[] = []
+    if (instructionsMatch) {
+      try { specialInstructions = JSON.parse(instructionsMatch[1]) as string[] } catch { /* ignore */ }
+    }
+
+    const coverLetterBody = coverLetterStart >= 0
+      ? raw.slice(coverLetterStart + 'COVER_LETTER:'.length).trim()
+      : raw.trim()
+
+    return Response.json({ coverLetterBody, specialInstructions })
   } catch (err) {
     console.error('[generate-cover-letter] Anthropic error:', err)
     return Response.json({ error: 'AI generation failed' }, { status: 500 })

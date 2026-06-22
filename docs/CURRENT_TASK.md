@@ -54,11 +54,16 @@ Phase 24 is the Handshake job assistant extension. Design doc at:
 - Session auth added to `extract-cover-letter-style` and `upload-resume` routes (was extension-only Bearer token)
 - Settings page fetches `resume_markdown` + `cover_letter_style_context` and renders `HandshakeSettings`
 
-### What's blocked / next steps
+### What's done (Phase 24-P3)
 
-1. **Upload 57 cover letter PDFs** — visit `/settings`, drag PDFs from `cover-letter-data/` into the Handshake section. This populates `cover_letter_style_context` so generation becomes style-aware.
-2. **Live-test Handshake selectors** on `app.joinhandshake.com/jobs/<id>` — verify job title/company/description scrape. Selectors in `extension/src/content/handshake.ts`.
-3. **Reload extension** in Chrome if needed (click Reload in `chrome://extensions`)
+- Two-phase async scrape: waits for title/company, then clicks "More" expand buttons and reads full description (up to 6000 chars)
+- Easter egg detection: single Claude call returns `{ coverLetterBody, specialInstructions }` — hidden instructions surfaced in an amber banner in the sidebar
+
+### What's next
+
+1. **Reload extension** in Chrome (`chrome://extensions`) and refresh a Handshake job page
+2. **Verify full description** is now scraped (previously cut off by collapsed "More" section)
+3. **Test Easter egg detection** on a job that has hidden instructions — check that the amber banner appears in the sidebar after generating a cover letter
 
 ---
 

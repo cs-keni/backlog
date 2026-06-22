@@ -146,12 +146,12 @@ export async function generateCoverLetter(payload: {
   jobTitle:       string
   company:        string
   jobDescription: string
-}): Promise<{ coverLetterBody: string } | { error: string }> {
+}): Promise<{ coverLetterBody: string; specialInstructions: string[] } | { error: string }> {
   const res = await apiFetch('/api/extension/generate-cover-letter', {
     method: 'POST',
     body: JSON.stringify(payload),
   })
-  return res.json() as Promise<{ coverLetterBody: string } | { error: string }>
+  return res.json() as Promise<{ coverLetterBody: string; specialInstructions: string[] } | { error: string }>
 }
 
 export async function suggestProjects(payload: {

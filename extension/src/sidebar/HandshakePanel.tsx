@@ -29,6 +29,7 @@ export function HandshakePanel({ tabId }: { tabId: number }) {
   const [coverLetter, setCoverLetter] = useState<string | null>(null)
   const [projects, setProjects] = useState<ProjectSuggestion[]>([])
   const [error, setError] = useState<string | null>(null)
+  const [specialInstructions, setSpecialInstructions] = useState<string[]>([])
   const [copied, setCopied] = useState(false)
   const [downloadingCl, setDownloadingCl] = useState(false)
   const [downloadingResume, setDownloadingResume] = useState(false)
@@ -81,6 +82,7 @@ export function HandshakePanel({ tabId }: { tabId: number }) {
       setStep('idle')
     } else {
       setCoverLetter(res.coverLetterBody)
+      setSpecialInstructions(res.specialInstructions ?? [])
       setStep('cl-ready')
     }
   }
@@ -201,6 +203,11 @@ export function HandshakePanel({ tabId }: { tabId: number }) {
             ? 'Refresh this tab to detect the job (the extension was reloaded).'
             : 'Scraping job details…'}
         </div>
+      )}
+
+      {/* Easter egg / special instructions banner */}
+      {specialInstructions.length > 0 && (
+        <SpecialInstructionsBanner instructions={specialInstructions} />
       )}
 
       {/* Error display */}
@@ -334,6 +341,39 @@ function JobInfoCard({ jobData }: { jobData: HandshakeJobData }) {
           No job description found
         </p>
       )}
+    </div>
+  )
+}
+
+function SpecialInstructionsBanner({ instructions }: { instructions: string[] }) {
+  return (
+    <div style={{
+      background: 'rgba(251, 146, 60, 0.07)',
+      border: '1px solid rgba(251, 146, 60, 0.35)',
+      borderRadius: '8px',
+      padding: '9px 11px',
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
+        {/* Warning triangle */}
+        <svg width="13" height="13" viewBox="0 0 13 13" fill="none" style={{ flexShrink: 0 }}>
+          <path d="M6.5 1.5L12 11.5H1L6.5 1.5Z" stroke="#fb923c" strokeWidth="1.3" strokeLinejoin="round" />
+          <path d="M6.5 5.5v3" stroke="#fb923c" strokeWidth="1.3" strokeLinecap="round" />
+          <circle cx="6.5" cy="9.5" r="0.6" fill="#fb923c" />
+        </svg>
+        <span style={{ fontSize: '10px', fontWeight: 600, color: '#fb923c', letterSpacing: '0.02em' }}>
+          EASTER EGG DETECTED
+        </span>
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+        {instructions.map((inst, i) => (
+          <div key={i} style={{
+            display: 'flex', gap: '6px', alignItems: 'flex-start',
+          }}>
+            <span style={{ color: '#fb923c', fontSize: '10px', flexShrink: 0, marginTop: '1px' }}>→</span>
+            <span style={{ fontSize: '11px', color: '#fdba74', lineHeight: 1.5 }}>{inst}</span>
+          </div>
+        ))}
+      </div>
     </div>
   )
 }

@@ -4,6 +4,37 @@ Reverse-chronological. One entry per meaningful session.
 
 ---
 
+## 2026-06-22 — Handshake: full description scrape + Easter egg detection (Claude Code)
+
+**Commit:** (see below)
+
+### What shipped
+
+**`extension/src/content/handshake.ts` — two-phase async scrape:**
+- Phase 1: MutationObserver waits for job title/company (up to 12s), resolves as soon as both appear
+- Phase 2: clicks all "More"/"Show more"/"See more" expand buttons in the job detail panel, waits 700ms for DOM re-render, then reads the full description across all H3 sections (`Job description`, `What they're looking for`, `What this job offers`)
+- Description limit raised from 4000 → 6000 chars
+- Extracted `readDescription()` helper reused in `installExternalApplyInterceptor()` so external-apply capture also gets the full text
+
+**`src/app/api/extension/generate-cover-letter/route.ts` — Easter egg detection:**
+- Single Claude call now returns TWO things in one response using a structured format (`INSTRUCTIONS_JSON:` + `COVER_LETTER:` separator)
+- Claude scans for hidden applicant instructions (email addresses, external URLs, keyword/phrase requirements, sourcing signals) and returns them as a JSON string array
+- If soft instructions (keywords to include) are present, Claude weaves them naturally into the cover letter body
+- API response now: `{ coverLetterBody, specialInstructions: string[] }`
+
+**`extension/src/shared/api.ts`:** `generateCoverLetter` return type updated to include `specialInstructions: string[]`
+
+**`extension/src/sidebar/HandshakePanel.tsx` — Easter egg banner:**
+- New `specialInstructions` state
+- After cover letter generation, if any instructions were detected, renders `SpecialInstructionsBanner` (amber warning card with → rows per instruction) between the job info card and the error/action area
+- Banner shows before the letter result so user sees actionable items immediately
+
+### Notes
+- "More" button expansion happens on every scrape, not just the first; refreshing the page will re-expand automatically since the content script re-runs
+- Easter egg detection is zero-cost: piggybacks on the same Claude call that writes the cover letter, no extra latency
+
+---
+
 ## 2026-06-22 — Handshake Settings UI (Phase 24-P2) (Claude Code)
 
 **Commit:** (see below)
