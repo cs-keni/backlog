@@ -41,3 +41,10 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 .gstack/
+
+# Personal data — not for version control
+projects-data/
+cover-letter-data/
+resume-data/
+.sources/
+backlog-icon.png
