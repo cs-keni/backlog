@@ -33,34 +33,34 @@ export function HandshakePanel({ tabId }: { tabId: number }) {
   const [downloadingCl, setDownloadingCl] = useState(false)
   const [downloadingResume, setDownloadingResume] = useState(false)
 
-  // Load handshake context from tab session storage
+  // Poll GET_HANDSHAKE_JOB_DATA every 2s until data arrives.
+  // More reliable than onChanged which can silently miss events in sidebar context.
   useEffect(() => {
-    if (!tabId) return
-    const key = `tab_${tabId}`
-    chrome.storage.session.get(key).then((result) => {
-      const state = result[key] as { handshakeContext?: HandshakeJobData | null } | undefined
-      if (state?.handshakeContext) setJobData(state.handshakeContext)
-    }).catch(() => {})
-  }, [tabId])
+    if (!tabId || jobData) return
+    let cancelled = false
 
-  // Listen for real-time updates when the scraper finds data
-  useEffect(() => {
-    if (!tabId) return
-    const key = `tab_${tabId}`
-    const listener = (changes: Record<string, chrome.storage.StorageChange>) => {
-      if (changes[key]?.newValue?.handshakeContext) {
-        setJobData(changes[key].newValue.handshakeContext as HandshakeJobData)
-      }
+    const poll = () => {
+      if (cancelled) return
+      chrome.runtime.sendMessage({ type: 'GET_HANDSHAKE_JOB_DATA' }, (res) => {
+        if (cancelled || chrome.runtime.lastError) return
+        const data = (res as { handshakeContext?: HandshakeJobData | null } | undefined)?.handshakeContext
+        if (data) {
+          setJobData(data)
+        } else {
+          setTimeout(poll, 2000)
+        }
+      })
     }
-    chrome.storage.session.onChanged.addListener(listener)
-    return () => chrome.storage.session.onChanged.removeListener(listener)
-  }, [tabId])
 
-  // If no job data arrives within 8s, the content script is likely orphaned
-  // (extension was reloaded without refreshing the tab). Show a hint.
+    // Immediate check, then every 2s
+    poll()
+    return () => { cancelled = true }
+  }, [tabId, jobData])
+
+  // If no job data arrives within 20s show a hint instead of spinning forever
   useEffect(() => {
     if (jobData) return
-    const t = setTimeout(() => setScrapeTimedOut(true), 8000)
+    const t = setTimeout(() => setScrapeTimedOut(true), 20000)
     return () => clearTimeout(t)
   }, [jobData])
 

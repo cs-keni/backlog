@@ -4,7 +4,7 @@ import type { HandshakeJobData } from '../shared/types'
 // Handshake is a React SPA. After a `backlog:navigation` event the DOM may not
 // be ready yet, so we retry with a MutationObserver up to 5 s.
 
-const SCRAPE_TIMEOUT_MS = 5000
+const SCRAPE_TIMEOUT_MS = 12000
 
 function attemptScrape(): HandshakeJobData | null {
   // Job title: first H1 that isn't the search page header ("Jobs") or a modal
