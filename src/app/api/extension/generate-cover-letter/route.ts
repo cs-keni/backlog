@@ -93,6 +93,7 @@ Tone and style:
 - Avoid generic filler phrases like "I am excited to apply" or "I believe I would be a great fit"
 - Match the energy of the job description: formal for enterprise, casual for startups
 - If the description asked to include a specific keyword or phrase in the letter, weave it naturally into the text
+- Do NOT include a "Thank you for your time" or "thank you for your consideration" line — it is added automatically after the body
 
 ${styleContext ? `\n## ${applicantName}'s writing style (extracted from past cover letters):\n${styleContext}\n` : ''}`
 

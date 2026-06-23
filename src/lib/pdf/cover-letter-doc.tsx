@@ -35,9 +35,12 @@ const s = StyleSheet.create({
   date: {
     marginBottom: 12,
   },
-  reLabel: {
+  companyLine: {
     fontFamily: FONT_BOLD,
     marginBottom: 14,
+  },
+  thankYou: {
+    marginBottom: 12,
   },
   salutation: {
     marginBottom: 12,
@@ -89,6 +92,9 @@ export function CoverLetterDoc({ name, contacts, date, jobTitle, company, body }
         {/* Date */}
         <Text style={s.date}>{date}</Text>
 
+        {/* Company name */}
+        <Text style={s.companyLine}>{company}</Text>
+
         {/* Salutation */}
         <Text style={s.salutation}>Dear Hiring Manager,</Text>
 
@@ -96,6 +102,9 @@ export function CoverLetterDoc({ name, contacts, date, jobTitle, company, body }
         {paragraphs.map((p, i) => (
           <Text key={i} style={s.paragraph}>{p}</Text>
         ))}
+
+        {/* Standard closing line */}
+        <Text style={s.thankYou}>Thank you for your time and consideration.</Text>
 
         {/* Closing */}
         <Text style={s.closing}>Sincerely,</Text>

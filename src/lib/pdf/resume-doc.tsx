@@ -92,10 +92,22 @@ const s = StyleSheet.create({
 
 interface ResumeDocProps {
   resume: ParsedResume
+  compact?: boolean
 }
 
-export function ResumeDoc({ resume }: ResumeDocProps) {
+export function ResumeDoc({ resume, compact = false }: ResumeDocProps) {
   const { header, sections } = resume
+
+  // Tighter spacing applied only when page overflow is detected on first render
+  const compactOverrides = compact ? {
+    lineHeight: 1.22,
+    fontSize: 8.5,
+  } : {}
+
+  const compactSection   = compact ? { marginBottom: 4 }  : {}
+  const compactEntry     = compact ? { marginBottom: 2 }  : {}
+  const compactBullet    = compact ? { marginBottom: 0.5 } : {}
+  const compactSecTitle  = compact ? { marginBottom: 3 }  : {}
 
   return (
     <Document
@@ -103,7 +115,7 @@ export function ResumeDoc({ resume }: ResumeDocProps) {
       author={header.name}
       creator="Backlog"
     >
-      <Page size="LETTER" style={s.page}>
+      <Page size="LETTER" style={[s.page, compactOverrides]}>
         {/* Name */}
         <Text style={s.name}>{header.name}</Text>
 
@@ -112,18 +124,18 @@ export function ResumeDoc({ resume }: ResumeDocProps) {
 
         {/* Sections */}
         {sections.map((section) => (
-          <View key={section.title} style={s.section}>
-            <Text style={s.sectionTitle}>{section.title}</Text>
+          <View key={section.title} style={[s.section, compactSection]}>
+            <Text style={[s.sectionTitle, compactSecTitle]}>{section.title}</Text>
 
             {/* Entry-based sections (Experience, Projects, Education) */}
             {section.entries.map((entry, ei) => (
-              <View key={ei} style={s.entry}>
+              <View key={ei} style={[s.entry, compactEntry]}>
                 <View style={s.entryHeader}>
                   <Text style={s.entryTitle}>{entry.heading}</Text>
                   {entry.date && <Text style={s.entryDate}>{entry.date}</Text>}
                 </View>
                 {entry.bullets.map((b, bi) => (
-                  <View key={bi} style={s.bullet}>
+                  <View key={bi} style={[s.bullet, compactBullet]}>
                     <Text style={s.bulletDot}>•</Text>
                     <Text style={s.bulletText}>{b}</Text>
                   </View>

@@ -106,7 +106,7 @@ For each project write EXACTLY 4 resume-style bullet points that:
 - Name the specific technologies from the project's stack
 - Mirror language from the job description where it fits naturally
 - Quantify impact where the project data provides numbers
-- Stay under 120 characters per bullet; write substantive, detail-rich bullets (not vague filler)
+- Stay under 105 characters per bullet; write substantive, detail-rich bullets (not vague filler). Shorter bullets = fewer awkward line-wraps.
 
 IMPORTANT rules:
 - Keep every other section EXACTLY as-is (Experience, Skills, Education, header)
@@ -128,10 +128,24 @@ IMPORTANT rules:
     .join('')
     .trim()
 
+  // Count rendered PDF pages — each page object has "/Type /Page" (not "/Pages")
+  function countPdfPages(buf: Buffer): number {
+    const str = buf.toString('binary')
+    const hits = str.match(/\/Type\s*\/Page[^s]/g)
+    return hits ? hits.length : 1
+  }
+
   const parsed = parseResume(tailoredMarkdown)
-  const buffer = await renderToBuffer(
+  let buffer = await renderToBuffer(
     createElement(ResumeDoc, { resume: parsed }) as unknown as Parameters<typeof renderToBuffer>[0]
   )
+
+  // If it spilled onto a second page, re-render with compact spacing
+  if (countPdfPages(buffer) > 1) {
+    buffer = await renderToBuffer(
+      createElement(ResumeDoc, { resume: parsed, compact: true }) as unknown as Parameters<typeof renderToBuffer>[0]
+    )
+  }
 
   const name     = user.full_name ?? 'Resume'
   const safeName = name.replace(/\s+/g, '_')
