@@ -55,6 +55,7 @@ export async function POST(request: Request) {
 
   const date = new Date().toLocaleDateString('en-US', {
     year: 'numeric', month: 'long', day: 'numeric',
+    timeZone: 'America/Los_Angeles',
   })
 
   const buffer = await renderToBuffer(
@@ -70,7 +71,7 @@ export async function POST(request: Request) {
     }) as unknown as Parameters<typeof renderToBuffer>[0]
   )
 
-  const filename = `Cover_Letter_${body.company.replace(/\s+/g, '_')}.pdf`
+  const filename = `${name.replace(/\s+/g, '_')}_Cover_Letter_${body.company.replace(/\s+/g, '_')}.pdf`
 
   return new Response(new Uint8Array(buffer), {
     headers: {
