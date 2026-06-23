@@ -40,13 +40,13 @@ Phase 24 is the Handshake job assistant extension. Design doc at:
 - `src/app/api/extension/download-cover-letter/route.ts`
 - `src/app/api/extension/download-tailored-resume/route.ts`
 - `src/app/api/user/upload-resume/route.ts`
-- `supabase/migrations/043_resume_markdown.sql` (NOT YET applied)
+- `supabase/migrations/043_resume_markdown.sql` — applied ✅
 
 **Scripts + migrations**
 - `scripts/seed-project-catalog.mjs` — parser bugs fixed
 - `scripts/upload-resume.mjs` — NEW: uploads `resume-data/resume.md` to DB
 - `supabase/migrations/042_application_materials.sql` — applied ✅
-- `supabase/migrations/043_resume_markdown.sql` — NOT applied yet
+- `supabase/migrations/043_resume_markdown.sql` — applied ✅
 
 ### What's done (Phase 24-P2)
 
